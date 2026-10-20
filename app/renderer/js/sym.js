@@ -179,27 +179,22 @@
       if (open.links) for (const t of LINK_T) { const s = AV.symOf(app, t); row(2, [sp(), chk(s.visible, v => { s.visible = v; app.savePrefs(); }), symBtn(t), h('span', { class: 'lname' }, NAMES[t]), h('span', { class: 'lcnt' }, String(counts[t] || 0))], { menu: typeMenu(t), dbl: () => app.symPane.open({ type: t }), add: t }); }
       }, subcatchments: () => {
       { const s = AV.symOf(app, 'SUBCATCH'); row(1, [sp(), chk(map.layerVis.subcatchments && s.visible, v => { map.layerVis.subcatchments = v; s.visible = v; app.savePrefs(); }), symBtn('SUBCATCH'), h('span', { class: 'lname' }, 'Subcatchments'), h('span', { class: 'lcnt' }, String(counts.SUBCATCH || 0))], { drag: 'subcatchments', menu: typeMenu('SUBCATCH'), dbl: () => app.symPane.open({ type: 'SUBCATCH' }), add: 'SUBCATCH' }); }
-      } };
-      for (const k of map.netOrder()) NET[k]();
-      row(1, [sp(), chk(map.layerVis.labels, v => map.layerVis.labels = v), h('span', { class: 'symicon txt' }, 'Aa'), h('span', { class: 'lname' }, 'Map Labels')], { add: 'LABEL', menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomAll() }, ZS('LABEL')] });
-    }
-    // ---- 2D flood surface (OsemCM V2.0)
-    if (m && AV.has2D(app) && (app.mesh2d || AV.f2dEnabled(m))) {
+      }, mesh: () => {
+      // 2D flood surface (2D module): drawn in the network order like nodes / links / subcatchments
       const mesh = app.mesh2d; const S = AV.meshStyle(app);
       const meshBox = () => { const c = mesh.cells; let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const q of c) { x1 = Math.min(x1, q.x - q.s / 2); y1 = Math.min(y1, q.y - q.s / 2); x2 = Math.max(x2, q.x + q.s / 2); y2 = Math.max(y2, q.y + q.s / 2); } return { x1, y1, x2, y2 }; };
-      const gmenu = () => [{ label: 'Create Meshes', fn: () => AV.createMeshes(app) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') }];
-      row(0, [tw('f2d'), h('b', null, '2D Flood')], { cls: 'lgrp', menu: gmenu });
-      if (open.f2d !== false) {
-        if (mesh) {
-          const ic = h('canvas', { class: 'symicon', width: 56, height: 32, title: 'Mesh style' }); { const g = ic.getContext('2d'); g.scale(2, 2); const C = ['#bdeeff', '#1e9bff', '#0d2fc4']; for (let i = 0; i < 3; i++) { g.fillStyle = C[i]; g.fillRect(4 + i * 7, 3, 6, 10); } g.strokeStyle = '#78909c'; g.strokeRect(4.5, 3.5, 20, 10); }
-          ic.addEventListener('click', (e) => { e.stopPropagation(); AV.meshStyleDialog(app); });
-          row(1, [sp(), chk(S.visible, v => { app.prefs.mesh2d.visible = v; app.savePrefs(); }), ic, h('span', { class: 'lname', title: 'Coloured by ' + AV.MESH_FIELDS[S.field] }, 'Meshes'), h('span', { class: 'lcnt' }, String(mesh.cells.length))], {
-            dbl: () => AV.meshStyleDialog(app),
-            menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox(meshBox()) }, '-', ...Object.keys(AV.MESH_FIELDS).map(k => ({ label: (S.field === k ? '● ' : '   ') + AV.MESH_FIELDS[k], fn: () => { app.prefs.mesh2d.field = k; app.savePrefs(); app._meshRange = null; map.redraw(); this.refreshLayers(); } })),
-              '-', { label: 'Style...', fn: () => AV.meshStyleDialog(app) }, { label: 'Export as Shapefile...', fn: () => AV.exportMeshShapefile(app) }, { label: 'Rebuild Meshes', fn: () => AV.createMeshes(app) },
-              { label: 'Remove Meshes', fn: async () => { if (!await AV.confirm('Remove the 2D mesh of this model? The next run is then 1D only until the mesh is created again.', 'Remove Meshes', 'Remove')) return; app.mesh2d = null; app.meshResults = null; app.meshSel = -1; const mp = AV.meshPath(app); if (mp) { try { await window.host.writeText(mp, 'null'); } catch (e) { } } this.refreshLayers(); map.redraw(); } }] });
-        } else row(1, [sp(), h('span', { class: 'lwarn', onclick: () => AV.createMeshes(app) }, 'No mesh yet — click to Create Meshes')]);
-      }
+      if (!mesh) { row(1, [sp(), h('span', { class: 'lwarn', onclick: () => AV.createMeshes(app) }, '2D Meshes: not created — click to Create Meshes')], { drag: 'mesh', menu: () => [{ label: 'Create Meshes', fn: () => AV.createMeshes(app) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') }] }); return; }
+      const ic = h('canvas', { class: 'symicon', width: 56, height: 32, title: 'Symbology' }); { const g = ic.getContext('2d'); g.scale(2, 2); const C = S.breaks ? [S.colors[0], S.colors[Math.floor(S.colors.length / 2)], S.colors[S.colors.length - 1]] : ['#2e7d32', '#fff176', '#bc8c5c']; for (let i = 0; i < 3; i++) { g.fillStyle = C[i]; g.fillRect(4 + i * 7, 3, 6, 10); } g.strokeStyle = '#78909c'; g.strokeRect(4.5, 3.5, 20, 10); }
+      ic.addEventListener('click', (e) => { e.stopPropagation(); app.symPane.open({ mesh: true }); });
+      row(1, [sp(), chk(S.visible, v => { app.prefs.mesh2d.visible = v; app.savePrefs(); }), ic, h('span', { class: 'lname', title: '2D flood surface, coloured by ' + AV.MESH_FIELDS[S.field] }, '2D Meshes'), h('span', { class: 'lcnt' }, String(mesh.cells.length))], {
+        drag: 'mesh', dbl: () => app.symPane.open({ mesh: true }),
+        menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox(meshBox()) }, '-', { label: 'Symbology...', fn: () => app.symPane.open({ mesh: true }) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') },
+          { label: 'Export as Shapefile...', fn: () => AV.exportMeshShapefile(app) }, '-', { label: 'Rebuild Meshes', fn: () => AV.createMeshes(app) },
+          { label: 'Remove Meshes', fn: async () => { if (!await AV.confirm('Remove the 2D mesh of this model? The next run is then 1D only until the mesh is created again.', 'Remove Meshes', 'Remove')) return; app.mesh2d = null; app.meshResults = null; app.meshSel = -1; const mp = AV.meshPath(app); if (mp) { try { await window.host.writeText(mp, 'null'); } catch (e) { } } this.refreshLayers(); map.redraw(); } }] });
+      } };
+      const show2D = m && AV.has2D(app) && (app.mesh2d || AV.f2dEnabled(m));
+      for (const k of map.netOrder()) if (k !== 'mesh' || show2D) NET[k]();
+      row(1, [sp(), chk(map.layerVis.labels, v => map.layerVis.labels = v), h('span', { class: 'symicon txt' }, 'Aa'), h('span', { class: 'lname' }, 'Map Labels')], { add: 'LABEL', menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomAll() }, ZS('LABEL')] });
     }
     // ---- external layers
     if (map.extLayers.length) {
@@ -235,7 +230,7 @@
     render() {
       const app = this.app, H = this.host; H.innerHTML = '';
       const t = this.target;
-      const title = t ? (t.type ? NAMES[t.type] : t.ext ? t.ext.name : 'Basemap') : '';
+      const title = t ? (t.type ? NAMES[t.type] : t.ext ? t.ext.name : t.mesh ? '2D Meshes' : 'Basemap') : '';
       H.appendChild(h('div', { class: 'ptitle' }, h('span', null, 'Symbology' + (title ? ' - ' + title : ''))));
       const body = h('div', { class: 'symbody' }); H.appendChild(body);
       if (!t) return;
@@ -283,6 +278,42 @@
           rowE('Layer transparency', opac(L, 'opacity')); rowE('Draw', sel(L, 'order', [['below', 'Below network'], ['above', 'Above network']]));
         }
         rowE('', check(L, 'visible', 'Visible'));
+      } else if (t.mesh) {
+        // 2D mesh flood map: variable, ranges with colours (theme style), ramp, transparency, outlines
+        const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); if (P.outline === undefined) P.outline = true; if (P.visible === undefined) P.visible = true; if (P.opacity === undefined) P.opacity = 0.8;
+        const S = AV.meshStyle(app); const F = S.field; const cont = !!AV.MESH_CONTINUOUS[F];
+        const redraw = () => { app._meshRange = null; this.changed(); };
+        sec('Display');
+        const fSel = h('select', { onchange: () => { P.field = fSel.value; redraw(); this.render(); } }, [['Dynamic results (current time step)', ['depth', 'wse']], ['Statistic results (whole run)', ['maxdepth', 'tpond', 'trecede']], ['Static properties', ['elev']]].map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k]))))); fSel.value = F;
+        rowE('Variable', fSel);
+        rowE('Transparency', opac(P, 'opacity')); rowE('', check(P, 'outline', 'Cell outlines')); rowE('', check(P, 'visible', 'Visible'));
+        sec(cont ? 'Colour ramp (continuous)' : 'Ranges');
+        const setRamp = (v) => { P.ramp = P.ramp || {}; P.ramp[F] = v; if (!cont) { const cls = (P.classes && P.classes[F]) || S.breaks.map(b => ({ v: b })); const c = AV.rampColors(v, cls.length, !!(P.invert && P.invert[F])); P.classes = P.classes || {}; P.classes[F] = cls.map((x, i) => ({ v: x.v, color: c[i] })); } redraw(); this.render(); };
+        const ramp = AV.rampPicker(S.ramp, S.invert, setRamp);
+        const inv = h('label', { class: 'symchk' }, h('input', { type: 'checkbox', checked: S.invert, onchange: (e) => { P.invert = P.invert || {}; P.invert[F] = e.target.checked; setRamp(S.ramp); } }), ' Invert ramp');
+        rowE('Colour ramp', h('span', { class: 'symnum' }, ramp, inv));
+        if (!cont) {
+          const cls = () => { P.classes = P.classes || {}; if (!P.classes[F]) P.classes[F] = S.breaks.map((b, i) => ({ v: b, color: S.colors[i] })); return P.classes[F]; };
+          const nIn = h('input', { type: 'number', min: 2, max: 12, value: S.breaks.length, style: { width: '56px' } });
+          const auto = () => { const n = Math.max(2, Math.min(12, +nIn.value || 5)); let br;
+            if (app.meshResults || F === 'elev') { const [a, b] = AV.meshRange(app, F); const lo = Math.max(a, 0) || 0, hi = b; if (isFinite(hi) && hi > lo) { const d0 = AV.meshDefaultBreaks(app, F)[0]; const st = (hi - Math.max(lo, d0)) / n; br = [...Array(n).keys()].map(i => +((Math.max(lo, d0)) + i * st).toPrecision(3)); } }
+            if (!br) { const d = AV.meshDefaultBreaks(app, F); br = [...Array(n).keys()].map(i => i < d.length ? d[i] : +(d[d.length - 1] * Math.pow(2, i - d.length + 1)).toPrecision(3)); }
+            const c = AV.rampColors(S.ramp, n, !!(P.invert && P.invert[F])); P.classes = P.classes || {}; P.classes[F] = br.map((v, i) => ({ v, color: c[i] })); redraw(); this.render(); };
+          rowE('Ranges', h('span', { class: 'symnum' }, nIn, h('button', { class: 'btn small', title: 'Equal intervals from the first break to the largest value of the current results', onclick: auto }, 'Auto-Theme'),
+            h('button', { class: 'btn small', title: 'Default classes', onclick: () => { if (P.classes) delete P.classes[F]; redraw(); this.render(); } }, 'Reset')));
+          const tb = h('tbody'); const C = cls();
+          C.forEach((r, i) => {
+            const v = h('input', { type: 'number', step: 'any', value: r.v, style: { width: '80px' }, onchange: () => { const x = parseFloat(v.value); if (!isFinite(x)) { v.value = r.v; return; } r.v = x; C.sort((a, b) => a.v - b.v); redraw(); this.render(); } });
+            const c = h('input', { type: 'color', value: AV.toHex(r.color), oninput: () => { r.color = c.value; redraw(); } });
+            tb.appendChild(h('tr', null, h('td', null, '≥'), h('td', null, v), h('td', { class: 'symv' }, i < C.length - 1 ? '– ' + AV.fmt(C[i + 1].v) : 'and above'), h('td', null, c),
+              h('td', null, C.length > 2 ? h('button', { class: 'btn small', title: 'Remove range', onclick: () => { C.splice(i, 1); redraw(); this.render(); } }, '−') : null)));
+          });
+          tb.appendChild(h('tr', null, h('td', { colspan: 5 }, h('button', { class: 'btn small', onclick: () => { const last = C[C.length - 1]; C.push({ v: +(last.v * 1.5 || 1).toPrecision(3), color: last.color }); redraw(); this.render(); } }, '+ Add range'))));
+          form.appendChild(h('div', { class: 'symranges' }, h('table', null, tb)));
+          form.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, 'Cells below the first value are left uncoloured (dry). ' + (F === 'tpond' ? 'Time Ponded counts the hours the depth is above the Flood Depth Threshold (Simulation Options → 2D Flood).' : F === 'depth' ? 'Depth follows the current time step: use Play to animate the flooding.' : '')));
+        } else form.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, 'The ramp is stretched between the smallest and the largest value' + (F === 'wse' ? ' of the current time step.' : '.')));
+        if (!app.meshResults && F !== 'elev') form.appendChild(h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'This is a results field: it is shown after a 1D-2D run or when a .fout results file is loaded.'));
+        return;
       } else if (t.basemap) {
         const bm = AV.basemapState(app);
         sec('Basemap'); rowE('Source', sel(bm, 'src', Object.keys(AV.BASEMAPS).map(k => [k, AV.BASEMAPS[k].name]))); rowE('Transparency', opac(bm, 'opacity')); rowE('', check(bm, 'on', 'Show basemap'));

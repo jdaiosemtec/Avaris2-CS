@@ -203,9 +203,9 @@
           { k: 'f2d_EXCLUSION', l: 'Exclusion Polygons', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Buildings and other areas without cells.' },
           { t: 'h', l: 'Mesh and run' },
           { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
-          { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['AUTO', 'MODEL'], note: 'AUTO (as Avaris DS): a model in US units with a map in metres is run in SI (FLOW_UNITS CMS, values unchanged), so the metre-based mesh and DEM match. MODEL: keep the model units and convert the mesh lengths.' },
+          { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['AUTO', 'MODEL'], note: 'AUTO: a model in US units with a map in metres is run in SI (FLOW_UNITS CMS, values unchanged), so the metre-based mesh and DEM match. MODEL: keep the model units and convert the mesh lengths.' },
           { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
-          { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (Simulation ribbon, or the 2D Flood group in the Layer View). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
+          { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (Simulation ribbon, or right-click the 2D Meshes layer). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
       };
       if (only2D) { for (const k of Object.keys(tabs)) if (k !== '2D Flood') delete tabs[k]; } else if (!AV.has2D(this.app)) delete tabs['2D Flood'];
       const body = h('div', { style: { width: only2D ? '600px' : '560px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);

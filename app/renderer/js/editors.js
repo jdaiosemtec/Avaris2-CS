@@ -152,6 +152,9 @@
       r: h('input', { type: 'number', step: 'any', value: 0.4 }), depth: h('input', { type: 'number', step: 'any', value: si ? 75 : 3 }),
       dur: h('input', { type: 'number', step: 'any', value: 120 }), step: h('input', { type: 'number', step: 'any', value: 5 }),
       name: h('input', { type: 'text', value: 'DesignStorm' }), gage: h('input', { type: 'checkbox', checked: true }),
+      // storm start = model Start Analysis date / time by default; the end follows from the duration
+      sdate: h('input', { type: 'text', value: app.model.options.START_DATE || '01/01/2026', placeholder: 'MM/DD/YYYY' }), stime: h('input', { type: 'text', value: String(app.model.options.START_TIME || '00:00:00').slice(0, 5), placeholder: 'HH:MM' }),
+      edate: h('input', { type: 'text', disabled: true }),
       table: h('textarea', { rows: 4, style: { fontFamily: 'var(--mono)' } }, '0 0\n0.5 0.2\n1 1'),
     };
     const units = si ? 'mm' : 'in';
@@ -159,13 +162,17 @@
     const R = (key, label, el) => { const lab = h('label', null, label); rows[key] = [lab, el]; return [lab, el]; };
     const form = h('div', { class: 'form' }, R('method', 'Method', f.method), R('a', 'IDF a (' + units + '/hr, t in min)', f.a), R('b', 'IDF b (min)', f.b), R('c', 'IDF c', f.c),
       R('r', 'Peak position ratio r (0-1)', f.r), R('depth', 'Total depth (' + units + ')', f.depth), R('table', 'Cumulative table (t, fraction)', f.table), R('dur', 'Duration (min)', f.dur), R('step', 'Time step (min)', f.step),
+      R('sdate', 'Start date (MM/DD/YYYY)', f.sdate), R('stime', 'Start time (HH:MM)', f.stime), R('edate', 'End date / time', f.edate),
       R('gage', 'Assign to a rain gage', f.gage));
     const chartHost = h('div', { style: { height: '260px', display: 'flex', marginTop: '10px', border: '1px solid var(--border)' } });
     const info = h('div', { style: { color: 'var(--muted)', marginTop: '6px' } });
     const body = h('div', { style: { width: '640px' } }, form, chartHost, info);
     const chart = new AV.Chart(chartHost, {});
     const params = () => ({ method: f.method.value, a: +f.a.value, b: +f.b.value, c: +f.c.value, r: +f.r.value, depth: +f.depth.value, dur: +f.dur.value, step: Math.max(0.5, +f.step.value), table: f.table.value.trim().split('\n').map(l => l.trim().split(/[\s,;]+/).map(Number)).filter(p => p.length >= 2 && p.every(isFinite)) });
+    const t0 = () => AV.parseSwmmDate(f.sdate.value, f.stime.value);
+    const updEnd = () => { const d0 = t0(); f.edate.value = d0 === null ? 'invalid start date' : AV.fmtDateTime(d0 + Math.max(1, Math.round((+f.dur.value || 0) / Math.max(0.5, +f.step.value || 5))) * Math.max(0.5, +f.step.value || 5) / 1440).slice(0, 16); };
     const update = () => {
+      updEnd();
       const p = params(); const show = { a: p.method === 'chicago', b: p.method === 'chicago', c: p.method === 'chicago', r: ['chicago', 'triangular'].includes(p.method), depth: p.method !== 'chicago', table: p.method === 'custom' };
       for (const k in show) rows[k].forEach(e => e.style.display = show[k] ? '' : 'none');
       if (p.method === 'custom' && p.table.length < 2) return;
@@ -184,10 +191,14 @@
         if (app.model.timeseries.has(nm) && !await AV.confirm('A time series named "' + nm + '" already exists. Replace it?', 'Add to Project', 'Replace', 'Cancel')) continue;
         break;
       }
+      if (t0() === null) { AV.toast('Enter the start date as MM/DD/YYYY and the time as HH:MM.', true); return false; }
       f.name.value = nm; return params(); } }] }).done;
     if (!r) return;
     const I = AV.designStorm(r); const m = app.model; let name = f.name.value.trim().replace(/\s+/g, '_') || 'DesignStorm';
-    const ts = { file: null, rows: I.map((v, i) => ['', AV.secToHms(i * r.step * 60).replace(/^0(\d)/, '$1').slice(0, -3), +v.toFixed(4)]).concat([['', AV.secToHms(I.length * r.step * 60).replace(/^0(\d)/, '$1').slice(0, -3), 0]]) };
+    // dated rows from the storm start (the date is written on the first row and when it changes)
+    const d0 = t0(); let lastD = '';
+    const row = (k, v) => { const s = AV.fmtDateTime(d0 + k * r.step / 1440); const ds = s.slice(0, 10).replace(/^0(\d)\/0?(\d+)/, '$1/$2').replace(/^(\d+)\/0(\d)/, '$1/$2'); const tm = s.slice(11, 16).replace(/^0(\d)/, '$1'); const out = [ds !== lastD ? ds : '', tm, v]; lastD = ds; return out; };
+    const ts = { file: null, rows: I.map((v, i) => row(i, +v.toFixed(4))).concat([row(I.length, 0)]) };
     const old = m.timeseries.get(name);
     const doGage = f.gage.checked; let gage = null, gageOld = null;
     if (doGage) {
@@ -202,6 +213,6 @@
       do: () => { m.timeseries.set(name, ts); if (doGage) { const g = gage || newGage; if (newGage) m.gages.set(newGage.id, newGage); Object.assign(g.p, { format: 'INTENSITY', interval, source: 'TIMESERIES', series: name }); if (newGage) for (const s of m.subcatchments.values()) if (!s.p.gage) s.p.gage = newGage.id; } },
       undo: () => { if (old) m.timeseries.set(name, old); else m.timeseries.delete(name); if (gage && gageOld) gage.p = Object.assign({}, gageOld); if (newGage) m.gages.delete(newGage.id); },
     });
-    AV.toast('Time series ' + name + ' added' + (doGage ? ' and assigned to rain gage ' + (gage || newGage).id : '') + '. Check the simulation end time covers the storm.');
+    AV.toast('Time series ' + name + ' added (' + f.sdate.value + ' ' + f.stime.value + ' – ' + f.edate.value + ')' + (doGage ? ' and assigned to rain gage ' + (gage || newGage).id : '') + '. Check the simulation end time covers the storm.', false, 6000);
   };
 })(window.AV);

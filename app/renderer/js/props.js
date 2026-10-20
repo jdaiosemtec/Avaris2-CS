@@ -70,15 +70,15 @@
           F('divLink', 'Diverted Link', 'text', { list: 'divLink' }),
           F('dtype', 'Divider Type', 'choice', { o: [['OVERFLOW', 'Overflow'], ['CUTOFF', 'Cutoff'], ['TABULAR', 'Tabular'], ['WEIR', 'Weir']], after: (a, objs, v) => { const d = { OVERFLOW: '', CUTOFF: '0', TABULAR: '', WEIR: '0 0 0' }[v]; a.setProps(objs, 'dparam', objs.map(() => d)); } }));
         if (p.dtype === 'CUTOFF') R.push(F('dp1', lab(m, 'Cutoff Flow', 'Q')));
-        if (p.dtype === 'TABULAR') R.push(F('dp1', 'Diversion Curve', 'choice', { o: () => empty(curvesOf(m, /^DIVERSION$/)) }));
+        if (p.dtype === 'TABULAR') R.push(F('dp1', 'Diversion Curve', 'choice', { o: () => empty(curvesOf(m, /^DIVERSION$/)), ref: 'curve', grp: 'DIVERSION' }));
         if (p.dtype === 'WEIR') R.push(F('dp1', lab(m, 'Min. Flow', 'Q')), F('dp2', lab(m, 'Max. Depth', 'L')), F('dp3', 'Discharge Coefficient'));
         break; }
       case 'OUTFALL':
         R.push(F('elev', lab(m, 'Invert Elevation', 'L')), ...nodeCommon(app, o), F('gated', 'Tide Gate', 'bool'), F('routeTo', 'Route To', 'text', { list: 'outlet' }),
           F('otype', 'Type', 'choice', { o: [['FREE', 'Free'], ['NORMAL', 'Normal'], ['FIXED', 'Fixed'], ['TIDAL', 'Tidal'], ['TIMESERIES', 'Time Series']], after: (a, objs) => a.setProps(objs, 'stage', objs.map(() => '')) }));
         if (p.otype === 'FIXED') R.push(F('stage', lab(m, 'Fixed Stage', 'L')));
-        if (p.otype === 'TIDAL') R.push(F('stage', 'Tidal Curve', 'choice', { o: () => empty(curvesOf(m, /^TIDAL$/)) }));
-        if (p.otype === 'TIMESERIES') R.push(F('stage', 'Time Series', 'choice', { o: () => empty([...m.timeseries.keys()]) }));
+        if (p.otype === 'TIDAL') R.push(F('stage', 'Tidal Curve', 'choice', { o: () => empty(curvesOf(m, /^TIDAL$/)), ref: 'curve', grp: 'TIDAL' }));
+        if (p.otype === 'TIMESERIES') R.push(F('stage', 'Time Series', 'choice', { o: () => empty([...m.timeseries.keys()]), ref: 'ts' }));
         break;
       case 'STORAGE': {
         R.push(F('elev', lab(m, 'Storage Floor Elevation', 'L')), ...nodeCommon(app, o), F('maxDepth', lab(m, 'Storage Depth', 'L')), F('initDepth', lab(m, 'Initial Depth', 'L')),
@@ -87,7 +87,7 @@
             after: (a, objs, v) => { if (v === 'TABULAR') a.setProps(objs, 'sp1', objs.map(() => '')); else a.setProps(objs, 'sp1', objs.map(x => isFinite(parseFloat(x.p.sp1)) ? x.p.sp1 : '0')); } }));
         const sh = p.shape || 'FUNCTIONAL';
         if (sh === 'FUNCTIONAL') R.push(F('sp3', 'Constant (a0)'), F('sp1', 'Coefficient (a1)'), F('sp2', 'Exponent (a2)'));
-        else if (sh === 'TABULAR') R.push(F('sp1', 'Storage Curve', 'choice', { o: () => empty(curvesOf(m, /^STORAGE$/)) }));
+        else if (sh === 'TABULAR') R.push(F('sp1', 'Storage Curve', 'choice', { o: () => empty(curvesOf(m, /^STORAGE$/)), ref: 'curve', grp: 'STORAGE' }));
         else { R.push(F('sp1', lab(m, 'Major Axis Length', 'L')), F('sp2', lab(m, 'Minor Axis Width', 'L')));
           if (sh === 'CONICAL' || sh === 'PYRAMIDAL') R.push(F('sp3', 'Side Slope (run/rise)')); if (sh === 'PARABOLIC') R.push(F('sp3', lab(m, 'Surface Height', 'L'))); }
         R.push(F('psi', lab(m, 'Suction Head', 'D'), 'text', { sg: 'Seepage Loss' }), F('imd', 'Initial Deficit', 'text', { sg: 'Seepage Loss' }), F('ksat', lab(m, 'Conductivity', 'R'), 'text', { sg: 'Seepage Loss' }));
@@ -97,7 +97,7 @@
         R.push(F('shape', 'Cross Section Shape', 'choice', { o: AV.XS_SHAPES.map(x => [x, AV.XS_INFO && AV.XS_INFO[x] ? AV.XS_INFO[x][0] : x]), xs: true, sg: 'Cross Section' }));
         info[1].forEach(([l, k], i) => {
           const key = sh === 'IRREGULAR' || sh === 'STREET' ? 'g1' : 'g' + (i + 1);
-          if (k === 'curve') R.push(F(key, l, 'choice', { o: () => empty(curvesOf(m, /^SHAPE$/)), sg: 'Cross Section' }));
+          if (k === 'curve') R.push(F(key, l, 'choice', { o: () => empty(curvesOf(m, /^SHAPE$/)), sg: 'Cross Section', ref: 'curve', grp: 'SHAPE' }));
           else if (k === 'transect') R.push(F(key, l, 'choice', { o: () => empty(dataTok(m, 'TRANSECTS').filter(t => (t[0] || '').toUpperCase() === 'X1').map(t => t[1])), sg: 'Cross Section' }));
           else if (k === 'street') R.push(F(key, l, 'choice', { o: () => empty(namesOf(m, 'STREETS')), sg: 'Cross Section' }));
           else R.push(F(key, lab(m, l, k), 'text', { sg: 'Cross Section' }));
@@ -107,7 +107,7 @@
           F('flap', 'Flap Gate', 'bool'), F('seepage', lab(m, 'Seepage Loss Rate', 'R')), F('barrels', 'Number of Barrels'), F('culvert', 'Culvert', 'text', { title: 'FHWA culvert inlet geometry code (1-57); blank = not a culvert' }));
         break; }
       case 'PUMP':
-        R.push(F('curve', 'Pump Curve', 'choice', { o: () => [['*', '<Ideal>']].concat(curvesOf(m, /^PUMP/).map(x => [x, x])) }), F('status', 'Start initially', 'bool', { yes: 'ON', no: 'OFF' }),
+        R.push(F('curve', 'Pump Curve', 'choice', { o: () => [['*', '<Ideal>']].concat(curvesOf(m, /^PUMP/).map(x => [x, x])), ref: 'curve', grp: 'PUMP' }), F('status', 'Start initially', 'bool', { yes: 'ON', no: 'OFF' }),
           F('startup', lab(m, 'Startup Depth', 'L')), F('shutoff', lab(m, 'Shutoff Depth', 'L')));
         break;
       case 'ORIFICE':
@@ -123,14 +123,14 @@
         F('g1', lab(m, 'Height', 'L'), 'text'), F('g2', lab(m, wt === 'V-NOTCH' ? 'Top Width' : 'Width', 'L'), 'text'));
         if (wt === 'TRAPEZOIDAL') R.push(F('g3', 'Left Side Slope (run/rise)', 'text'), F('g4', 'Right Side Slope (run/rise)', 'text'));
         R.push(F('crest', lab(m, offLbl(m, 'Inlet Offset'), 'L')), F('qcoeff', 'Discharge Coefficient'), F('gated', 'Flap Gate', 'bool'), F('surcharge', 'Can Surcharge', 'bool'),
-          F('endCon', 'End Contractions'), F('endCoeff', 'End Coefficient'), F('coeffCurve', 'Coefficient Curve', 'choice', { o: () => empty(curvesOf(m, /^WEIR$/)) }));
+          F('endCon', 'End Contractions'), F('endCoeff', 'End Coefficient'), F('coeffCurve', 'Coefficient Curve', 'choice', { o: () => empty(curvesOf(m, /^WEIR$/)), ref: 'curve', grp: 'WEIR' }));
         if (wt === 'ROADWAY') R.push(F('roadWidth', lab(m, 'Road Width', 'L'), 'text'), F('roadSurf', 'Road Surface', 'choice', { o: [['', '<Empty>'], ['PAVED', 'Paved'], ['GRAVEL', 'Gravel']] }));
         break; }
       case 'OUTLET':
         R.push(F('offset', lab(m, offLbl(m, 'Inlet Offset'), 'L')), F('gated', 'Flap Gate', 'bool'),
           F('otype', 'Rating Curve Type', 'choice', { o: [['FUNCTIONAL/DEPTH', 'Functional/Depth'], ['FUNCTIONAL/HEAD', 'Functional/Head'], ['TABULAR/DEPTH', 'Tabular/Depth'], ['TABULAR/HEAD', 'Tabular/Head']],
             after: (a, objs, v) => { if (/^TABULAR/.test(v)) a.setProps(objs, 'c1', objs.map(x => m.curves.has(x.p.c1) ? x.p.c1 : '')); else a.setProps(objs, 'c1', objs.map(x => isFinite(parseFloat(x.p.c1)) ? x.p.c1 : '10')); } }));
-        if (/^TABULAR/.test(p.otype || '')) R.push(F('c1', 'Rating Curve', 'choice', { o: () => empty(curvesOf(m, /^RATING$/)) }));
+        if (/^TABULAR/.test(p.otype || '')) R.push(F('c1', 'Rating Curve', 'choice', { o: () => empty(curvesOf(m, /^RATING$/)), ref: 'curve', grp: 'RATING' }));
         else R.push(F('c1', 'Coefficient', 'text'), F('c2', 'Exponent', 'text'));
         break;
       case 'SUBCATCH': {
@@ -156,7 +156,7 @@
         R.push(F('format', 'Rain Format', 'choice', { o: [['INTENSITY', 'Intensity'], ['VOLUME', 'Volume'], ['CUMULATIVE', 'Cumulative']] }), F('interval', 'Time Interval (H:MM)', 'text'), F('scf', 'Snow Catch Factor'),
           F('source', 'Data Source', 'choice', { o: [['TIMESERIES', 'Time Series'], ['FILE', 'File']] }));
         if (p.source === 'FILE') R.push(F('series', 'File Name', 'text'), F('station', 'Station ID', 'text'), F('units', 'Rain Units', 'choice', { o: [['IN', 'IN'], ['MM', 'MM']] }));
-        else R.push(F('series', 'Time Series', 'choice', { o: () => empty([...m.timeseries.keys()]) }));
+        else R.push(F('series', 'Time Series', 'choice', { o: () => empty([...m.timeseries.keys()]), ref: 'ts' }));
         break;
     }
     return R;
@@ -184,6 +184,9 @@
       sl.value = mixed ? '__mixed' : String(v === undefined || v === null ? '' : v);
       sl.addEventListener('change', () => { if (sl.value !== '__mixed') set(sl.value); });
       if (f.xs) return h('span', { class: 'xscell' }, sl, h('button', { class: 'xsbtn', title: 'Cross Section Editor', onclick: (e) => { e.stopPropagation(); AV.crossSectionEditor(app, objs); } }, '✎'));
+      // time series / curve choices: a button opens the item in its editor
+      if (f.ref) return h('span', { class: 'xscell' }, sl, h('button', { class: 'xsbtn', title: f.ref === 'ts' ? 'Open in the Time Series Editor' : 'Open in the Curve Editor', onclick: async (e) => { e.stopPropagation();
+        await AV.openRef(app, f.ref, sl.value === '__mixed' ? '' : sl.value, f.grp); app.panels.showProps(); } }, '✎'));
       return sl;
     }
     const i = h('input', { type: 'text', value: mixed ? '' : clean(v), placeholder: mixed ? MIX : '' });
@@ -263,9 +266,9 @@
     let cur = cons[0]; const list = h('div', { class: 'plist' }); const right = h('div', { class: 'pright' }); let save = null;
     const tsNames = [...m.timeseries.keys()];
     const show = () => { right.innerHTML = ''; const d = data[cur];
-      const base = inp(d.base, 150), pat = sel(empty(patterns(m)), d.pat, 150), ts = sel(empty(tsNames), d.ts, 150), sf = inp(d.sf, 150);
+      const base = inp(d.base, 150), pat = sel(empty(patterns(m)), d.pat, 150), ts = sel(empty(tsNames), d.ts, 150), ts0 = ts, sf = inp(d.sf, 150);
       const ty = sel([['CONCEN', 'CONCEN'], ['MASS', 'MASS']], d.type === 'FLOW' ? 'CONCEN' : d.type, 150), mf = inp(d.mf, 150);
-      const rows = [[cur === 'FLOW' ? 'Baseline (' + m.flowUnits + ')' : 'Baseline', base], ['Baseline Pattern', pat], ['Time Series', ts], ['Scale Factor', sf]];
+      const rows = [[cur === 'FLOW' ? 'Baseline (' + m.flowUnits + ')' : 'Baseline', base], ['Baseline Pattern', pat], ['Time Series', AV.refEdit(app, ts0, 'ts')], ['Scale Factor', sf]];
       if (cur !== 'FLOW') rows.push(['Inflow Type', ty], ['Units Factor', mf]);
       right.append(h('div', { class: 'psub' }, 'Attributes'), ptab(rows), h('div', { class: 'note pnote' }, 'Inflow = Baseline × Baseline Pattern + Scale Factor × Time Series' + (cur === 'FLOW' ? ' (flow units ' + m.flowUnits + ').' : '. For MASS inflow the Units Factor converts the series mass rate to the model mass units per second.')));
       save = () => { Object.assign(d, { base: base.value.trim(), pat: pat.value, ts: ts.value, sf: sf.value.trim() || '1.0' }); if (cur !== 'FLOW') Object.assign(d, { type: ty.value, mf: mf.value.trim() || '1.0' }); }; };

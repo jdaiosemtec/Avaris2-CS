@@ -101,7 +101,7 @@
     // Temperature
     const tsrc = (v) => h('input', { type: 'radio', name: 'tsrc', value: v, checked: c.tempSrc === v });
     const r0 = tsrc('none'), r1 = tsrc('file'), r2 = tsrc('ts'); const tTS = refSel(tsNames, c.tempTS, 260);
-    const tTemp = form(h('h4', null, 'Temperature Source Type'), h('label', { class: 'full prad' }, r0, ' No Data'), h('label', { class: 'full prad' }, r1, ' From Climate File'), fld(h('span', { class: 'prad' }, r2, ' Time Series'), tTS),
+    const tTemp = form(h('h4', null, 'Temperature Source Type'), h('label', { class: 'full prad' }, r0, ' No Data'), h('label', { class: 'full prad' }, r1, ' From Climate File'), fld(h('span', { class: 'prad' }, r2, ' Time Series'), AV.refEdit(app, tTS, 'ts')),
       h('div', { class: 'note' }, 'Air temperature (' + u.T + ') drives snowmelt and the Temperature evaporation method.'));
     // Evaporation
     const eSrc = sel([['CONSTANT', 'Constant Value'], ['TIMESERIES', 'Time Series'], ['FILE', 'Climate File'], ['MONTHLY', 'Monthly Averages'], ['TEMPERATURE', 'Temperatures']], c.evap, 300);
@@ -110,7 +110,7 @@
     const eBox = h('div');
     const eShow = () => { eBox.innerHTML = ''; const s = eSrc.value;
       if (s === 'CONSTANT') eBox.appendChild(form(fld('Daily Evaporation (' + u.E + ')', eC)));
-      else if (s === 'TIMESERIES') eBox.appendChild(form(fld('Time Series (' + u.E + ')', eTS)));
+      else if (s === 'TIMESERIES') eBox.appendChild(form(fld('Time Series (' + u.E + ')', AV.refEdit(app, eTS, 'ts'))));
       else if (s === 'MONTHLY') eBox.append(h('div', { class: 'psub' }, 'Monthly Daily Evaporation (' + u.E + ')'), eM.el);
       else if (s === 'FILE') eBox.append(h('div', { class: 'psub' }, 'Monthly Pan Coefficients'), ePan.el);
       else eBox.appendChild(h('div', { class: 'note' }, 'Evaporation is computed from the daily air temperatures (Hargreaves method); the Temperature source must be a climate file.')); };
@@ -408,6 +408,25 @@
   };
   const ibtn = (icon, title, fn) => h('button', { class: 'pbtn', title, onclick: fn }, h('span', { class: 'pbi' }, icon), title);
   // editable two-column table that always keeps a few blank rows at the bottom
+  // open a time series ('ts') or curve in its editor (curve group from the curve type, or grp)
+  AV.openRef = async function (app, kind, name, grp) { const m = app.model; name = name && name !== '*' ? name : undefined;
+    if (kind === 'ts') return AV.timeSeriesEditor(app, name);
+    const c = name && m.curves.get(name); const g = c && c.type ? (/^PUMP/.test(c.type) ? 'PUMP' : c.type) : grp || 'STORAGE'; return AV.curveTypeEditor(app, CURVE_GROUPS[g] ? g : 'STORAGE', name); };
+  // a <select> of time series / curves with a button that opens the chosen item in its editor; the list is refreshed afterwards
+  AV.refEdit = function (app, s, kind, grp) {
+    const names = () => kind === 'ts' ? [...app.model.timeseries.keys()] : [...app.model.curves.entries()].filter(([, c]) => !grp || (grp === 'PUMP' ? /^PUMP/.test(c.type || '') : (c.type || '') === grp)).map(([n]) => n);
+    const b = h('button', { class: 'btn small refed', title: kind === 'ts' ? 'Open in the Time Series Editor (view / edit)' : 'Open in the Curve Editor (view / edit)', onclick: async (e) => { e.preventDefault(); e.stopPropagation();
+      const before = names(), keep = s.value; await AV.openRef(app, kind, keep, grp); const after = names();
+      const fixed = [...s.options].filter(o => o.value === '' || o.value === '*').map(o => [o.value, o.textContent]);
+      s.innerHTML = ''; for (const [v, t] of fixed) s.appendChild(h('option', { value: v }, t)); for (const n of after) s.appendChild(h('option', { value: n }, n));
+      const added = after.filter(n => !before.includes(n)); s.value = after.includes(keep) || fixed.some(f => f[0] === keep) ? keep : added.length === 1 ? added[0] : (s.options[0] ? s.options[0].value : '');
+      s.dispatchEvent(new Event('change')); } }, '✎');
+    return h('span', { class: 'prow refrow' }, s, b); };
+  // copy a table to the clipboard as tab-separated text (pastes into Excel as cells) / read it back
+  const copyTSV = (heads, rows) => navigator.clipboard.writeText([heads].concat(rows).map(r => r.join('\t')).join('\r\n') + '\r\n').then(() => AV.toast(rows.length + ' row(s) copied - paste into Excel with Ctrl+V.'), () => AV.toast('Clipboard not accessible.', true));
+  const pasteTSV = async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch (e) { AV.toast('Clipboard not accessible.', true); return null; }
+    const R = t.replace(/\r/g, '').split('\n').filter(l => l.trim() !== '').map(l => l.split('\t').map(x => x.trim())); if (!R.length) { AV.toast('The clipboard is empty.', true); return null; } return R; };
+  AV.copyTSV = copyTSV; AV.pasteTSV = pasteTSV;
   function xyTable(heads, pts, minRows) {
     const tb = h('tbody'); const t = h('table', { class: 'pgridtab pxy' }, h('thead', null, h('tr', null, heads.map(x => h('th', null, x)))), tb);
     const addRow = (a, b) => { const r = h('tr', null, [a, b].map(v => h('td', null, h('input', { type: 'text', value: v === undefined || v === null ? '' : String(v) })))); r.addEventListener('input', () => { if (r === tb.lastChild) addRow('', ''); }); tb.appendChild(r); };
@@ -453,7 +472,9 @@
       const note = h('div', { class: 'note pnote' }, PUMP_NOTE[it.type] || '');
       const ty = group === 'PUMP' ? sel(['PUMP1', 'PUMP2', 'PUMP3', 'PUMP4', 'PUMP5'], it.type, 90) : null;
       if (ty) ty.onchange = () => { const P = tab.raw(); tab = xyTable(curveHeads(m, ty.value), P, 15); tabHost.innerHTML = ''; tabHost.appendChild(tab.el); note.textContent = PUMP_NOTE[ty.value]; };
-      const tools = h('div', { class: 'ptoolbar' }, ibtn('⇩', 'Import', () => importPairs(tab)), ibtn('⇧', 'Export', () => exportPairs(tab, nm.value, curveHeads(m, ty ? ty.value : it.type))), ibtn('✕', 'Clear', () => tab.set([])),
+      const cpy = () => copyTSV(curveHeads(m, ty ? ty.value : it.type), tab.raw());
+      const pst = async () => { const R = await pasteTSV(); if (!R) return; const P = R.filter(r => r.length >= 2 && isFinite(parseFloat(r[0])) && isFinite(parseFloat(r[1]))).map(r => [r[0], r[1]]); if (!P.length) { AV.toast('No numeric x / y pairs on the clipboard.', true); return; } tab.set(P); AV.toast(P.length + ' row(s) pasted.'); };
+      const tools = h('div', { class: 'ptoolbar' }, ibtn('⇩', 'Import', () => importPairs(tab)), ibtn('⇧', 'Export', () => exportPairs(tab, nm.value, curveHeads(m, ty ? ty.value : it.type))), ibtn('⧉', 'Copy', cpy), ibtn('📋', 'Paste', pst), ibtn('✕', 'Clear', () => tab.set([])),
         ibtn('📈', 'View', () => { const P = tab.values().filter(p => isFinite(p[0]) && isFinite(p[1])); const hd = curveHeads(m, ty ? ty.value : it.type); AV.viewXY('Curve Viewer - ' + nm.value, hd[0], hd[1], [{ name: nm.value, x: P.map(p => p[0]), y: P.map(p => p[1]), steps: /^PUMP[12]$/.test(ty ? ty.value : '') }]); }),
         ty ? h('span', { class: 'ptype' }, 'Type ', ty) : null);
       return { el: h('div', null, h('div', { class: 'psub' }, 'Curve Name'), nm, h('div', { class: 'psub' }, 'Description'), ds, tools, tabHost, group === 'PUMP' ? note : null),
@@ -487,7 +508,11 @@
         if (!R.length) { AV.toast('No time / value rows found in the file.', true); return; } fill(R); rd.checked = true; };
       const exp = async () => { const p = await window.host.saveDialog({ title: 'Export time series', defaultPath: nm.value + '.dat', filters: [{ name: 'SWMM time series', extensions: ['dat', 'txt'] }, { name: 'CSV', extensions: ['csv'] }] }); if (!p) return; const sep = /\.csv$/i.test(p) ? ',' : '\t';
         await window.host.writeText(p, rowsNow().map(r => (r[0] ? [r[0], r[1], r[2]] : [r[1], r[2]]).join(sep)).join('\r\n') + '\r\n'); AV.toast('Exported to ' + p); };
-      const tools = h('div', { class: 'ptoolbar' }, ibtn('⇩', 'Import', imp), ibtn('⇧', 'Export', exp), ibtn('✕', 'Clear', () => fill([])), ibtn('📈', 'View', view));
+      const cpy = () => copyTSV(['Date (M/D/Y)', 'Time (H:M)', 'Value'], [...tb.children].map(tr => [...tr.querySelectorAll('input')].map(x => x.value.trim())).filter(r => r[1] !== '' || r[2] !== ''));
+      // paste rows copied from Excel: date / time / value, or time / value (a header row is skipped)
+      const pst = async () => { const R0 = await pasteTSV(); if (!R0) return; const R = R0.filter(r => isFinite(parseFloat(r[r.length - 1])) && r.length >= 2).map(r => r.length >= 3 ? [r[0], r[1], r[2]] : ['', r[0], r[1]]);
+        if (!R.length) { AV.toast('No time / value rows on the clipboard.', true); return; } fill(R); rd.checked = true; AV.toast(R.length + ' row(s) pasted.'); };
+      const tools = h('div', { class: 'ptoolbar' }, ibtn('⇩', 'Import', imp), ibtn('⇧', 'Export', exp), ibtn('⧉', 'Copy', cpy), ibtn('📋', 'Paste', pst), ibtn('✕', 'Clear', () => fill([])), ibtn('📈', 'View', view));
       const table = h('div', { class: 'pxywrap tsx' }, h('table', { class: 'pgridtab pxy' }, h('thead', null, h('tr', null, h('th', null, 'Date (M/D/Y)'), h('th', null, 'Time (H:M)'), h('th', null, 'Value'))), tb));
       return { el: h('div', null, h('div', { class: 'psub' }, 'Name'), nm, h('div', { class: 'psub' }, 'Description'), ds,
           h('label', { class: 'prad pradrow' }, rf, ' File'), h('div', { class: 'prow' }, fp, fb), h('label', { class: 'prad pradrow' }, rd, ' Data'), tools, table,
@@ -540,7 +565,7 @@
       const fp = inp(it.file, 170); const fb = h('button', { class: 'btn small', onclick: async () => { const p = await window.host.openDialog({ title: 'Rainfall file', filters: [{ name: 'Rainfall files', extensions: ['dat', 'txt', 'csv'] }, { name: 'All files', extensions: ['*'] }] }); if (p) fp.value = p; } }, '…');
       const st = inp(it.station, 200), un = sel(['IN', 'MM'], it.units, 200);
       const sync = () => { const f = src.value === 'FILE'; ts.disabled = f; fp.disabled = fb.disabled = st.disabled = un.disabled = !f; }; src.onchange = sync; sync();
-      return { el: form(fld('Gage Name', nm), fld('Description', ds), fld('Rain Format', fmt), fld('Time Interval (H:MM)', iv), fld('Snow Catch Factor', scf), fld('Data Source', src), fld('Time Series', ts), fld('File Name', h('span', { class: 'prow' }, fp, fb)), fld('Station ID', st), fld('Rain Units', un),
+      return { el: form(fld('Gage Name', nm), fld('Description', ds), fld('Rain Format', fmt), fld('Time Interval (H:MM)', iv), fld('Snow Catch Factor', scf), fld('Data Source', src), fld('Time Series', AV.refEdit(app, ts, 'ts')), fld('File Name', h('span', { class: 'prow' }, fp, fb)), fld('Station ID', st), fld('Rain Units', un),
           h('div', { class: 'note' }, 'Station ID and Rain Units apply to rainfall files only; a time series is read in the project rain units.')),
         save: () => { Object.assign(it, { name: nm.value.trim(), desc: ds.value.trim(), format: fmt.value, interval: iv.value.trim(), scf: scf.value.trim() || '1', source: src.value, series: ts.value, file: fp.value.trim(), station: st.value.trim(), units: un.value }); } }; } }, selName);
 
@@ -578,9 +603,9 @@
       const tb = h('div', { class: 'tabs2' }); const pages = []; const savers = [];
       P.forEach((p, i) => { const b = it.B[p], w = it.W[p];
         const bf = sel(BU_FN, b.fn, 170), b1 = inp(b.c1, 170), b2 = inp(b.c2, 170), b3 = inp(b.c3, 170), bn = sel([['AREA', 'Area'], ['CURB', 'Curb Length']], b.norm, 170);
-        const bts = refSel([...ctx.m.timeseries.keys()], b.fn === 'EXT' ? b.c3 : '', 170);
+        const bts = refSel([...ctx.m.timeseries.keys()], b.fn === 'EXT' ? b.c3 : '', 170); const btsW = AV.refEdit(app, bts, 'ts');
         const L1 = h('label', null, 'Max. Buildup'), L2 = h('label', null, 'Rate Constant'), L3 = h('label', null, 'Power/Sat. Constant');
-        const b3cell = h('span'); const syncB = () => { const f = bf.value; [b1, b2, b3, bn, bts].forEach(x => x.disabled = f === 'NONE'); L2.textContent = f === 'EXT' ? 'Scaling Factor' : 'Rate Constant'; L3.textContent = f === 'EXT' ? 'Time Series' : f === 'SAT' ? 'Half-Saturation Constant (days)' : 'Power/Sat. Constant'; b3cell.innerHTML = ''; b3cell.appendChild(f === 'EXT' ? bts : b3); }; bf.onchange = syncB; syncB();
+        const b3cell = h('span'); const syncB = () => { const f = bf.value; [b1, b2, b3, bn, bts].forEach(x => x.disabled = f === 'NONE'); L2.textContent = f === 'EXT' ? 'Scaling Factor' : 'Rate Constant'; L3.textContent = f === 'EXT' ? 'Time Series' : f === 'SAT' ? 'Half-Saturation Constant (days)' : 'Power/Sat. Constant'; b3cell.innerHTML = ''; b3cell.appendChild(f === 'EXT' ? btsW : b3); }; bf.onchange = syncB; syncB();
         const wf = sel(WO_FN, w.fn, 170), w1 = inp(w.c1, 170), w2 = inp(w.c2, 170), ws = inp(w.sweep, 170), wb = inp(w.bmp, 170);
         const syncW = () => { [w1, w2, ws, wb].forEach(x => x.disabled = wf.value === 'NONE'); w2.disabled = wf.value === 'NONE' || wf.value === 'EMC'; }; wf.onchange = syncW; syncW();
         const pg = h('div', { style: { display: i ? 'none' : '' } }, form(h('h4', null, 'Buildup'), fld('Function', bf), L1, b1, L2, b2, L3, b3cell, fld('Normalizer', bn), h('h4', null, 'Washoff'), fld('Function', wf), fld('Coefficient', w1), fld('Exponent', w2), fld('Cleaning Effic. (%)', ws), fld('BMP Effic. (%)', wb)));

@@ -41,6 +41,8 @@
     constructor(app) {
       this.app = app; this.logLines = [];
       app.on('selection', (sel) => { for (const g of this.graphs || []) g.onSelection(sel); });
+      // a 2D cell clicked on the map: graphs that follow the selection show the cell
+      app.on('cellselect', (k) => { if (!app.mesh2d || !app.mesh2d.cells[k]) return; for (const g of this.graphs || []) g.onSelection([AV.cellNode(app, k)]); });
     }
     get m() { return this.app.model; }
 
@@ -439,7 +441,7 @@
     // ================================================================ ICM-style object graph (follows map selection)
     graphTool(objs) {
       if (!this.app.results && !this.app.sim.scen.length) { AV.alert('Run a simulation (or load a results file) first, then select objects on the map to graph their results.', 'Graph'); return; }
-      const g = new GraphPanel(this, objs || [...this.app.selection]);
+      const a = this.app; const g = new GraphPanel(this, objs || (a.selection.size || !(a.meshSel >= 0) || !a.mesh2d ? [...a.selection] : [AV.cellNode(a, a.meshSel)]));
       (this.graphs || (this.graphs = [])).push(g);
     }
     profileTool(from, to) {
@@ -741,7 +743,7 @@
       const X = xs(meta); const XS = src.map(x => xs(x.res.meta));
       const per = this.app.results ? this.app.results.period : 0;
       const marker = this.xmode === 'd' ? meta.startDate + (per + 1) * meta.reportStep / 86400 : (per + 1) * meta.reportStep / 3600;
-      const title = this.objs.length === 1 ? (this.objs[0].kind === 'NODE' || this.objs[0].kind === 'LINK' ? this.objs[0].type.charAt(0) + this.objs[0].type.slice(1).toLowerCase() : 'Subcatchment') + ' ' + this.objs[0].id : this.objs.length + ' objects';
+      const title = this.objs.length === 1 && this.objs[0].mesh ? '2D Cell ' + this.objs[0].id : this.objs.length === 1 ? (this.objs[0].kind === 'NODE' || this.objs[0].kind === 'LINK' ? this.objs[0].type.charAt(0) + this.objs[0].type.slice(1).toLowerCase() : 'Subcatchment') + ' ' + this.objs[0].id : this.objs.length + ' objects';
       this.panel.setTitle('Graph - ' + title + (multi ? '  (' + src.length + ' scenarios)' : ''));
       const inv = this.app.prefs.invertRain;
       const SC = ['#e040fb', '#e91e63', '#1e88e5', '#43a047', '#fb8c00', '#00acc1', '#6d4c41', '#3949ab'];

@@ -17,7 +17,7 @@ graphs, reports, export, history, users.
 | Import Avaris DS `.ini [2D]` | automatic on Open | `mesh2d.js` `AV.importAvaris2D`, called from `app.js` openFile |
 | Create Meshes | Simulation → Create Meshes; Layer View 2D Flood group | `mesh2d.js` `AV.buildMesh2D`, `AV.createMeshes`; sidecar `<model>.mesh2d.json`; ribbon item `lic: '2D'` in `ribbon.js` |
 | 1D-2D run (`.finp/.frpt/.fout`) | Simulation → Run (when 2D is enabled and a mesh exists) | `sim.js` run → `AV.mesh2DToINP`; `main.js` engine:run `flood2d` |
-| 2D results (depth, max depth, time ponded, time to recede, elevation), animation, legend | Layer View → 2D Flood → Meshes (right-click / style); time slider | `mesh2d.js` computeMeshResults / drawMesh / drawMeshLegend / meshStyleDialog; `outreader.js` pondStats (`out:pondStats`) |
+| 2D results (depth, max depth, time ponded, time to recede, elevation), animation, legend | Layer View → 2D Meshes (drag to reorder; Symbology pane); time slider | `mesh2d.js` computeMeshResults / drawMesh / drawMeshLegend / meshStyleDialog; `outreader.js` pondStats (`out:pondStats`) |
 | Cell hover / click info, Graph Depth | map | `map.js` (meshHit hooks), `app.js` onHoverCell, `mesh2d.js` showCellInfo |
 | Export mesh shapefile | Meshes layer menu | `mesh2d.js` exportMeshShapefile |
 | Load `.fout` results | Catalog / Load results | `sim.js` loadResults, `catalog.js` |

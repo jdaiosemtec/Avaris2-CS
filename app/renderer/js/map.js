@@ -370,9 +370,9 @@
         for (const [key, G] of groups) flushN(key, G);
       }
       };
-      const DRAW = { subcatchments: drawSubs, links: drawLinks, nodes: drawNodes };
-      // the 2D mesh is drawn right above the subcatchments (dry cells are only outlined)
-      for (const k of this.netOrder().slice().reverse()) { DRAW[k](); if (k === 'subcatchments' && this.app.mesh2d) { try { AV.drawMesh(this, ctx); } catch (e) { console.warn('mesh', e); } } }
+      const drawMeshL = () => { if (this.app.mesh2d) { try { AV.drawMesh(this, ctx); } catch (e) { console.warn('mesh', e); } } };
+      const DRAW = { subcatchments: drawSubs, links: drawLinks, nodes: drawNodes, mesh: drawMeshL };
+      for (const k of this.netOrder().slice().reverse()) DRAW[k]();
       // ---- ID labels
       const lon = (k) => st.labelsOn ? st.labelsOn(k) : false;
       const showN = (this.showNodeLabels || lon('node')) && visObjs.n.length < 4000, showL = (this.showLinkLabels || lon('link')) && visObjs.l.length < 4000;
@@ -395,8 +395,11 @@
     }
     // selection, traced objects, outlet arrows, vertex handles, rubber bands, scale bar
     // top-to-bottom order of the network layers (Layer View); stored in the preferences
-    netOrder() { const P = this.app.prefs || {}; const o = Array.isArray(P.netOrder) ? P.netOrder.filter(k => ['nodes', 'links', 'subcatchments'].includes(k)) : [];
-      return o.length === 3 && new Set(o).size === 3 ? o : ['nodes', 'links', 'subcatchments']; }
+    netOrder() { const P = this.app.prefs || {}; const K = ['nodes', 'links', 'mesh', 'subcatchments'];
+      let o = Array.isArray(P.netOrder) ? P.netOrder.filter((k, i, a) => K.includes(k) && a.indexOf(k) === i) : [];
+      if (!['nodes', 'links', 'subcatchments'].every(k => o.includes(k))) o = ['nodes', 'links', 'subcatchments'];
+      if (!o.includes('mesh')) o.splice(o.indexOf('subcatchments'), 0, 'mesh'); // the 2D mesh sits right above the subcatchments by default
+      return o; }
     drawOverlay() {
       const ctx = this.ctx, m = this.model, st = this.app.theme, sel = this.app.selection;
       const SC = this.app.selColors ? this.app.selColors() : { link: '#ff1744', node: '#ffd600', sub: '#00bcd4' };

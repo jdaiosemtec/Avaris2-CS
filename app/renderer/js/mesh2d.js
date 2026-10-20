@@ -85,17 +85,26 @@
     const pad = (a) => a.map((x, i) => i === a.length - 1 ? String(x) : String(x).padEnd(i === 0 ? 17 : 11)).join(' ');
     const add = { JUNCTIONS: [], OUTFALLS: [], CONDUITS: [], ORIFICES: [], XSECTIONS: [], COORDINATES: [] };
     for (const c of mesh.cells) { add.JUNCTIONS.push(pad([c.id, c.elev, MAXD2D, 0, 0, 0])); add.COORDINATES.push(pad([c.id, c.x, c.y])); }
+    // The crest of every coupling orifice is set to the higher of its own level and the cell ground, and a coupled
+    // manhole is deepened to the top of its orifice. The engine would make exactly these adjustments itself
+    // (WARNING 10 "crest elevation raised to downstream invert", WARNING 02 "maximum depth increased"); doing it
+    // here gives the same results without hundreds of warnings in the report.
+    const cellZ = new Map(mesh.cells.map(c => [c.id, c.elev])); const r4 = (v) => +(+v).toFixed(4); const up4 = (v) => Math.ceil(v * 1e4 + 1e-6) / 1e4; const deepen = new Map();
     for (const o of mesh.outfalls) { add.OUTFALLS.push(pad([o.id, o.elev, 'FREE', 'NO'])); add.COORDINATES.push(pad([o.id, o.x, o.y]));
-      add.ORIFICES.push(pad([o.id + 'X', o.id, o.cell, 'SIDE', elevOff ? o.elev : 0, 0.65, 'NO', 0])); add.XSECTIONS.push(pad([o.id + 'X', 'RECT_CLOSED', MAXD2D, o.w, 0, 0])); }
+      const zc = cellZ.get(o.cell); const crest = Math.max(o.elev, isFinite(zc) ? zc : o.elev);
+      add.ORIFICES.push(pad([o.id + 'X', o.id, o.cell, 'SIDE', crest > o.elev ? up4(elevOff ? crest : crest - o.elev) : r4(elevOff ? crest : 0), 0.65, 'NO', 0])); add.XSECTIONS.push(pad([o.id + 'X', 'RECT_CLOSED', MAXD2D, o.w, 0, 0])); }
     for (const l of mesh.links) { add.CONDUITS.push(pad([l.id, l.a, l.b, l.len, l.n, 0, 0, 0, 0])); add.XSECTIONS.push(pad([l.id, 'RECT_OPEN', MAXD2D, l.w, 0, 0, 1])); }
-    for (const x of mesh.couplings) { const nd = m.nodes.get(x.node); if (!nd) continue; const rim = (+nd.p.maxDepth || 0);
-      add.ORIFICES.push(pad([x.id, x.node, x.cell, 'SIDE', elevOff ? +nd.p.elev + rim : rim, 0.65, 'NO', 0])); add.XSECTIONS.push(pad([x.id, 'RECT_CLOSED', MAXD2D, x.w, 0, 0])); }
+    for (const x of mesh.couplings) { const nd = m.nodes.get(x.node); if (!nd) continue; const z0 = +nd.p.elev || 0, rim = (+nd.p.maxDepth || 0);
+      const zc = cellZ.get(x.cell); const crest = Math.max(z0 + rim, isFinite(zc) ? zc : z0 + rim);
+      add.ORIFICES.push(pad([x.id, x.node, x.cell, 'SIDE', crest > z0 + rim ? up4(elevOff ? crest : crest - z0) : r4(elevOff ? crest : rim), 0.65, 'NO', 0])); add.XSECTIONS.push(pad([x.id, 'RECT_CLOSED', MAXD2D, x.w, 0, 0]));
+      deepen.set(x.node, +(up4(crest - z0 + MAXD2D) + 0.0001).toFixed(4)); }
     const lines = text.split(/\r?\n/); const out = []; let sec = null; const seen = new Set();
     const rs = parseFloat(f.ROUTING_STEP); const run = AV.f2dRun(m);
     for (const ln of lines) {
       const t = ln.trim();
       if (t.startsWith('[')) { sec = t.slice(1, t.indexOf(']')).toUpperCase(); out.push(ln); if (add[sec]) { seen.add(sec); out.push(';;OsemCM 2D surface elements'); out.push(...add[sec]); } continue; }
       if (sec === 'OPTIONS' && /^ROUTING_STEP\b/i.test(t) && rs > 0) { out.push(pad(['ROUTING_STEP', rs])); continue; }
+      if ((sec === 'JUNCTIONS' || sec === 'STORAGE') && t && t[0] !== ';') { const k = AV.tokenize(t); const d = deepen.get(k[0]); if (d !== undefined && k.length >= 3 && !(+k[2] >= d)) { k[2] = String(d); out.push(pad(k)); continue; } }
       if (sec === 'OPTIONS' && /^FLOW_UNITS\b/i.test(t) && run.flow) { out.push(pad(['FLOW_UNITS', run.flow]) + '   ;;OsemCM 2D: run in SI units (map in metres)'); continue; }
       out.push(ln);
     }
@@ -206,21 +215,31 @@
   };
   const FIELDS = { depth: 'Depth (current time)', maxdepth: 'Max. Depth', tpond: 'Time Ponded (hr)', trecede: 'Time to Recede (hr)', wse: 'Water Surface Elev. (current time)', elev: 'Ground Elevation' };
   AV.MESH_FIELDS = FIELDS;
-  const DEPTH_RAMP = ['#bdeeff', '#5fd0ff', '#1e9bff', '#1659ff', '#0d2fc4', '#08156e'];
-  const TIME_RAMP = ['#fff3b0', '#ffd166', '#f8961e', '#e85d04', '#c1121f', '#6a040f'];
+  // ramps for the flood map (also listed in the ramp picker)
+  AV.RAMPS['Flood Depth'] = ['#bdeeff', '#5fd0ff', '#1e9bff', '#1659ff', '#0d2fc4', '#08156e'];
+  AV.RAMPS['Flood Time'] = ['#fff3b0', '#ffd166', '#f8961e', '#e85d04', '#c1121f', '#6a040f'];
+  AV.RAMPS['Terrain'] = ['#2e7d32', '#aed581', '#fff176', '#bc8c5c', '#f5f5f5'];
+  const DEF_RAMP = { depth: 'Flood Depth', maxdepth: 'Flood Depth', tpond: 'Flood Time', trecede: 'Flood Time', wse: 'Terrain', elev: 'Terrain' };
+  AV.MESH_CONTINUOUS = { wse: true, elev: true };
+  AV.meshDefaultBreaks = (app, field) => { const si = AV.meshSI(app);
+    return { depth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], maxdepth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], tpond: [0.25, 0.5, 1, 2, 4], trecede: [0.25, 0.5, 1, 2, 4] }[field] || null; };
+  // style of the Meshes layer (set in the Symbology pane). Class i colours values from breaks[i] up to breaks[i+1];
+  // values below the first break are not coloured (dry). Elevation / water surface use a continuous ramp.
   AV.meshStyle = function (app) {
     const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); const field = FIELDS[P.field] ? P.field : 'depth';
-    const si = app.model && AV.meshSI(app);
-    const defB = { depth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], maxdepth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], tpond: [0.25, 0.5, 1, 2, 4], trecede: [0.25, 0.5, 1, 2, 4], wse: null, elev: null };
-    const breaks = (P.breaks && P.breaks[field]) || defB[field];
-    return { field, breaks, colors: field === 'tpond' || field === 'trecede' ? TIME_RAMP : DEPTH_RAMP, opacity: P.opacity === undefined ? 0.8 : P.opacity, outline: P.outline !== false, visible: P.visible !== false };
+    const ramp = (P.ramp && P.ramp[field]) || DEF_RAMP[field], invert = !!(P.invert && P.invert[field]);
+    let breaks = null, colors = null;
+    if (!AV.MESH_CONTINUOUS[field]) { const cls = P.classes && P.classes[field];
+      if (cls && cls.length) { breaks = cls.map(c => +c.v); colors = cls.map(c => c.color); } else { breaks = AV.meshDefaultBreaks(app, field); colors = AV.rampColors(ramp, breaks.length, invert); } }
+    return { field, breaks, colors, ramp, invert, opacity: P.opacity === undefined ? 0.8 : P.opacity, outline: P.outline !== false, visible: P.visible !== false };
   };
-  const terrain = (t) => { const C = [[0, [46, 125, 50]], [0.35, [174, 213, 129]], [0.6, [255, 241, 118]], [0.8, [188, 140, 92]], [1, [245, 245, 245]]]; for (let i = 1; i < C.length; i++) if (t <= C[i][0]) { const a = C[i - 1], b = C[i]; const f = (t - a[0]) / (b[0] - a[0]); return 'rgb(' + a[1].map((v, j) => Math.round(v + (b[1][j] - v) * f)).join(',') + ')'; } return 'rgb(245,245,245)'; };
+  const rampAt = (name, t, inv) => { const R = AV.RAMPS[name] || AV.RAMPS['Terrain']; if (inv) t = 1 - t; t = Math.max(0, Math.min(1, t)); const x = t * (R.length - 1), k = Math.min(R.length - 2, Math.floor(x)), f = x - k;
+    const c1 = R[k], c2 = R[k + 1]; const g = (c, i) => parseInt(c.slice(1 + 2 * i, 3 + 2 * i), 16); return 'rgb(' + [0, 1, 2].map(i => Math.round(g(c1, i) + (g(c2, i) - g(c1, i)) * f)).join(',') + ')'; };
+  AV.meshRange = (app, field) => { const r = app._meshRange || (app._meshRange = {}); if (!r[field]) { let a = Infinity, b = -Infinity; for (let i = 0; i < app.mesh2d.cells.length; i++) { const x = AV.cellValue(app, i, field); if (x !== null && isFinite(x)) { a = Math.min(a, x); b = Math.max(b, x); } } r[field] = [a, b]; } return r[field]; };
   // colour of a cell, or null when it is dry / has no value (only the outline is drawn)
   AV.meshColor = function (app, k, S) {
     const v = AV.cellValue(app, k, S.field); if (v === null || !isFinite(v)) return null;
-    if (!S.breaks) { const r = app._meshRange || (app._meshRange = {}); const key = S.field; if (!r[key]) { let a = Infinity, b = -Infinity; for (let i = 0; i < app.mesh2d.cells.length; i++) { const x = AV.cellValue(app, i, key); if (x !== null && isFinite(x)) { a = Math.min(a, x); b = Math.max(b, x); } } r[key] = [a, b]; }
-      const [a, b] = r[key]; return terrain(b > a ? (v - a) / (b - a) : 0.5); }
+    if (!S.breaks) { const [a, b] = AV.meshRange(app, S.field); return rampAt(S.ramp, b > a ? (v - a) / (b - a) : 0.5, S.invert); }
     if (v < S.breaks[0]) return null;
     let c = S.colors[S.colors.length - 1]; for (let i = 1; i < S.breaks.length; i++) if (v < S.breaks[i]) { c = S.colors[i - 1]; break; }
     return c;
@@ -248,10 +267,11 @@
   };
   // legend for result fields (bottom-left of the map)
   AV.drawMeshLegend = function (map, ctx) {
-    const app = map.app; if (!app.mesh2d || !app.mesh2d.cells.length) return; const S = AV.meshStyle(app); if (!S.visible || !S.breaks) return;
+    const app = map.app; if (!app.mesh2d || !app.mesh2d.cells.length) return; const S = AV.meshStyle(app); if (!S.visible) return;
     if (S.field !== 'elev' && !app.meshResults) return;
     const u = S.field === 'tpond' || S.field === 'trecede' ? 'hr' : (AV.meshSI(app) ? 'm' : 'ft');
-    const rows = S.breaks.map((b, i) => [S.colors[i], i < S.breaks.length - 1 ? AV.fmt(b) + ' – ' + AV.fmt(S.breaks[i + 1]) : '> ' + AV.fmt(b)]);
+    let rows; if (S.breaks) rows = S.breaks.map((b, i) => [S.colors[i], i < S.breaks.length - 1 ? AV.fmt(b) + ' – ' + AV.fmt(S.breaks[i + 1]) : '> ' + AV.fmt(b)]);
+    else { const [a, b] = AV.meshRange(app, S.field); if (!isFinite(a)) return; rows = [0, 0.25, 0.5, 0.75, 1].map(t => [rampAt(S.ramp, t, S.invert), AV.fmt(a + (b - a) * t, 2)]).reverse(); }
     const W = 150, H = 22 + rows.length * 16, x = 10, y = map.hgt - H - 34;
     ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.strokeStyle = '#b0bec5'; ctx.fillRect(x, y, W, H); ctx.strokeRect(x + .5, y + .5, W, H);
     ctx.font = 'bold 11px Segoe UI'; ctx.fillStyle = '#263238'; ctx.textBaseline = 'middle'; ctx.fillText('2D: ' + FIELDS[S.field].replace(/ \(.*\)/, '') + ' (' + u + ')', x + 7, y + 11);
@@ -260,19 +280,8 @@
   };
 
   // ------------------------------------------------------------------ mesh style dialog / layer menu / cell info
-  AV.meshStyleDialog = async function (app) {
-    const S = AV.meshStyle(app); const P = app.prefs.mesh2d;
-    const fs = h('select', null, Object.keys(FIELDS).map(k => h('option', { value: k }, FIELDS[k]))); fs.value = S.field;
-    const brk = h('input', { type: 'text', value: S.breaks ? S.breaks.join(' ') : '', style: { width: '260px' } }); const op = h('input', { type: 'text', value: S.opacity, style: { width: '80px' } });
-    const ol = h('input', { type: 'checkbox', checked: S.outline });
-    const sync = () => { const b = AV.meshStyle(Object.assign({}, app, { prefs: { mesh2d: Object.assign({}, P, { field: fs.value }) } })).breaks; brk.value = b ? b.join(' ') : ''; brk.disabled = !b; };
-    fs.onchange = sync; brk.disabled = !S.breaks;
-    const body = h('div', { class: 'form', style: { width: '480px' } }, h('label', null, 'Colour cells by'), fs, h('label', null, 'Class breaks'), brk, h('label', null, 'Opacity (0-1)'), op, h('label', null, 'Cell outlines'), ol,
-      h('div', { class: 'note' }, 'Cells below the first break are left uncoloured (dry). Depth and water surface follow the current time step (Play to animate the flooding); Max. Depth, Time Ponded and Time to Recede come from the whole run. Time Ponded counts the hours the depth is above the Flood Depth set in Simulation Options → 2D Flood.'));
-    const r = await AV.modal({ title: '2D Mesh Style', body, buttons: [{ label: 'Cancel', value: null }, { label: 'OK', primary: true, value: true }] }).done; if (!r) return;
-    P.field = fs.value; const b = brk.value.trim().split(/[\s,;]+/).map(Number).filter(isFinite); if (b.length) { P.breaks = P.breaks || {}; P.breaks[fs.value] = b.sort((x, y) => x - y); }
-    const o = parseFloat(op.value); if (o >= 0 && o <= 1) P.opacity = o; P.outline = ol.checked; app.savePrefs(); app._meshRange = null; app.map.redraw();
-  };
+  // the Meshes layer style is edited in the Symbology pane (right dock), like the other layers
+  AV.meshStyleDialog = (app) => app.symPane.open({ mesh: true });
   AV.exportMeshShapefile = async function (app) {
     const mesh = app.mesh2d; if (!mesh) return; const p = await window.host.saveDialog({ title: 'Export 2D mesh', defaultPath: 'Meshes.shp', filters: [{ name: 'Shapefile', extensions: ['shp'] }] }); if (!p) return;
     const feats = mesh.cells.map((c, k) => { const hs = c.s / 2; const props = { id: c.id, elev: c.elev, maxdepth: 0, tpond: 0, trecede: 0 };
@@ -285,7 +294,7 @@
     AV.toast('Mesh exported to ' + base + '.shp');
   };
   // pseudo node used to plot the depth of a cell with the normal graph tools
-  AV.cellNode = (app, k) => { const c = app.mesh2d.cells[k]; return { id: c.id, kind: 'NODE', type: 'JUNCTION', x: c.x, y: c.y, p: { elev: c.elev, maxDepth: MAXD2D }, tag: '', mesh: true }; };
+  AV.cellNode = (app, k) => { const c = app.mesh2d.cells[k]; return { id: c.id, kind: 'NODE', type: 'JUNCTION', x: c.x, y: c.y, p: { elev: c.elev, maxDepth: 0 }, tag: '', mesh: true }; };
   AV.showCellInfo = function (app, k) {
     const el = AV.$('#props'); if (!el) return; const c = app.mesh2d.cells[k]; el.innerHTML = '';
     const L = AV.meshSI(app) ? 'm' : 'ft'; const f = (v, d) => v === null || v === undefined || !isFinite(v) ? '-' : AV.fmt(v, d);
@@ -298,5 +307,6 @@
     el.appendChild(tb);
     if (MR) el.appendChild(h('div', { style: { padding: '8px 10px' } }, h('button', { class: 'btn', onclick: () => app.feat.graphTool([AV.cellNode(app, k)]) }, 'Graph Depth')));
     if (app.showRightTab) app.showRightTab('props');
+    app.emit('cellselect', k);
   };
 })(window.AV);
