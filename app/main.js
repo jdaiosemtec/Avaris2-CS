@@ -105,6 +105,23 @@ const usersFile = () => path.join(app.getPath('userData'), 'users.json');
 ipcMain.handle('app:users:get', async () => { try { return JSON.parse(fs.readFileSync(usersFile(), 'utf8')); } catch (e) { return null; } });
 ipcMain.handle('app:hash', async (e, pw, salt) => { const c = require('crypto'); if (!salt) salt = c.randomBytes(16).toString('hex'); return { salt, hash: c.pbkdf2Sync(String(pw), salt, 120000, 32, 'sha256').toString('hex') }; });
 ipcMain.handle('app:users:set', async (e, u) => { fs.mkdirSync(path.dirname(usersFile()), { recursive: true }); fs.writeFileSync(usersFile(), JSON.stringify(u, null, 2)); return true; });
+// ---------------------------------------------------------------- licence (offline Ed25519-signed keys)
+// key = OSEMCM-<base64url payload>.<base64url signature>, payload = ver|edition(1D|2D)|licensee|expiry|serial|issued
+const LIC_PUB = '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAY6AEfM7kFpdG4rajIfIEUwJA7Iw7nGIgUovmv9x++2g=\n-----END PUBLIC KEY-----\n';
+function verifyLicence(raw) {
+  const out = { valid: false, edition: null, licensee: '', expiry: '', serial: '', issued: '', error: '' };
+  const key = String(raw || '').replace(/\s+/g, ''); if (!key) { out.error = 'No licence key.'; return out; }
+  const m = /^OSEMCM-([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(key); if (!m) { out.error = 'This is not an OsemCM licence key.'; return out; }
+  const dec = (s) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  let ok = false; const payload = dec(m[1]);
+  try { ok = require('crypto').verify(null, payload, require('crypto').createPublicKey(LIC_PUB), dec(m[2])); } catch (e) { ok = false; }
+  if (!ok) { out.error = 'The licence key is not valid (signature check failed).'; return out; }
+  const f = payload.toString('utf8').split('|'); if (f[0] !== '1' || !['1D', '2D'].includes(f[1])) { out.error = 'Unsupported licence key version.'; return out; }
+  Object.assign(out, { edition: f[1], licensee: f[2] || '', expiry: f[3] || '', serial: f[4] || '', issued: f[5] || '' });
+  if (out.expiry && new Date(out.expiry + 'T23:59:59') < new Date()) { out.error = 'The licence expired on ' + out.expiry + '.'; return out; }
+  out.valid = true; return out;
+}
+ipcMain.handle('license:verify', async (e, key) => verifyLicence(key));
 ipcMain.handle('app:settings:get', async () => loadSettings());
 // ---- file browsing for the Catalog pane
 ipcMain.handle('fs:list', async (e, dir) => {

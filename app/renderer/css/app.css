@@ -656,3 +656,13 @@ tr.surch td { color: #c62828; font-weight: 600; }
 .fpick input { flex: 1; min-width: 0; }
 .fpick .btn.small { padding: 2px 7px; }
 .fpick { min-width: 0; max-width: 270px; }
+/* licence-locked ribbon buttons (2D module without a 1D-2D licence) */
+.rbig, .rsmall { position: relative; }
+.rbig .rlock, .rsmall .rlock { display: none; position: absolute; right: 2px; top: 1px; font-size: 10px; }
+.rbig.locked, .rsmall.locked { opacity: .5; }
+.rbig.locked .rlock, .rsmall.locked .rlock { display: block; }
+.licur { padding: 8px 10px; border-radius: 4px; background: #fff4e5; border: 1px solid #ffd8a8; font-size: 12.5px; }
+.licur.ok { background: #e8f5e9; border-color: #a5d6a7; }
+table.edtbl { border-collapse: collapse; font-size: 12px; width: 100%; }
+table.edtbl th, table.edtbl td { border: 1px solid var(--border); padding: 3px 8px; }
+table.edtbl th { background: #f3f5f7; font-weight: 600; }

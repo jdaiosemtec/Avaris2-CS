@@ -184,10 +184,10 @@
       row(1, [sp(), chk(map.layerVis.labels, v => map.layerVis.labels = v), h('span', { class: 'symicon txt' }, 'Aa'), h('span', { class: 'lname' }, 'Map Labels')], { add: 'LABEL', menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomAll() }, ZS('LABEL')] });
     }
     // ---- 2D flood surface (OsemCM V2.0)
-    if (m && (app.mesh2d || AV.f2dEnabled(m))) {
+    if (m && AV.has2D(app) && (app.mesh2d || AV.f2dEnabled(m))) {
       const mesh = app.mesh2d; const S = AV.meshStyle(app);
       const meshBox = () => { const c = mesh.cells; let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const q of c) { x1 = Math.min(x1, q.x - q.s / 2); y1 = Math.min(y1, q.y - q.s / 2); x2 = Math.max(x2, q.x + q.s / 2); y2 = Math.max(y2, q.y + q.s / 2); } return { x1, y1, x2, y2 }; };
-      const gmenu = () => [{ label: 'Create Meshes', fn: () => AV.createMeshes(app) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') }];
+      const gmenu = () => [{ label: 'Create Meshes', fn: () => AV.createMeshes(app) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood', true) }];
       row(0, [tw('f2d'), h('b', null, '2D Flood')], { cls: 'lgrp', menu: gmenu });
       if (open.f2d !== false) {
         if (mesh) {

@@ -64,7 +64,6 @@
         name: 'Simulation', groups: [
           { name: 'Simulation', items: [
             { id: 'options', label: 'Options', img: 'options', fn: () => S().optionsDialog() },
-            { id: 'meshes', label: 'Create Meshes', img: 'meshes', fn: () => AV.createMeshes(this), tip: 'Create the 2D surface mesh from the boundary, DEM and lines set in Options → 2D Flood' },
             { id: 'run', label: 'Run', img: 'run', fn: () => S().run(), tip: 'Run simulation (F5)' }] },
           { name: 'Result', items: [
             { id: 'report', label: 'Report', img: 'report', fn: () => S().showReport() },
@@ -74,6 +73,18 @@
             { id: 'plot', label: 'Plot', img: 'plot', fn: () => F().graphTool() },
             { id: 'play', label: 'Play', img: 'play', fn: () => S().togglePlaybar() },
             { id: 'timestep', label: 'Time Step', img: 'transient', fn: () => this.timeStep.toggle(), active: () => !!this.tsOpen, tip: 'Step through the results time by time for the selected object' }] },
+        ]
+      },
+      // ---- 2D module (OsemCM 1D-2D licence only)
+      {
+        name: '2D Flood', lic: '2D', groups: [
+          { name: '2D Model', items: [
+            { id: 'f2dopt', label: '2D Options', img: 'options', lic: '2D', fn: () => S().optionsDialog('2D Flood', true), tip: '2D flood settings: boundary, DEM, water front, cut-off lines, exclusion polygons, routing step' },
+            { id: 'meshes', label: 'Create Meshes', img: 'meshes', lic: '2D', fn: () => AV.createMeshes(this), tip: 'Create the 2D surface mesh from the boundary, DEM and lines set in 2D Options' }] },
+          { name: '2D Results', items: [
+            { id: 'f2dstyle', label: 'Flood Map', img: 'theme', lic: '2D', fn: () => { if (!this.mesh2d) { AV.toast('Create the 2D mesh first.', true); return; } AV.meshStyleDialog(this); }, tip: 'Colour the 2D cells by depth, max. depth, time ponded, time to recede or ground elevation' },
+            { id: 'f2dplay', label: 'Play', img: 'play', lic: '2D', fn: () => S().togglePlaybar(), tip: 'Animate the flooding (time slider)' },
+            { id: 'f2dexp', label: 'Export Mesh', img: 'export', lic: '2D', fn: () => { if (!this.mesh2d) { AV.toast('Create the 2D mesh first.', true); return; } AV.exportMeshShapefile(this); }, tip: 'Export the 2D cells with their results as a shapefile' }] },
         ]
       },
       {
@@ -104,7 +115,9 @@
     const mkBtn = (it, small) => {
       const icon = it.img ? h('img', { src: IMG(it.img), draggable: 'false' }) : h('span', { class: 'svgi' }, AV.icon(it.svg || 'select'));
       const b = h('button', { class: small ? 'rsmall' : 'rbig', title: typeof it.tip === 'function' ? '' : (it.tip || it.label) }, icon, h('span', { class: 'rl' }, it.label));
+      if (it.lic) b.appendChild(h('span', { class: 'rlock', title: 'Requires an OsemCM 1D-2D licence' }, '🔒'));
       b.addEventListener('click', (e) => {
+        if (it.lic === '2D' && !AV.has2D(this)) { AV.need2D(this, it.label); return; }
         if (it.mode) this.setTool(it.mode); else if (it.fn) it.fn();
         this.refreshRibbon();
       });
@@ -133,6 +146,7 @@
     if (!this.ribbonButtons) return;
     for (const { b, it } of this.ribbonButtons) {
       if (it.enabled) b.classList.toggle('disabled', !it.enabled());
+      if (it.lic) b.classList.toggle('locked', it.lic === '2D' && !AV.has2D(this));
       if (typeof it.tip === 'function') b.title = it.tip();
       if (it.active) b.classList.toggle('active', !!it.active());
     }

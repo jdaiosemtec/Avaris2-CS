@@ -509,7 +509,7 @@
       ctx.restore();
     }
     drawTemp() {
-      const ctx = this.ctx, t = this.temp; if (!t) return;
+      const ctx = this.ctx, t = this.temp || {}; if (!this.temp && !this.splitCur) return;
       ctx.save();
       if (t.kind === 'box') {
         ctx.strokeStyle = '#1565c0'; ctx.setLineDash([5, 3]); ctx.fillStyle = 'rgba(21,101,192,.08)';
@@ -525,13 +525,16 @@
           const p = pts[pts.length - 1]; ctx.font = 'bold 12px Segoe UI'; ctx.fillStyle = '#4a148c'; this._label(AV.fmt(L, 2) + ' ' + this.app.mapUnitsLabel(), p[0] + 8, p[1] - 6);
         }
       }
+      if (this.splitCur) { const c = this.splitCur; ctx.strokeStyle = '#263238'; ctx.lineWidth = 1.5; ctx.fillStyle = 'rgba(255,255,255,.55)';
+        ctx.beginPath(); ctx.moveTo(c[0], c[1] - 8); ctx.lineTo(c[0] + 8, c[1] + 6); ctx.lineTo(c[0] - 8, c[1] + 6); ctx.closePath(); ctx.fill(); ctx.stroke(); }
       if (t.kind === 'ssplit') {
-        const pts = t.pts.map(p => this.toScreen(p[0], p[1])); const cur = t.snap ? this.toScreen(t.snap.pt[0], t.snap.pt[1]) : t.cursor;
-        if (pts.length) { ctx.strokeStyle = '#e53935'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath(); pts.concat(cur ? [cur] : []).forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.setLineDash([]);
+        const pts = t.pts.map(p => this.toScreen(p[0], p[1])); const cur = t.snap ? this.toScreen(t.snap.pt[0], t.snap.pt[1]) : t.cursor; const rub = cur || t.mouse;
+        if (pts.length) { ctx.strokeStyle = '#e53935'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath(); pts.concat(rub ? [rub] : []).forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.setLineDash([]);
           ctx.fillStyle = '#e53935'; for (const p of pts) { ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, 7); ctx.fill(); } }
         if (cur) { ctx.strokeStyle = '#263238'; ctx.lineWidth = 1.5; ctx.fillStyle = 'rgba(255,255,255,.35)';
-          if (t.snap) { ctx.fillRect(cur[0] - 7, cur[1] - 7, 14, 14); ctx.strokeRect(cur[0] - 7, cur[1] - 7, 14, 14); }
-          else { ctx.beginPath(); ctx.moveTo(cur[0], cur[1] - 8); ctx.lineTo(cur[0] + 8, cur[1] + 6); ctx.lineTo(cur[0] - 8, cur[1] + 6); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+          // square: snapped to the boundary (filled) or inside the subcatchment
+          if (t.snap) { ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 2; }
+          ctx.fillRect(cur[0] - 7, cur[1] - 7, 14, 14); ctx.strokeRect(cur[0] - 7, cur[1] - 7, 14, 14); }
       }
       ctx.restore();
     }
@@ -560,7 +563,7 @@
       };
       const hint = AV.$('#mapHint');
       if (hints[mode]) { hint.textContent = hints[mode]; hint.style.display = 'block'; } else hint.style.display = 'none';
-      this.canvas.style.cursor = mode === 'pan' ? 'grab' : mode === 'select' ? 'default' : mode === 'splitsub' ? 'none' : 'crosshair';
+      this.canvas.style.cursor = mode === 'pan' ? 'grab' : mode === 'select' ? 'default' : mode === 'splitsub' ? 'default' : 'crosshair';
       this.redraw();
     }
     _bind() {
@@ -662,6 +665,8 @@
         if (e.target !== c) return;
         if (this.temp && (this.temp.kind === 'link' || this.temp.kind === 'poly' || this.temp.kind === 'measure' || this.temp.kind === 'line')) { this.temp.cursor = [sx, sy]; this.redrawOverlay(); }
         if (this.mode === 'splitsub' && this.temp && this.temp.kind === 'ssplit') { this.app.feat.subSplitMove(sx, sy); this.redrawOverlay(); }
+        if (this.mode === 'pick' && this.pickSplit) { const hit = this.hitTest(sx, sy, ['LINK']); const on = !!hit && hit.type === 'CONDUIT'; const was = !!this.splitCur;
+          this.splitCur = on ? [sx, sy] : null; c.style.cursor = on ? 'none' : 'default'; if (on || was) this.redrawOverlay(); }
         // hover tooltip
         if (this.mode === 'select' || this.mode === 'pick' || this.mode.startsWith('add-')) {
           const hit = this.hitTest(sx, sy);

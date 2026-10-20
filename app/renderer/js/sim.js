@@ -138,7 +138,9 @@
     sources() { const out = []; const cur = this.app.filePath ? AV.basename(this.app.filePath).replace(/\.inp$/i, '') : 'Current'; if (this.results) out.push({ name: cur, res: this.results, current: true }); for (const s of this.scen) if (s.scenName !== cur || !this.results) out.push({ name: s.scenName, res: s }); if (this.compare) out.push({ name: 'Compare (' + AV.basename(this.compare.meta.file || 'run') + ')', res: this.compare }); return out; }
 
     // =============================================================== options
-    async optionsDialog(startTab) {
+    // Simulation Options (1D). only2D: the 2D Options dialog of the 2D Flood ribbon tab (OsemCM 1D-2D licence)
+    async optionsDialog(startTab, only2D) {
+      if (only2D && !AV.has2D(this.app)) { AV.need2D(this.app, '2D Options'); return; }
       const o = this.model.options; const g = (k, d) => (o[k] !== undefined ? o[k] : d);
       const v = {
         FLOW_UNITS: g('FLOW_UNITS', 'CFS'), INFILTRATION: g('INFILTRATION', 'HORTON'), FLOW_ROUTING: g('FLOW_ROUTING', 'KINWAVE'), LINK_OFFSETS: g('LINK_OFFSETS', 'DEPTH'),
@@ -203,9 +205,10 @@
           { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
           { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['AUTO', 'MODEL'], note: 'AUTO (as Avaris DS): a model in US units with a map in metres is run in SI (FLOW_UNITS CMS, values unchanged), so the metre-based mesh and DEM match. MODEL: keep the model units and convert the mesh lengths.' },
           { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
-          { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (2D Flood group in the Layer View, or the Simulation ribbon). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
+          { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (2D Flood ribbon tab, or the 2D Flood group in the Layer View). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
       };
-      const body = h('div', { style: { width: '640px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
+      if (only2D) { for (const k of Object.keys(tabs)) if (k !== '2D Flood') delete tabs[k]; } else delete tabs['2D Flood'];
+      const body = h('div', { style: { width: only2D ? '600px' : '560px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
       const inputs = {}; const pages = [];
       const t0 = Math.max(0, Object.keys(tabs).indexOf(startTab));
       Object.keys(tabs).forEach((name, ti) => {
@@ -229,13 +232,13 @@
         pages.push(form); body.appendChild(form);
         tb.appendChild(h('div', { class: 't2' + (ti !== t0 ? '' : ' active'), onclick: (e) => { AV.$$('.t2', tb).forEach(t => t.classList.remove('active')); e.target.classList.add('active'); pages.forEach((p, j) => p.style.display = j === ti ? 'grid' : 'none'); } }, name));
       });
-      const r = await AV.modal({ title: 'Simulation Options', body, buttons: [{ label: 'Cancel', value: null }, { label: 'OK', primary: true, onClick: () => { const out = {}; for (const k in inputs) out[k] = inputs[k].type === 'checkbox' ? inputs[k].checked : inputs[k].value.trim(); return out; } }] }).done;
+      const r = await AV.modal({ title: only2D ? '2D Options' : 'Simulation Options', body, buttons: [{ label: 'Cancel', value: null }, { label: 'OK', primary: true, onClick: () => { const out = {}; for (const k in inputs) out[k] = inputs[k].type === 'checkbox' ? inputs[k].checked : inputs[k].value.trim(); return out; } }] }).done;
       if (!r) return;
       // object defaults (app settings, not part of the model)
       const nd = {}; for (const k of Object.keys(r)) if (k.startsWith('def_')) { const key = k.slice(4), val = r[k]; delete r[k]; if (typeof val === 'boolean') nd[key] = val; else { const x = parseFloat(val); if (!isFinite(x)) { AV.alert('Object default "' + key + '" must be a number.'); return; } nd[key] = x; } }
       Object.assign(this.app.defaults, nd); this.app.settings.defaults = this.app.defaults; window.host.setSettings(this.app.settings);
       // 2D flood settings (stored in the model as ;;@OSEM2D lines)
-      { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
+      if (only2D) { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
         n2.ENABLED = n2.ENABLED ? 'YES' : 'NO';
         for (const k of ['ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS']) if (n2[k] !== '' && !(parseFloat(n2[k]) >= 0)) { AV.alert('2D Flood: "' + k.replace('_', ' ').toLowerCase() + '" must be a number.'); return; }
         const m = this.model; const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = {}; for (const k of AV.F2D_KEYS) if (n2[k] !== '' && n2[k] !== undefined) nw2[k] = String(n2[k]);
@@ -246,6 +249,7 @@
           const geo = ['BOUNDARY', 'DEM', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'CELL_SIZE', 'ROUGHNESS'].some(k => ch.some(c => c.key === '2D ' + k));
           if (AV.f2dEnabled(m) && geo && nw2.BOUNDARY && nw2.DEM) setTimeout(async () => { if (await AV.confirm((this.app.mesh2d ? 'The 2D input layers changed. Rebuild the mesh now?' : 'Create the 2D mesh now?'), 'Create Meshes', 'Create Meshes', 'Later')) AV.createMeshes(this.app); }, 50);
         } }
+      if (only2D) return;
       // validation
       const ur = parseFloat(r.UNDER_RELAXATION); if (!(ur >= 0.1 && ur <= 1)) { AV.alert('Under-relaxation factor must be between 0.1 and 1.0.'); return; }
       for (const k of ['START_DATE', 'END_DATE', 'REPORT_START_DATE']) if (AV.parseSwmmDate(r[k]) === null) { AV.alert('Invalid date for ' + k + ': ' + r[k]); return; }
@@ -281,7 +285,8 @@
       const encoding = app.filePath ? await window.host.encoding(app.filePath) : 'utf8';
       // 2D flood module: the mesh cells / surface links / couplings are added to a copy of the model (<model>.finp)
       let inpText = m.toINP({ reportAll: true }); let flood2d = false;
-      if (AV.f2dEnabled(m)) {
+      if (AV.f2dEnabled(m) && !AV.has2D(app)) AV.toast('This model has 2D flood settings, but your licence is OsemCM 1D: running the 1D model only.', false, 6000);
+      if (AV.f2dEnabled(m) && AV.has2D(app)) {
         if (!app.mesh2d || !app.mesh2d.cells.length) { this.runDlg.close(); this.runDlg = null;
           const a = await AV.modal({ title: 'Run Simulation', body: h('div', { style: { maxWidth: '480px', lineHeight: 1.5 } }, '2D flooding is enabled but no mesh has been created for this model yet.'), buttons: [{ label: 'Cancel', value: null }, { label: 'Run 1D only', value: '1d' }, { label: 'Create Meshes', primary: true, value: 'mesh' }] }).done;
           if (a === 'mesh') { await AV.createMeshes(app); if (app.mesh2d && app.mesh2d.cells.length) return this.run(); return; }
@@ -341,6 +346,7 @@
       if (p) this.loadResults(p, p.replace(/\.out$/i, '.rpt').replace(/\.fout$/i, '.frpt'), false);
     }
     async loadResults(out, rpt, fresh) {
+      if (/\.fout$/i.test(out) && !AV.has2D(this.app)) { AV.need2D(this.app, '1D-2D results (.fout)'); return; }
       try {
         if (this.results) await this.clearResults(true);
         const meta = await window.host.outOpen(out);

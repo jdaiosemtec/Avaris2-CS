@@ -135,7 +135,10 @@
     splitMode() {
       const sel = [...this.app.selection];
       if (sel.length === 1 && sel[0].kind === 'SUBCATCH') { this.subSplitStart(sel[0]); return; }
-      this.startPick({ kinds: ['LINK'], hint: 'Split: click on a conduit where the new junction should go (Esc to finish).', onPick: (hit, wx, wy) => { if (hit) this.splitLink(hit, wx, wy); } });
+      const map = this.app.map;
+      this.startPick({ kinds: ['LINK'], hint: 'Split: click on a conduit where the new junction should go (triangle cursor on a conduit; Esc to finish).', onPick: (hit, wx, wy) => { if (hit) this.splitLink(hit, wx, wy); },
+        onEnd: () => { map.pickSplit = false; map.splitCur = null; map.canvas.style.cursor = ''; map.redrawOverlay(); } });
+      map.pickSplit = true; map.splitCur = null; map.canvas.style.cursor = 'default';
     }
     // ================================================================ split a subcatchment polygon with a cut line
     subSplitStart(sc) {
@@ -152,7 +155,10 @@
         if (d <= 8 && (!best || d < best.d - 1e-9)) { const a = P[k], b = P[(k + 1) % n]; best = { d, pos: t >= 1 ? (k + 1) % n : k + t, pt: [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])] }; } }
       return best;
     }
-    subSplitMove(sx, sy) { const t = this.app.map.temp; if (!t) return; t.cursor = [sx, sy]; t.snap = this._ssSnap(sx, sy); }
+    // square cursor on / inside the subcatchment being split, the normal pointer outside it
+    subSplitMove(sx, sy) { const map = this.app.map, t = map.temp; if (!t || !this.ss) return; t.mouse = [sx, sy]; t.snap = this._ssSnap(sx, sy);
+      const [wx, wy] = map.toWorld(sx, sy); const on = !!t.snap || AV.pointInPoly(wx, wy, this.ss.P);
+      t.cursor = on ? [sx, sy] : null; map.canvas.style.cursor = on ? 'none' : 'default'; }
     subSplitClick(sx, sy, wx, wy) {
       const t = this.app.map.temp; if (!t || !this.ss) return; const snap = this._ssSnap(sx, sy);
       if (!t.pts.length) { if (!snap) { AV.toast('Start the cut on the subcatchment boundary (square cursor).', true); return; } t.pts.push(snap.pt); t.startPos = snap.pos; this.app.map.redrawOverlay(); return; }

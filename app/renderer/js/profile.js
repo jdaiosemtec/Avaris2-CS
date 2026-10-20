@@ -325,7 +325,11 @@
       ctx.fillStyle = '#fafbfc'; ctx.fillRect(0, y0, L, y1 - y0);
       ctx.font = '12px Segoe UI'; ctx.textBaseline = 'middle';
       // group captions + row labels
-      const cap = (txt, ya, yb) => { ctx.save(); ctx.translate(12, (ya + yb) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillStyle = '#90a4ae'; ctx.fillText(txt, 0, 0); ctx.restore(); };
+      // vertical caption when the group is tall enough, otherwise horizontal (e.g. a single link row)
+      const cap = (txt, ya, yb) => { if (yb - ya < 4) return; ctx.save(); ctx.fillStyle = '#90a4ae'; ctx.font = '11px Segoe UI'; const w = ctx.measureText(txt).width;
+        if (yb - ya >= w + 8) { ctx.translate(12, (ya + yb) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText(txt, 0, 0); }
+        else { ctx.textAlign = 'left'; ctx.fillText(txt, 5, (ya + yb) / 2); }
+        ctx.strokeStyle = '#cfd8dc'; ctx.beginPath(); ctx.moveTo(0, yb - .5); ctx.lineTo(L, yb - .5); ctx.stroke(); ctx.restore(); };
       cap('Node', nodeY, linkY); cap('Link', linkY, y1);
       ctx.textAlign = 'right'; ctx.fillStyle = '#546e7a';
       nodeRows.forEach((k, r) => ctx.fillText(k === 'node' ? 'ID' : LABEL[k], L - 8, nodeY + r * RH + RH / 2));

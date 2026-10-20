@@ -24,6 +24,7 @@
       this.settings = Object.assign({ recent: [] }, await window.host.getSettings());
       if (this.settings.defaults) Object.assign(this.defaults, this.settings.defaults);
       if (this.settings.prefs) Object.assign(this.prefs, this.settings.prefs);
+      await this.loadLicence();
       this.buildLayout();
       this.theme = new AV.Theme(this);
       this.map = new AV.MapView(AV.$('#mapWrap'), this);
@@ -52,18 +53,6 @@
       // engine version is shown in Help → About only
     }
 
-    // Help > Register: licence registration form (activation is added in a later version; the details are kept locally)
-    async registerDialog() {
-      const P = this.prefs.registration || {};
-      const r = await AV.formDialog('Register OsemCM', [
-        { t: 'note', l: 'Register your copy of OsemCM ' + ((this.info && this.info.version) || '') + '. Online activation will be enabled in a later version; your details are stored on this computer until then.' },
-        { k: 'name', l: 'Name', t: 'text' }, { k: 'company', l: 'Company / Organisation', t: 'text' }, { k: 'email', l: 'E-mail', t: 'text' }, { k: 'key', l: 'Licence Key', t: 'text' }],
-        { name: P.name || '', company: P.company || '', email: P.email || '', key: P.key || '' }, { okLabel: 'Register', width: 520 });
-      if (!r) return;
-      if (!String(r.name || '').trim() || !/^\S+@\S+\.\S+$/.test(String(r.email || '').trim())) { AV.toast('Enter your name and a valid e-mail address.', true); return; }
-      this.prefs.registration = Object.assign({}, r, { date: new Date().toISOString() }); this.savePrefs();
-      AV.toast('Registration details saved. Activation will be completed when online registration is available.', false, 5000);
-    }
     // drag handle between Parameter View and Layer View (like Avaris): sets the Parameter View height, remembered in the preferences
     makeVSplitter() {
       const sp = h('div', { class: 'vsplitter', title: 'Drag to resize Parameter View / Layer View' }, h('span', null, '⋯'));
@@ -360,8 +349,8 @@
     setDirty() { this.dirty = true; this.model.touch(); this.updateTitle(); this.refreshRibbon(); }
     updateTitle() {
       const name = this.filePath ? AV.basename(this.filePath) : 'Untitled';
-      window.host.setTitle('OsemCM V2.0 -- ' + name + (this.dirty ? ' *' : ''));
-      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'OsemCM V2.0 -- ' + name + (this.dirty ? ' *' : '');
+      window.host.setTitle('OsemCM V2.0 ' + AV.editionLabel(this) + ' -- ' + name + (this.dirty ? ' *' : ''));
+      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'OsemCM V2.0 ' + AV.editionLabel(this) + ' -- ' + name + (this.dirty ? ' *' : '');
       const m = this.model;
       AV.$('#modelCount').textContent = m ? `${m.nodes.size} nodes · ${m.links.size} links` : '';
     }
@@ -424,8 +413,8 @@
           try { const P = AV.Proj.parse(this.crsWKT); m.mapInfo.units = P.type === 'geographic' ? 'Degrees' : (Math.abs(P.unit - 1) < 1e-6 ? 'Meters' : 'Feet'); this.refreshAll(); } catch (e) { }
         }
         // 2D flood module: settings from an Avaris DS project, mesh from <model>.mesh2d.json (rebuilt when missing)
-        await AV.importAvaris2D(this); await AV.loadMesh2D(this);
-        if (!this.mesh2d && !this._meshRemoved && AV.f2dEnabled(m) && AV.f2d(m).BOUNDARY && AV.f2d(m).DEM) await AV.createMeshes(this, true);
+        if (AV.has2D(this)) { await AV.importAvaris2D(this); await AV.loadMesh2D(this); }
+        if (AV.has2D(this) && !this.mesh2d && !this._meshRemoved && AV.f2dEnabled(m) && AV.f2d(m).BOUNDARY && AV.f2d(m).DEM) await AV.createMeshes(this, true);
         if (this.mesh2d) { this.panels.refreshLayers(); this.map.redraw(); }
         // auto-load previous results if they exist next to the model (1D-2D results first)
         const fout = p.replace(/\.inp$/i, '.fout'), out = p.replace(/\.inp$/i, '.out');
@@ -783,7 +772,7 @@
         'Space + drag / middle mouse  Pan', 'Mouse wheel  Zoom', 'Ctrl+click  Add to selection', 'Shift+click  Choose from overlapping objects (Default Settings)', 'Drag a selected node  Move it (Edit mode ON)', 'Backspace  Remove last vertex while drawing', 'Enter / double-click  Finish polygon'].join('\n'), 'Keyboard Shortcuts');
     }
     about() {
-      AV.alert('OsemCM V2.0 (' + this.info.version + ')' + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
+      AV.alert('OsemCM V2.0 (' + this.info.version + ')\nEdition: ' + (this.license && this.license.valid ? AV.EDITIONS[this.license.edition] + ' — licensed to ' + this.license.licensee : 'OsemCM 1D (unregistered)') + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
         + '  - user-set dynamic-wave under-relaxation (UNDER_RELAXATION option)\n  - OpenMP parallel node-depth solution with per-node convergence flags\n'
         + '  - extended "Most Frequent Nonconverging Nodes" list (NONCONV_REPORT_COUNT)\n  - outfalls excluded from nonconvergence statistics\n\nCPU threads available: ' + this.info.cpus, 'About OsemCM');
     }

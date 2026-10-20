@@ -122,8 +122,9 @@
 
   // ------------------------------------------------------------------ Create Meshes
   AV.createMeshes = async function (app, quiet) {
+    if (!AV.has2D(app)) { if (!quiet) AV.need2D(app, 'Create Meshes'); return; }
     const m = app.model, f = AV.f2d(m);
-    if (!f.BOUNDARY || !f.DEM) { if (quiet) return; AV.alert('Set the 2D boundary and the DEM first (Simulation Options → 2D Flood).', 'Create Meshes'); app.sim.optionsDialog('2D Flood'); return; }
+    if (!f.BOUNDARY || !f.DEM) { if (quiet) return; AV.alert('Set the 2D boundary and the DEM first (2D Flood → 2D Options).', 'Create Meshes'); app.sim.optionsDialog('2D Flood', true); return; }
     const dlg = quiet ? { body: {}, close() {} } : AV.modal({ title: 'Create Meshes', width: 420, body: h('div', null, 'Reading boundary, DEM and lines...'), noFooter: true });
     try {
       const B = await readVector(app, f.BOUNDARY, 'Boundary');
@@ -134,7 +135,7 @@
       const boundary = polys.map(p => { const size = isFinite(cellOver) && cellOver > 0 ? cellOver : numProp(p.props, ['length', 'size', 'cellsize']); const n = isFinite(nOver) && nOver > 0 ? nOver : numProp(p.props, ['roughness', 'n', 'manning']);
         return { rings: p.coords, size: size > 0 ? size : NaN, n: n > 0 ? n : 0.03 }; });
       const bad = boundary.find(b => !(b.size > 0));
-      if (bad) throw new Error('The boundary polygon has no cell size. Add a numeric field "length" (cell size in map units) and "roughness" (Manning n) to its attribute table, or enter a cell size in Simulation Options → 2D Flood.');
+      if (bad) throw new Error('The boundary polygon has no cell size. Add a numeric field "length" (cell size in map units) and "roughness" (Manning n) to its attribute table, or enter a cell size in 2D Flood → 2D Options.');
       const area = boundary.reduce((a, b) => { const xs = b.rings.flat(); let A = 0; for (const r of b.rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) A += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return a + Math.abs(A / 2) / (b.size * b.size); }, 0);
       if (area > 400000 && (quiet || !await AV.confirm('About ' + Math.round(area).toLocaleString() + ' cells would be created. Large meshes run slowly; a larger cell size ("length") is recommended. Continue?', 'Create Meshes', 'Continue'))) { dlg.close(); return; }
       dlg.body.textContent = 'Reading DEM...';
@@ -182,7 +183,7 @@
   // ------------------------------------------------------------------ results on the mesh
   // per-cell node index in the output file, max depth, hours above the flood depth, hours to recede after the peak
   AV.computeMeshResults = async function (app) {
-    const R = app.results, mesh = app.mesh2d; if (!R || !mesh) { app.meshResults = null; return; }
+    const R = app.results, mesh = app.mesh2d; if (!R || !mesh || !AV.has2D(app)) { app.meshResults = null; return; }
     const idx = mesh.cells.map(c => { const i = R.idx.node.get(c.id); return i === undefined ? -1 : i; });
     if (!idx.some(i => i >= 0)) { app.meshResults = null; return; }
     const thr = parseFloat(AV.f2d(app.model).FLOOD_DEPTH) || 0;
@@ -267,7 +268,7 @@
     const sync = () => { const b = AV.meshStyle(Object.assign({}, app, { prefs: { mesh2d: Object.assign({}, P, { field: fs.value }) } })).breaks; brk.value = b ? b.join(' ') : ''; brk.disabled = !b; };
     fs.onchange = sync; brk.disabled = !S.breaks;
     const body = h('div', { class: 'form', style: { width: '480px' } }, h('label', null, 'Colour cells by'), fs, h('label', null, 'Class breaks'), brk, h('label', null, 'Opacity (0-1)'), op, h('label', null, 'Cell outlines'), ol,
-      h('div', { class: 'note' }, 'Cells below the first break are left uncoloured (dry). Depth and water surface follow the current time step (Play to animate the flooding); Max. Depth, Time Ponded and Time to Recede come from the whole run. Time Ponded counts the hours the depth is above the Flood Depth set in Simulation Options → 2D Flood.'));
+      h('div', { class: 'note' }, 'Cells below the first break are left uncoloured (dry). Depth and water surface follow the current time step (Play to animate the flooding); Max. Depth, Time Ponded and Time to Recede come from the whole run. Time Ponded counts the hours the depth is above the Flood Depth set in 2D Options.'));
     const r = await AV.modal({ title: '2D Mesh Style', body, buttons: [{ label: 'Cancel', value: null }, { label: 'OK', primary: true, value: true }] }).done; if (!r) return;
     P.field = fs.value; const b = brk.value.trim().split(/[\s,;]+/).map(Number).filter(isFinite); if (b.length) { P.breaks = P.breaks || {}; P.breaks[fs.value] = b.sort((x, y) => x - y); }
     const o = parseFloat(op.value); if (o >= 0 && o <= 1) P.opacity = o; P.outline = ol.checked; app.savePrefs(); app._meshRange = null; app.map.redraw();
