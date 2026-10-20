@@ -1,0 +1,260 @@
+[TITLE]
+;;Project Title/Notes
+Avaris Demo - Urban combined drainage network with storage, pump, orifice and weir
+
+[OPTIONS]
+;;Option             Value
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+MIN_SLOPE            0
+ALLOW_PONDING        NO
+SKIP_STEADY_STATE    NO
+START_DATE           06/01/2026
+START_TIME           00:00:00
+REPORT_START_DATE    06/01/2026
+REPORT_START_TIME    00:00:00
+END_DATE             06/01/2026
+END_TIME             12:00:00
+SWEEP_START          01/01
+SWEEP_END            12/31
+DRY_DAYS             5
+REPORT_STEP          00:05:00
+WET_STEP             00:01:00
+DRY_STEP             01:00:00
+ROUTING_STEP         0:00:05
+RULE_STEP            00:00:00
+INERTIAL_DAMPING     PARTIAL
+NORMAL_FLOW_LIMITED  BOTH
+FORCE_MAIN_EQUATION  H-W
+VARIABLE_STEP        0.75
+LENGTHENING_STEP     0
+MIN_SURFAREA         12.566
+MAX_TRIALS           8
+HEAD_TOLERANCE       0.005
+SYS_FLOW_TOL         5
+LAT_FLOW_TOL         5
+MINIMUM_STEP         0.5
+THREADS              1
+
+[EVAPORATION]
+;;Data Source    Parameters
+CONSTANT         0.0
+DRY_ONLY         NO
+
+[RAINGAGES]
+;;Name           Format    Interval SCF      Source
+RG1              INTENSITY 0:05     1.0      TIMESERIES Chicago_10yr_2h
+
+[SUBCATCHMENTS]
+;;Name           Rain Gage        Outlet           Area     %Imperv  Width    %Slope   CurbLen  SnowPack
+S1               RG1              J1               12.5     65       820      1.5      0
+S2               RG1              J2               9.8      55       700      1.2      0
+S3               RG1              J3               15.2     70       950      1.0      0
+S4               RG1              J4               8.6      45       610      2.0      0
+S5               RG1              J6               11.0     60       760      1.4      0
+S6               RG1              J7               13.4     75       880      0.9      0
+S7               RG1              J8               7.9      50       540      1.8      0
+S8               RG1              J10              10.6     62       720      1.1      0
+
+[SUBAREAS]
+;;Subcatchment   N-Imperv   N-Perv     S-Imperv   S-Perv     PctZero    RouteTo    PctRouted
+S1               0.013      0.15       0.06       0.25       25         OUTLET
+S2               0.013      0.15       0.06       0.25       25         OUTLET
+S3               0.013      0.15       0.06       0.25       25         OUTLET
+S4               0.013      0.15       0.06       0.25       25         OUTLET
+S5               0.013      0.15       0.06       0.25       25         OUTLET
+S6               0.013      0.15       0.06       0.25       25         OUTLET
+S7               0.013      0.15       0.06       0.25       25         OUTLET
+S8               0.013      0.15       0.06       0.25       25         OUTLET
+
+[INFILTRATION]
+;;Subcatchment   Param1     Param2     Param3     Param4     Param5
+S1               3.0        0.5        4          7          0
+S2               3.0        0.5        4          7          0
+S3               3.0        0.5        4          7          0
+S4               3.0        0.5        4          7          0
+S5               3.0        0.5        4          7          0
+S6               3.0        0.5        4          7          0
+S7               3.0        0.5        4          7          0
+S8               3.0        0.5        4          7          0
+
+[JUNCTIONS]
+;;Name           Elevation  MaxDepth   InitDepth  SurDepth   Aponded
+J1               110.0      10         0          0          0
+J2               107.5      10         0          0          0
+J3               106.0      11         0          0          0
+J4               108.2      9          0          0          0
+J5               103.4      12         0          0          0
+J6               104.8      10         0          0          0
+J7               101.9      12         0          0          0
+J8               103.0      10         0          0          0
+J9               99.6       13         0          0          0
+J10              101.0      10         0          0          0
+J11              97.2       14         0          0          0
+J12              92.0       8          0          0          0
+
+[OUTFALLS]
+;;Name           Elevation  Type       Stage Data       Gated    Route To
+OF1              88.0       FREE                        NO
+OF2              95.5       FREE                        NO
+OF3              86.0       FREE                        NO
+
+[STORAGE]
+;;Name           Elev.    MaxDepth   InitDepth  Shape      Curve Type/Params            SurDepth  Fevap    Psi      Ksat     IMD
+ST1              93.0     12         0          FUNCTIONAL 0         0         8000     0         0
+
+[CONDUITS]
+;;Name           From Node        To Node          Length     Roughness  InOffset   OutOffset  InitFlow   MaxFlow
+C1               J1               J2               400        0.013      0          0          0          0
+C2               J2               J3               350        0.013      0          0          0          0
+C3               J3               J5               420        0.013      0          0          0          0
+C4               J4               J5               500        0.013      0          0          0          0
+C5               J5               J7               380        0.013      0          0          0          0
+C6               J6               J7               450        0.013      0          0          0          0
+C7               J7               J9               400        0.013      0          0          0          0
+C8               J8               J9               420        0.013      0          0          0          0
+C9               J9               J11              360        0.013      0          0          0          0
+C10              J10              J11              480        0.013      0          0          0          0
+C11              J11              ST1              300        0.013      0          0          0          0
+C12              J12              OF1              250        0.013      0          0          0          0
+
+[PUMPS]
+;;Name           From Node        To Node          Pump Curve       Status   Sartup Shutoff
+P1               ST1              J12              PumpCurve1       ON       3.0    1.0
+
+[ORIFICES]
+;;Name           From Node        To Node          Type         Offset     Qcoeff     Gated    CloseTime
+OR1              J9               OF2              SIDE         6.0        0.65       NO       0
+
+[WEIRS]
+;;Name           From Node        To Node          Type         CrestHt    Qcoeff     Gated    EndCon   EndCoeff   Surcharge  RoadWidth  RoadSurf
+W1               ST1              OF3              TRANSVERSE   9.0        3.33       NO       0        0          YES
+
+[XSECTIONS]
+;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels    Culvert
+C1               CIRCULAR     2.0              0          0          0          1
+C2               CIRCULAR     2.5              0          0          0          1
+C3               CIRCULAR     3.0              0          0          0          1
+C4               CIRCULAR     2.0              0          0          0          1
+C5               CIRCULAR     3.5              0          0          0          1
+C6               CIRCULAR     2.5              0          0          0          1
+C7               RECT_CLOSED  4.0              5.0        0          0          1
+C8               CIRCULAR     2.0              0          0          0          1
+C9               RECT_CLOSED  4.5              6.0        0          0          1
+C10              CIRCULAR     2.5              0          0          0          1
+C11              RECT_CLOSED  5.0              6.0        0          0          1
+C12              CIRCULAR     3.0              0          0          0          1
+OR1              RECT_CLOSED  2.0              3.0        0          0
+W1               RECT_OPEN    3.0              20.0       0          0
+
+[CURVES]
+;;Name           Type       X-Value    Y-Value
+PumpCurve1       Pump4      0          0
+PumpCurve1                  3          20
+PumpCurve1                  6          45
+PumpCurve1                  12         60
+
+[TIMESERIES]
+;;Name           Date       Time       Value
+Chicago_10yr_2h             0:00       0.40
+Chicago_10yr_2h             0:05       0.48
+Chicago_10yr_2h             0:10       0.58
+Chicago_10yr_2h             0:15       0.73
+Chicago_10yr_2h             0:20       0.97
+Chicago_10yr_2h             0:25       1.42
+Chicago_10yr_2h             0:30       2.60
+Chicago_10yr_2h             0:35       6.10
+Chicago_10yr_2h             0:40       3.10
+Chicago_10yr_2h             0:45       1.88
+Chicago_10yr_2h             0:50       1.36
+Chicago_10yr_2h             0:55       1.08
+Chicago_10yr_2h             1:00       0.90
+Chicago_10yr_2h             1:05       0.77
+Chicago_10yr_2h             1:10       0.68
+Chicago_10yr_2h             1:15       0.61
+Chicago_10yr_2h             1:20       0.55
+Chicago_10yr_2h             1:25       0.50
+Chicago_10yr_2h             1:30       0.46
+Chicago_10yr_2h             1:35       0.43
+Chicago_10yr_2h             1:40       0.40
+Chicago_10yr_2h             1:45       0.38
+Chicago_10yr_2h             1:50       0.36
+Chicago_10yr_2h             1:55       0.34
+Chicago_10yr_2h             2:00       0.00
+
+[REPORT]
+;;Reporting Options
+SUBCATCHMENTS ALL
+NODES ALL
+LINKS ALL
+
+[TAGS]
+
+[MAP]
+DIMENSIONS 0.000 0.000 10000.000 10000.000
+Units      None
+
+[COORDINATES]
+;;Node           X-Coord            Y-Coord
+J1               1000.000           8000.000
+J2               2200.000           7600.000
+J3               3300.000           7100.000
+J4               2600.000           5200.000
+J5               4300.000           6200.000
+J6               5600.000           8100.000
+J7               5600.000           5900.000
+J8               7400.000           7600.000
+J9               6800.000           4900.000
+J10              8800.000           5600.000
+J11              7400.000           3500.000
+J12              6000.000           1900.000
+OF1              4600.000           1000.000
+OF2              8700.000           3600.000
+ST1              7000.000           2400.000
+OF3              7900.000           1200.000
+
+[VERTICES]
+;;Link           X-Coord            Y-Coord
+C12              5300.000           1600.000
+
+[POLYGONS]
+;;Subcatchment   X-Coord            Y-Coord
+S1               300.000            9200.000
+S1               1900.000           9300.000
+S1               1800.000           8100.000
+S1               400.000            7600.000
+S2               1900.000           9300.000
+S2               3200.000           9100.000
+S2               2900.000           7900.000
+S2               1800.000           8100.000
+S3               3200.000           9100.000
+S3               4600.000           8800.000
+S3               4100.000           7000.000
+S3               2900.000           7900.000
+S4               1200.000           6600.000
+S4               3100.000           6500.000
+S4               3200.000           4600.000
+S4               1400.000           4500.000
+S5               4600.000           8800.000
+S5               6500.000           9300.000
+S5               6600.000           7300.000
+S5               4900.000           7200.000
+S6               4100.000           7000.000
+S6               4900.000           7200.000
+S6               6600.000           7300.000
+S6               6300.000           5200.000
+S6               4500.000           5300.000
+S7               6500.000           9300.000
+S7               8600.000           9000.000
+S7               8200.000           6900.000
+S7               6600.000           7300.000
+S8               8200.000           6900.000
+S8               9700.000           6800.000
+S8               9500.000           4700.000
+S8               7800.000           4800.000
+
+[SYMBOLS]
+;;Gage           X-Coord            Y-Coord
+RG1              500.000            9700.000

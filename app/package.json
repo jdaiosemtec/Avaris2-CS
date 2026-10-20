@@ -1,0 +1,9 @@
+{
+  "name": "osemcm",
+  "productName": "OsemCM",
+  "version": "1.23.0",
+  "description": "OsemCM - urban drainage hydraulic modeling (Avaris DS / EPA SWMM compatible)",
+  "main": "main.js",
+  "author": "OSEMTEC",
+  "license": "Proprietary"
+}
