@@ -15,13 +15,13 @@
   const MAXD2D = 30; // depth of the 2D surface "channels" and cells (as in Avaris DS)
   AV.F2D_KEYS = KEYS;
   AV.f2d = (m) => Object.assign({}, DEF, (m && m.osem2d) || {});
-  // units of the 1D-2D run.
-  //   MODEL (default, as Avaris DS): the run keeps the model flow units and the mesh numbers (cell size, DEM elevations)
-  //          are used as they are.
-  //   SI:     the run is switched to CMS (values unchanged) - for models whose data are metric but labelled US.
-  //   CONVERT: model units kept, mesh lengths converted from map units to model units (metres -> feet ...).
+  // units of the 1D-2D run (the flow units are never changed here: to run in other units, switch the model's flow
+  // units in the status bar and choose "Keep values").
+  //   MODEL (default, as Avaris DS): the mesh numbers (cell size, DEM elevations, water-front elevations) are used as
+  //          they are, i.e. read as model units.
+  //   CONVERT: the mesh numbers are converted from the map units to the model units when the mesh is built
+  //          (map in metres + US model: lengths, widths and elevations x 3.28084; map in feet + SI model: x 0.3048).
   AV.f2dRun = (m) => { const mapU = String((m.mapInfo && m.mapInfo.units) || 'None').toUpperCase(); const u = String(AV.f2d(m).UNITS).toUpperCase();
-    if (u === 'SI') return { flow: m.isSI ? null : 'CMS', lenFactor: 1, si: true };
     if (u === 'CONVERT') return { flow: null, lenFactor: mapU === 'METERS' && !m.isSI ? 3.28084 : mapU === 'FEET' && m.isSI ? 0.3048 : 1, si: !!m.isSI };
     return { flow: null, lenFactor: 1, si: !!m.isSI }; };
   AV.f2dEnabled = (m) => /^(YES|TRUE|1)$/i.test(AV.f2d(m).ENABLED);
@@ -51,7 +51,7 @@
         if (!inPoly(cx, cy, B.rings)) continue;
         if (opt.exclusion.some(r => inPoly(cx, cy, r))) { skippedExcl++; continue; }
         const z = opt.sample(cx, cy); if (z === null || !isFinite(z)) { skippedNoData++; continue; }
-        const c = { k: cells.length, id: '', x: cx, y: cy, s, n: B.n, elev: +z.toFixed(4), bi, i, j, deg: 0 };
+        const c = { k: cells.length, id: '', x: cx, y: cy, s, n: B.n, elev: +(z * lf).toFixed(4), bi, i, j, deg: 0 };
         idx.set(i + ',' + j, c); cells.push(c);
       }
       grids.push({ x0, y0, s, idx });
@@ -73,7 +73,7 @@
     for (const C of opt.coast) { if (!(step0 > 0)) break; let ch = 0, next = step0;
       for (let k = 1; k < C.pts.length; k++) { const a = C.pts[k - 1], b = C.pts[k]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
         while (L > 0 && next <= ch + L + 1e-9) { const f = (next - ch) / L; const x = a[0] + f * (b[0] - a[0]), y = a[1] + f * (b[1] - a[1]);
-          const c = cellAt(x, y); if (c) { outfalls.push({ id: '2DO_' + (++ko), x, y, elev: isFinite(C.elev) ? C.elev : c.elev, cell: c.id, w: +(c.s * lf).toFixed(4) }); }
+          const c = cellAt(x, y); if (c) { outfalls.push({ id: '2DO_' + (++ko), x, y, elev: isFinite(C.elev) ? +(C.elev * lf).toFixed(4) : c.elev, cell: c.id, w: +(c.s * lf).toFixed(4) }); }
           next += step0; }
         ch += L; } }
     // 1D-2D coupling: an orifice at the rim of every 1D node that lies in a cell
@@ -109,7 +109,6 @@
       if (t.startsWith('[')) { sec = t.slice(1, t.indexOf(']')).toUpperCase(); out.push(ln); if (add[sec]) { seen.add(sec); out.push(';;OsemCM 2D surface elements'); out.push(...add[sec]); } continue; }
       if (sec === 'OPTIONS' && /^ROUTING_STEP\b/i.test(t) && rs > 0) { out.push(pad(['ROUTING_STEP', rs])); continue; }
       if ((sec === 'JUNCTIONS' || sec === 'STORAGE') && t && t[0] !== ';') { const k = AV.tokenize(t); const d = deepen.get(k[0]); if (d !== undefined && k.length >= 3 && !(+k[2] >= d)) { k[2] = String(d); out.push(pad(k)); continue; } }
-      if (sec === 'OPTIONS' && /^FLOW_UNITS\b/i.test(t) && run.flow) { out.push(pad(['FLOW_UNITS', run.flow]) + '   ;;OsemCM 2D: run in SI units (map in metres)'); continue; }
       out.push(ln);
     }
     for (const s in add) if (!seen.has(s) && add[s].length) { out.push('', '[' + s + ']'); out.push(...add[s]); }

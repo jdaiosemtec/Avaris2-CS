@@ -157,7 +157,7 @@
         UNDER_RELAXATION: g('UNDER_RELAXATION', '0.5'), NONCONV_REPORT_COUNT: g('NONCONV_REPORT_COUNT', '100'), detail: !!this.detailReport,
       };
       const D = this.app.defaults; for (const k in D) v['def_' + k] = D[k];
-      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false; if (!/^(MODEL|SI|CONVERT)$/i.test(v.f2d_UNITS)) v.f2d_UNITS = 'MODEL';
+      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false; if (!/^(MODEL|CONVERT)$/i.test(v.f2d_UNITS)) v.f2d_UNITS = 'MODEL';
       const YN = ['NO', 'YES'];
       const tabs = {
         General: [
@@ -206,7 +206,7 @@
           { k: 'f2d_EXCLUSION', l: 'Exclusion Polygons', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Buildings and other areas without cells.' },
           { t: 'h', l: 'Mesh and run' },
           { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
-          { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['MODEL', 'SI', 'CONVERT'], note: 'MODEL (as Avaris DS): the run keeps the model flow units; cell size and DEM elevations are used as they are. SI: the run is switched to CMS without changing any value (for models whose data are metric but labelled US). CONVERT: model units kept, mesh lengths converted from map units (rebuild the mesh after changing).' },
+          { k: 'f2d_UNITS', l: 'Mesh Units', t: 'choice', o: ['MODEL', 'CONVERT'], note: 'MODEL (as Avaris DS): cell size and DEM / water-front elevations are used as they are, read in the model units. CONVERT: they are converted from the map units to the model units when the mesh is built (e.g. map and DEM in metres, model in US units: 100 m cells become 328 ft, DEM elevations in m become ft). Rebuild the mesh after changing. To run in other flow units, change the Flow Units in the status bar.' },
           { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec, blank = model)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
           { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (Simulation ribbon, or right-click the 2D Meshes layer). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
       };
