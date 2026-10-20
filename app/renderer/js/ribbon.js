@@ -72,8 +72,7 @@
             { id: 'comparison', label: 'Comparison', img: 'summary', fn: () => this.toggleComparison(), active: () => this.views && this.views.has('cmp'), tip: 'Open / close the Scenario Comparison window' },
             { id: 'profile', label: 'Profile', img: 'profile', fn: () => F().profileTool() },
             { id: 'plot', label: 'Plot', img: 'plot', fn: () => F().graphTool() },
-            { id: 'play', label: 'Play', img: 'play', fn: () => S().togglePlaybar() },
-            { id: 'timestep', label: 'Time Step', img: 'transient', fn: () => this.timeStep.toggle(), active: () => !!this.tsOpen, tip: 'Step through the results time by time for the selected object' }] },
+            { id: 'play', label: 'Play', img: 'play', fn: () => S().togglePlaybar(), active: () => !!this.playMode, tip: 'Play mode: animate the results over time (click again to leave play mode)' }] },
         ]
       },
       {

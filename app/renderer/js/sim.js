@@ -157,7 +157,7 @@
         UNDER_RELAXATION: g('UNDER_RELAXATION', '0.5'), NONCONV_REPORT_COUNT: g('NONCONV_REPORT_COUNT', '100'), detail: !!this.detailReport,
       };
       const D = this.app.defaults; for (const k in D) v['def_' + k] = D[k];
-      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false;
+      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false; if (!/^(MODEL|SI|CONVERT)$/i.test(v.f2d_UNITS)) v.f2d_UNITS = 'MODEL';
       const YN = ['NO', 'YES'];
       const tabs = {
         General: [
@@ -206,8 +206,8 @@
           { k: 'f2d_EXCLUSION', l: 'Exclusion Polygons', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Buildings and other areas without cells.' },
           { t: 'h', l: 'Mesh and run' },
           { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
-          { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['AUTO', 'MODEL'], note: 'AUTO: a model in US units with a map in metres is run in SI (FLOW_UNITS CMS, values unchanged), so the metre-based mesh and DEM match. MODEL: keep the model units and convert the mesh lengths.' },
-          { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
+          { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['MODEL', 'SI', 'CONVERT'], note: 'MODEL (as Avaris DS): the run keeps the model flow units; cell size and DEM elevations are used as they are. SI: the run is switched to CMS without changing any value (for models whose data are metric but labelled US). CONVERT: model units kept, mesh lengths converted from map units (rebuild the mesh after changing).' },
+          { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec, blank = model)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
           { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (Simulation ribbon, or right-click the 2D Meshes layer). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
       };
       if (only2D) { for (const k of Object.keys(tabs)) if (k !== '2D Flood') delete tabs[k]; } else if (!AV.has2D(this.app)) delete tabs['2D Flood'];
@@ -370,8 +370,12 @@
         if (this.app.timeStep) setTimeout(() => this.app.timeStep.refresh(), 0);
         AV.$('#sbResults').textContent = 'Results: ' + meta.nPeriods + ' steps @ ' + AV.secToHms(meta.reportStep);
         const th = this.app.theme;
-        if (!th.layers.link.subs.length) th.layers.link.subs.push(th.newSub('link', 'm:4', 'Max. capacity'));
-        if (!th.layers.node.subs.length) th.layers.node.subs.push(th.newSub('node', 'm:full', 'Max. depth / max depth'));
+        // default themes: statistics (shown outside play mode) and dynamic results (shown while playing)
+        const hasF = (L, re) => th.layers[L].subs.some(t => re.test(t.field || ''));
+        if (!hasF('link', /^m:/)) th.layers.link.subs.push(th.newSub('link', 'm:4', 'Max. capacity'));
+        if (!hasF('node', /^m:/)) th.layers.node.subs.push(th.newSub('node', 'm:full', 'Max. depth / max depth'));
+        if (!hasF('link', /^r:/)) th.layers.link.subs.push(th.newSub('link', 'r:4', 'Capacity'));
+        if (!hasF('node', /^r:/)) th.layers.node.subs.push(th.newSub('node', 'r:full', 'Depth / max depth'));
         th.refreshAutoRanges();
         // start at time of peak system total inflow
         const st = R.stats.system; const tPeak = st.tmax[9] || 0;
@@ -384,7 +388,7 @@
     async clearResults(silent) {
       this.stop();
       if (this.results) { try { await window.host.outClose(this.results.handle); } catch (e) { } }
-      this.results = this.app.results = null; this.app.meshResults = null;
+      this.results = this.app.results = null; this.app.meshResults = null; this.app.playMode = false;
       if (this.app.timeStep) this.app.timeStep.refresh();
       if (this.compare) { try { await window.host.outClose(this.compare.handle); } catch (e) { } this.compare = null; }
       const pb = AV.$('#playbar'); if (pb) { pb.classList.remove('show'); pb.innerHTML = ''; }
@@ -406,12 +410,17 @@
         h('button', { class: 'btn small', title: 'Jump to a peak time (choose which peak)', onclick: (e) => this.peakMenu(e) }, 'Peak ▾'),
         h('button', { class: 'btn small quitbtn', title: 'Quit the simulation results: stop playback, close the time bar and unload the results (the result files stay on disk)', onclick: () => this.quitResults() }, '✕ Quit'));
     }
-    async quitResults() {
-      this.stop(); if (this.app.views.has('cmp')) this.app.closeView('cmp');
-      await this.clearResults(); await this.clearScenarios();
-      const th = this.app.theme; for (const k in th.layers) th.layers[k].subs = th.layers[k].subs.filter(t => !/^(r:|m:|nc$|cmp:)/.test(t.field || ''));
-      th.invalidate(); this.app.map.redraw(); th.updateLegend && th.updateLegend(); this.app.panels.showProps(); this.app.refreshRibbon && this.app.refreshRibbon();
-      this.app.status('Simulation results closed.');
+    // Quit = leave play mode: playback stops, the time bar closes, dynamic-result themes and the "Results at" cards are
+    // hidden. The results stay loaded (statistic themes, Statistic Results, graphs and profiles keep working).
+    async quitResults() { this.setPlayMode(false); this.app.status('Play mode closed (results remain loaded).'); }
+    setPlayMode(on) {
+      const app = this.app; if (!on) this.stop();
+      app.playMode = !!on && !!this.results;
+      const pb = AV.$('#playbar'); if (pb) pb.classList.toggle('show', app.playMode);
+      app.theme.invalidate(); app.map.redraw(); app.panels.showProps(); app.refreshRibbon && app.refreshRibbon();
+      if (app.meshSel >= 0 && app.mesh2d && !app.selection.size) AV.showCellInfo(app, app.meshSel, true);
+      if (app.symPane && app.symPane.target && app.symPane.target.mesh) app.symPane.render();
+      app.activateView('map'); app.map.resize();
     }
     // "Peak" button: let the user choose which peak to jump to
     peakMenu(e) {
@@ -445,9 +454,9 @@
     async togglePlaybar(force) {
       if (!this.results) { const f = await this.lastResultsFile(); if (f) { await this.loadResults(f.out, f.rpt, false); if (force === undefined && this.results) this.play(); return; }
         AV.toast('Run a simulation (or load a results file) first.'); return; }
-      const pb = AV.$('#playbar'); const show = force === undefined ? !pb.classList.contains('show') : force;
-      pb.classList.toggle('show', show); if (show && !this.playing && force === undefined) this.play();
-      this.app.activateView('map'); this.app.map.resize();
+      // Play: enter play mode and start; a second click leaves play mode (same as Quit)
+      const show = force === undefined ? !this.app.playMode : force;
+      this.setPlayMode(show); if (show && !this.playing && force === undefined) this.play();
     }
     async setPeriod(p) {
       const R = this.results; if (!R) return;
@@ -480,6 +489,7 @@
     // =============================================================== properties results card
     resultsCard(el, o) {
       const R = this.results; const r = R.index(o);
+      if (!this.app.playMode) { if (r) el.appendChild(h('div', { style: { padding: '8px 10px 10px', display: 'flex', gap: '6px' } }, h('button', { class: 'btn', onclick: () => this.app.feat.graphTool([o]) }, 'Graph'), (o.kind === 'NODE' || o.kind === 'LINK') ? h('button', { class: 'btn', onclick: () => this.app.feat.profileTool() }, 'Long Section') : null)); return; }
       if (!r) { el.appendChild(h('div', { class: 'rescard' }, h('div', { class: 'rh' }, 'Results'), h('div', { class: 'empty' }, 'No results for this object.'))); return; }
       const card = h('div', { class: 'rescard', id: 'rescard-live' }); this._liveObj = o;
       this.fillLive(card, o); el.appendChild(card);
@@ -511,7 +521,7 @@
     async showReport(path) {
       const rp = path || (this.results && this.results.rpt) || (this.lastRun && this.lastRun.rpt) || (this.app.filePath ? this.app.filePath.replace(/\.inp$/i, '.rpt') : null);
       if (!rp || !await window.host.exists(rp)) { AV.alert('No report file found. Run the simulation first.'); return; }
-      const text = await window.host.readText(rp);
+      const text = (await window.host.readText(rp)).replace(/^\s*OSEMCM HYDRAULIC ENGINE[^\n]*\n[^\n]*EPA SWMM[^\n]*\n\s*-{10,}\s*\n/, '');
       const toc = h('div', { class: 'toc' }); const pre = h('pre');
       const lines = text.split('\n');
       const heads = [];

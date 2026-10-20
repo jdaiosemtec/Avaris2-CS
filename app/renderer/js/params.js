@@ -264,8 +264,9 @@
         lys.forEach((ly, i) => { const vals = F[ly].map((f, k) => it.L[ly] && it.L[ly][k] !== undefined ? it.L[ly][k] : f[1]); ins[ly] = vals.map(v => inp(v, 140)); const pg = form(F[ly].map((f, k) => fld(f[0], ins[ly][k]))); pg.style.display = i ? 'none' : ''; pages.push(pg);
           tb.appendChild(h('div', { class: 't2' + (i ? '' : ' active'), onclick: (e) => { AV.$$('.t2', tb).forEach(x => x.classList.remove('active')); e.currentTarget.classList.add('active'); pages.forEach((p, j) => p.style.display = j === i ? '' : 'none'); } }, ly.charAt(0) + ly.slice(1).toLowerCase().replace('mat', ' Mat'))); });
         host.append(h('div', { class: 'psub' }, 'Structure Layer'), tb, ...pages); };
-      ty.onchange = () => { saveL(); showL(); }; showL();
-      return { el: h('div', null, h('div', { class: 'psub' }, 'General'), form(nr.row, fld('LID Type', ty)), host), save: () => { nr.save(); saveL(); it.type = ty.value; } }; } }, selName);
+      const sketch = h('div', { class: 'lidsketch', title: 'Schematic cross section' }); const drawSk = () => { sketch.innerHTML = AV.lidSketch(ty.value); };
+      ty.onchange = () => { saveL(); showL(); drawSk(); }; showL(); drawSk();
+      return { el: h('div', null, h('div', { class: 'lidtop' }, h('div', null, h('div', { class: 'psub' }, 'General'), form(nr.row, fld('LID Type', ty))), sketch), host), save: () => { nr.save(); saveL(); it.type = ty.value; } }; } }, selName);
 
   // small x-y plot with axes, ticks, grid and axis titles (transects, cross sections ...)
   // opts: pts [[x,y]], xLabel, yLabel, fill 'below' (ground) | 'none', vlines [{x, label}], markers

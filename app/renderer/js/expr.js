@@ -315,7 +315,7 @@
       h('div', { class: 'note' }, opts.mode !== 'value' ? 'Examples:  rptMaxFlow - 1 >= length + 2     |     (us_rptFreeboard < 12 or ds_rptFreeboard < 12) and rptMaxCapacity >= 1     |     name like \'J_5%\'' : 'Examples:  rptMaxHgl - rim     |     length / diam     |     iif(rptCapacity > 1, \'surcharged\', \'ok\')'));
     return AV.modal({ title: opts.title || (opts.mode === 'select' ? 'Select by Attribute' : 'Clause Editor'), width: 900, body, enterSubmits: false,
       buttons: [{ label: 'Clear', onClick: () => { ta.value = ''; msg.textContent = ''; ta.focus(); return false; } }, { label: 'Verify', onClick: () => { verify(); return false; } },
-        { label: 'Cancel', value: null }, { label: 'OK', primary: true, onClick: () => verify() ? { clause: ta.value.trim(), kind, method: method.value } : false }] }).done;
+        { label: 'Cancel', value: null }, { label: 'OK', primary: true, onClick: () => !ta.value.trim() ? (opts.mode === 'filter' ? { clause: '', kind, method: method.value } : 'empty') : verify() ? { clause: ta.value.trim(), kind, method: method.value } : false }] }).done.then(v => v === 'empty' ? null : v); // empty clause + OK = leave without change
   };
 
   // ------------------------------------------------------------------ select by attribute

@@ -241,6 +241,8 @@ ipcMain.handle('engine:run', async (e, job) => {
     engineProc.on('error', (err) => { result.errors.push('Engine error: ' + err.message); });
     engineProc.on('close', (code, signal) => {
       if (buf.trim()) handleLine(buf.trim());
+      // the report starts directly with the analysis (no engine banner)
+      try { const t = fs.readFileSync(rpt, 'latin1'); const t2 = t.replace(/^\s*OSEMCM HYDRAULIC ENGINE[^\n]*\n[^\n]*EPA SWMM[^\n]*\n\s*-{10,}\s*\n/, ''); if (t2 !== t) fs.writeFileSync(rpt, t2, 'latin1'); } catch (e) { }
       if (signal) result.canceled = true;
       if (result.code === -1 && !signal) result.code = code;
       engineProc = null;

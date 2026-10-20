@@ -11,16 +11,19 @@
 (function (AV) {
   const h = AV.h;
   const KEYS = ['ENABLED', 'BOUNDARY', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'DEM', 'ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS', 'UNITS'];
-  const DEF = { ENABLED: 'NO', BOUNDARY: '', WATERFRONT: '', CUTOFF: '', EXCLUSION: '', DEM: '', ROUTING_STEP: '5', FLOOD_DEPTH: '0', CELL_SIZE: '', ROUGHNESS: '', UNITS: 'AUTO' };
+  const DEF = { ENABLED: 'NO', BOUNDARY: '', WATERFRONT: '', CUTOFF: '', EXCLUSION: '', DEM: '', ROUTING_STEP: '', FLOOD_DEPTH: '0', CELL_SIZE: '', ROUGHNESS: '', UNITS: 'MODEL' };
   const MAXD2D = 30; // depth of the 2D surface "channels" and cells (as in Avaris DS)
   AV.F2D_KEYS = KEYS;
   AV.f2d = (m) => Object.assign({}, DEF, (m && m.osem2d) || {});
-  // units of the 1D-2D run. AUTO (as Avaris DS): a model in US units whose map is in metres is run in SI (FLOW_UNITS CMS,
-  // values unchanged) so that the metre-based mesh, DEM and model share one unit system. MODEL: keep the model units
-  // and convert the mesh lengths from map units.
-  AV.f2dRun = (m) => { const mapU = String((m.mapInfo && m.mapInfo.units) || 'None').toUpperCase(); const auto = String(AV.f2d(m).UNITS).toUpperCase() !== 'MODEL';
-    if (auto && mapU === 'METERS' && !m.isSI) return { flow: 'CMS', lenFactor: 1, si: true };
-    return { flow: null, lenFactor: mapU === 'METERS' && !m.isSI ? 3.28084 : mapU === 'FEET' && m.isSI ? 0.3048 : 1, si: !!m.isSI }; };
+  // units of the 1D-2D run.
+  //   MODEL (default, as Avaris DS): the run keeps the model flow units and the mesh numbers (cell size, DEM elevations)
+  //          are used as they are.
+  //   SI:     the run is switched to CMS (values unchanged) - for models whose data are metric but labelled US.
+  //   CONVERT: model units kept, mesh lengths converted from map units to model units (metres -> feet ...).
+  AV.f2dRun = (m) => { const mapU = String((m.mapInfo && m.mapInfo.units) || 'None').toUpperCase(); const u = String(AV.f2d(m).UNITS).toUpperCase();
+    if (u === 'SI') return { flow: m.isSI ? null : 'CMS', lenFactor: 1, si: true };
+    if (u === 'CONVERT') return { flow: null, lenFactor: mapU === 'METERS' && !m.isSI ? 3.28084 : mapU === 'FEET' && m.isSI ? 0.3048 : 1, si: !!m.isSI };
+    return { flow: null, lenFactor: 1, si: !!m.isSI }; };
   AV.f2dEnabled = (m) => /^(YES|TRUE|1)$/i.test(AV.f2d(m).ENABLED);
 
   // ------------------------------------------------------------------ geometry helpers
@@ -93,7 +96,8 @@
     for (const o of mesh.outfalls) { add.OUTFALLS.push(pad([o.id, o.elev, 'FREE', 'NO'])); add.COORDINATES.push(pad([o.id, o.x, o.y]));
       const zc = cellZ.get(o.cell); const crest = Math.max(o.elev, isFinite(zc) ? zc : o.elev);
       add.ORIFICES.push(pad([o.id + 'X', o.id, o.cell, 'SIDE', crest > o.elev ? up4(elevOff ? crest : crest - o.elev) : r4(elevOff ? crest : 0), 0.65, 'NO', 0])); add.XSECTIONS.push(pad([o.id + 'X', 'RECT_CLOSED', MAXD2D, o.w, 0, 0])); }
-    for (const l of mesh.links) { add.CONDUITS.push(pad([l.id, l.a, l.b, l.len, l.n, 0, 0, 0, 0])); add.XSECTIONS.push(pad([l.id, 'RECT_OPEN', MAXD2D, l.w, 0, 0, 1])); }
+    const cellN = new Map(mesh.cells.map(c => [c.id, c.n])); // roughness may have been edited per cell in the attribute table
+    for (const l of mesh.links) { const na = cellN.get(l.a), nb = cellN.get(l.b); const n = isFinite(na) && isFinite(nb) ? Math.max(na, nb) : l.n; add.CONDUITS.push(pad([l.id, l.a, l.b, l.len, n, 0, 0, 0, 0])); add.XSECTIONS.push(pad([l.id, 'RECT_OPEN', MAXD2D, l.w, 0, 0, 1])); }
     for (const x of mesh.couplings) { const nd = m.nodes.get(x.node); if (!nd) continue; const z0 = +nd.p.elev || 0, rim = (+nd.p.maxDepth || 0);
       const zc = cellZ.get(x.cell); const crest = Math.max(z0 + rim, isFinite(zc) ? zc : z0 + rim);
       add.ORIFICES.push(pad([x.id, x.node, x.cell, 'SIDE', crest > z0 + rim ? up4(elevOff ? crest : crest - z0) : r4(elevOff ? crest : rim), 0.65, 'NO', 0])); add.XSECTIONS.push(pad([x.id, 'RECT_CLOSED', MAXD2D, x.w, 0, 0]));
@@ -221,12 +225,15 @@
   AV.RAMPS['Terrain'] = ['#2e7d32', '#aed581', '#fff176', '#bc8c5c', '#f5f5f5'];
   const DEF_RAMP = { depth: 'Flood Depth', maxdepth: 'Flood Depth', tpond: 'Flood Time', trecede: 'Flood Time', wse: 'Terrain', elev: 'Terrain' };
   AV.MESH_CONTINUOUS = { wse: true, elev: true };
+  AV.MESH_DYNAMIC = { depth: true, wse: true };
+  AV.meshField = (app) => { const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); return app.playMode ? (AV.MESH_DYNAMIC[P.playField] ? P.playField : 'depth') : (FIELDS[P.field] && !AV.MESH_DYNAMIC[P.field] ? P.field : 'maxdepth'); };
   AV.meshDefaultBreaks = (app, field) => { const si = AV.meshSI(app);
     return { depth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], maxdepth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], tpond: [0.25, 0.5, 1, 2, 4], trecede: [0.25, 0.5, 1, 2, 4] }[field] || null; };
   // style of the Meshes layer (set in the Symbology pane). Class i colours values from breaks[i] up to breaks[i+1];
   // values below the first break are not coloured (dry). Elevation / water surface use a continuous ramp.
   AV.meshStyle = function (app) {
-    const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); const field = FIELDS[P.field] ? P.field : 'depth';
+    // play mode shows a dynamic variable (depth / water surface), otherwise a statistic or static one
+    const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); const field = AV.meshField(app);
     const ramp = (P.ramp && P.ramp[field]) || DEF_RAMP[field], invert = !!(P.invert && P.invert[field]);
     let breaks = null, colors = null;
     if (!AV.MESH_CONTINUOUS[field]) { const cls = P.classes && P.classes[field];
@@ -293,39 +300,38 @@
     if (app.crs && app.crs.wkt) await window.host.writeText(base + '.prj', app.crs.wkt);
     AV.toast('Mesh exported to ' + base + '.shp');
   };
-  // attribute table of the 2D cells (read only): sort by a column, click a row to select / zoom to the cell, copy to Excel
-  AV.meshTable = function (app) {
-    const mesh = app.mesh2d; if (!mesh) { AV.toast('Create the 2D mesh first.', true); return; }
-    const L = AV.meshSI(app) ? 'm' : 'ft'; const has = !!app.meshResults; const per = app.results ? app.results.timeLabel(app.results.period) : '';
-    const cols = [['id', 'ID'], ['x', 'X'], ['y', 'Y'], ['elev', 'Ground Elev. (' + L + ')'], ['n', 'Roughness'], ['deg', 'Neighbours']].concat(has ? [['depth', 'Depth (' + L + ') ' + per], ['wse', 'Water Surface (' + L + ')'], ['maxdepth', 'Max. Depth (' + L + ')'], ['tpond', 'Time Ponded (hr)'], ['trecede', 'Time to Recede (hr)']] : []);
-    const rows = mesh.cells.map((c, k) => { const r = { k, id: c.id, x: c.x, y: c.y, elev: c.elev, n: c.n, deg: c.deg }; if (has) for (const f of ['depth', 'wse', 'maxdepth', 'tpond', 'trecede']) r[f] = AV.cellValue(app, k, f); return r; });
-    let sortK = null, sortD = 1; const MAXR = 5000;
-    const holder = h('div', { class: 'grid-scroll', style: { flex: 1, overflow: 'auto' } }); const info = h('span', { class: 'note' });
-    const fmtv = (v, k) => v === null || v === undefined || (typeof v === 'number' && !isFinite(v)) ? '' : typeof v === 'number' ? (k === 'x' || k === 'y' ? v.toFixed(2) : AV.fmt(v, 4)) : String(v);
-    const render = () => {
-      const R = rows.slice(); if (sortK) R.sort((a, b) => { const x = a[sortK], y = b[sortK]; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })) * sortD; });
-      const t = h('table', { class: 'grid' }, h('thead', null, h('tr', null, cols.map(([k, l]) => h('th', { style: { cursor: 'pointer', whiteSpace: 'nowrap' }, onclick: () => { sortD = sortK === k ? -sortD : 1; sortK = k; render(); } }, l + (sortK === k ? (sortD > 0 ? ' ▲' : ' ▼') : ''))))));
-      const tb = h('tbody'); for (const r of R.slice(0, MAXR)) { const tr = h('tr', { style: { cursor: 'pointer' } }, cols.map(([k]) => h('td', { class: k === 'id' ? '' : 'num' }, fmtv(r[k], k)))); tr.addEventListener('click', () => { app.clearSelection(); app.meshSel = r.k; AV.showCellInfo(app, r.k); const c = mesh.cells[r.k]; app.map.zoomToBox({ x1: c.x - c.s * 4, y1: c.y - c.s * 4, x2: c.x + c.s * 4, y2: c.y + c.s * 4 }, 0); app.map.redrawOverlay(); }); tb.appendChild(tr); }
-      t.appendChild(tb); holder.innerHTML = ''; holder.appendChild(t); info.textContent = rows.length + ' cells' + (rows.length > MAXR ? ' (first ' + MAXR + ' shown; Copy exports all)' : '') + (has ? '' : ' - run the 1D-2D model to add the flooding results');
-    };
-    const copy = () => AV.copyTSV(cols.map(c => c[1]), rows.map(r => cols.map(([k]) => fmtv(r[k], k))));
-    const body = h('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } }, h('div', { class: 'followbar' }, h('button', { class: 'btn small', onclick: copy }, '⧉ Copy (Excel)'), info), holder);
-    AV.floatPanel({ id: 'meshtable', title: 'Attribute Table - 2D Meshes', w: 760, h: 420, body }); render();
-  };
+  // attribute table of the 2D cells: the normal Attribute Table with the '2D Meshes' layer
+  AV.meshTable = (app) => { if (!app.mesh2d) { AV.toast('Create the 2D mesh first.', true); return; } AV.openTable(app, 'MESH'); };
   // pseudo node used to plot the depth of a cell with the normal graph tools
   AV.cellNode = (app, k) => { const c = app.mesh2d.cells[k]; return { id: c.id, kind: 'NODE', type: 'JUNCTION', x: c.x, y: c.y, p: { elev: c.elev, maxDepth: 0 }, tag: '', mesh: true }; };
+  // ---- selection of 2D cells (separate from the network selection; used by the map, the attribute table and the graphs)
+  const IDX = new WeakMap();
+  AV.cellIndex = (app, c) => { const mesh = app.mesh2d; if (!mesh) return -1; let m = IDX.get(mesh); if (!m) { m = new Map(mesh.cells.map((x, i) => [x, i])); IDX.set(mesh, m); } const i = m.get(c); return i === undefined ? -1 : i; };
+  AV.meshSelSet = (app) => app.meshSelSet || (app.meshSelSet = new Set());
+  AV.meshSelect = function (app, cells, add) {
+    const S = AV.meshSelSet(app); if (!add) S.clear(); for (const c of cells) S.add(c);
+    if (app.selection.size) { app.selection.clear(); app._keepMesh = true; app.onSelectionChanged(); app._keepMesh = false; }
+    const last = cells.length ? cells[cells.length - 1] : [...S].pop();
+    app.meshSel = last ? AV.cellIndex(app, last) : -1;
+    if (S.size === 1 && app.meshSel >= 0) AV.showCellInfo(app, app.meshSel); else { app.panels.showProps(); if (S.size) app.status(S.size + ' 2D cell(s) selected'); }
+    app.map.redrawOverlay(); AV.syncTableSelection(app);
+  };
+  AV.meshClearSel = function (app) { if (app.meshSelSet) app.meshSelSet.clear(); app.meshSel = -1; app.map.redrawOverlay(); AV.syncTableSelection(app); };
   AV.showCellInfo = function (app, k, quiet) {
-    if (!quiet) { app.meshSel = k; app.map.redrawOverlay(); }
+    if (!quiet) { app.meshSel = k; const S = AV.meshSelSet(app), c = app.mesh2d.cells[k]; if (c && !S.has(c)) { S.clear(); S.add(c); AV.syncTableSelection(app); } app.map.redrawOverlay(); }
     const el = AV.$('#props'); if (!el) return; const c = app.mesh2d.cells[k]; el.innerHTML = '';
     const L = AV.meshSI(app) ? 'm' : 'ft'; const f = (v, d) => v === null || v === undefined || !isFinite(v) ? '-' : AV.fmt(v, d);
     el.appendChild(h('div', { class: 'phead' }, h('div', { class: 'pt' }, '2D Cell ' + c.id), h('div', { class: 'ps' }, 'X ' + AV.fmt(c.x, 2) + '   Y ' + AV.fmt(c.y, 2))));
     const rows = [['Ground Elevation (' + L + ')', f(c.elev, 3)], ['Cell Size (map units)', f(c.s)], ['Roughness (n)', f(c.n, 4)], ['Connected Neighbours', String(c.deg)]];
-    const MR = app.meshResults; const res = MR ? [['Depth at ' + app.results.timeLabel(app.results.period) + ' (' + L + ')', f(AV.cellValue(app, k, 'depth'), 3)], ['Water Surface Elev. (' + L + ')', f(AV.cellValue(app, k, 'wse'), 3)], ['Max. Depth (' + L + ')', f(AV.cellValue(app, k, 'maxdepth'), 3)],
+    const MR = app.meshResults; const res = MR ? [['Max. Depth (' + L + ')', f(AV.cellValue(app, k, 'maxdepth'), 3)], ['Max. Water Surface Elev. (' + L + ')', f(c.elev + (AV.cellValue(app, k, 'maxdepth') || 0), 3)],
       ['Time Ponded (hr)', f(AV.cellValue(app, k, 'tpond'), 2)], ['Time to Recede (hr)', f(AV.cellValue(app, k, 'trecede'), 2)]] : [];
     const tb = h('table', { class: 'pgrid' }, h('tr', { class: 'pg0' }, h('td', { colspan: 2 }, 'General')), rows.map(([a, b]) => h('tr', null, h('td', { class: 'k' }, a), h('td', { class: 'v' }, h('div', { class: 'ro' }, b)))),
-      res.length ? h('tr', { class: 'pg0' }, h('td', { colspan: 2 }, 'Flooding Results')) : null, res.map(([a, b]) => h('tr', { class: 'st' }, h('td', { class: 'k' }, a), h('td', { class: 'v' }, h('div', { class: 'ro' }, b)))));
+      res.length ? h('tr', { class: 'pg0' }, h('td', { colspan: 2 }, 'Statistic Results')) : null, res.map(([a, b]) => h('tr', { class: 'st' }, h('td', { class: 'k' }, a), h('td', { class: 'v' }, h('div', { class: 'ro' }, b)))));
     el.appendChild(tb);
-    if (MR) el.appendChild(h('div', { style: { padding: '8px 10px' } }, h('button', { class: 'btn', onclick: () => app.feat.graphTool([AV.cellNode(app, k)]) }, 'Graph Depth')));
+    // play mode: depth at the current time step (blue card, like the nodes / links)
+    if (MR && app.playMode) el.appendChild(h('div', { class: 'rescard' }, h('div', { class: 'rh' }, 'Results at ' + app.results.timeLabel(app.results.period)),
+      h('table', null, h('tr', null, h('td', null, 'Depth (' + L + ')'), h('td', { class: 'num' }, f(AV.cellValue(app, k, 'depth'), 3))))));
+    if (MR) el.appendChild(h('div', { style: { padding: '8px 10px' } }, h('button', { class: 'btn', onclick: () => app.feat.graphTool([AV.cellNode(app, k)]) }, 'Graph')));
     if (quiet) return;
     if (app.showRightTab) app.showRightTab('props');
     app.emit('cellselect', k);

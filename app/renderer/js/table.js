@@ -5,7 +5,21 @@
   const ROW_H = 22;
   const ALL_TYPES = ['JUNCTION', 'OUTFALL', 'STORAGE', 'DIVIDER', 'CONDUIT', 'PUMP', 'ORIFICE', 'WEIR', 'OUTLET', 'SUBCATCH', 'GAGE'];
 
+  // 2D cells (2D module): ground elevation and roughness can be edited; results are read only
+  function meshRows(app) {
+    const mesh = app.mesh2d; const objs = mesh ? mesh.cells : []; const L = AV.meshSI(app) ? 'm' : 'ft'; const K = (c) => AV.cellIndex(app, c);
+    const r4 = (v) => v === null || v === undefined || !isFinite(v) ? '' : +(+v).toFixed(4);
+    const cols = [{ k: 'id', l: 'ID', get: (c) => c.id, ro: true }, { k: 'x', l: 'X', get: (c) => +c.x.toFixed(3), num: true, ro: true }, { k: 'y', l: 'Y', get: (c) => +c.y.toFixed(3), num: true, ro: true },
+      { k: 'elev', l: 'Ground Elev. (' + L + ')', get: (c) => c.elev, num: true, mesh: true }, { k: 'n', l: 'Roughness', get: (c) => c.n, num: true, mesh: true },
+      { k: 's', l: 'Cell Size', get: (c) => c.s, num: true, ro: true }, { k: 'deg', l: 'Neighbours', get: (c) => c.deg, num: true, ro: true }];
+    if (app.meshResults) cols.push({ k: '_maxdepth', l: 'Max. Depth (' + L + ') (result)', get: (c) => r4(AV.cellValue(app, K(c), 'maxdepth')), num: true, ro: true, res: true },
+      { k: '_tpond', l: 'Time Ponded (hr) (result)', get: (c) => r4(AV.cellValue(app, K(c), 'tpond')), num: true, ro: true, res: true },
+      { k: '_trecede', l: 'Time to Recede (hr) (result)', get: (c) => r4(AV.cellValue(app, K(c), 'trecede')), num: true, ro: true, res: true });
+    if (app.meshResults && app.playMode) cols.push({ k: '_depth', l: 'Depth (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'depth')), num: true, ro: true, res: true });
+    return { kind: 'MESH', cols, objs };
+  }
   AV.tableRows = function (app, type) {
+    if (type === 'MESH') return meshRows(app);
     const m = app.model; const kind = AV.NODE_TYPES.includes(type) ? 'NODE' : AV.LINK_TYPES.includes(type) ? 'LINK' : type;
     const coll = kind === 'NODE' ? m.nodes : kind === 'LINK' ? m.links : kind === 'SUBCATCH' ? m.subcatchments : m.gages;
     const objs = (kind === 'NODE' || kind === 'LINK') ? [...coll.values()].filter(o => o.type === type) : [...coll.values()];
@@ -30,16 +44,16 @@
     constructor(app, type) {
       this.app = app; this.type = type; this.sortCol = null; this.sortDir = 1; this.filter = ''; this.selOnly = false;
       this.el = h('div', { class: 'grid-wrap' });
-      this.typeSel = h('select', { onchange: () => { this.type = this.typeSel.value; this.sortCol = null; this.refresh(); } }, ALL_TYPES.map(t => h('option', { value: t }, AV.TYPE_LABEL[t])));
+      this.typeSel = h('select', { onchange: () => { this.type = this.typeSel.value; this.sortCol = null; this.refresh(); } }, ALL_TYPES.concat(app.mesh2d ? ['MESH'] : []).map(t => h('option', { value: t }, t === 'MESH' ? '2D Meshes' : AV.TYPE_LABEL[t])));
       this.typeSel.value = type;
       this.filterInp = h('input', { type: 'text', placeholder: 'Filter ID...', style: { width: '130px' }, oninput: AV.debounce(() => { this.filter = this.filterInp.value.toLowerCase(); this.refresh(); }, 200) });
       this.count = h('span', { style: { color: 'var(--muted)' } });
       const B = (label, fn, title) => h('button', { class: 'btn small', onclick: fn, title }, label);
       this.selOnlyChk = h('input', { type: 'checkbox', onchange: (e) => { this.selOnly = e.target.checked; this.refresh(); } });
       this.el.appendChild(h('div', { class: 'grid-tools' }, this.typeSel, this.filterInp,
-        B('Select by Attribute...', () => this.selectByAttr()), B('Select All', () => this.app.selectMany(this.rows.objs, false)), B('Invert', () => { const s = new Set(this.rows.objs.filter(o => !this.app.selection.has(o))); this.app.selectMany([...s]); }),
-        B('Clear', () => this.app.clearSelection()), h('label', null, this.selOnlyChk, ' Selected only'),
-        B('Zoom to Selected', () => { this.app.activateView('map'); this.app.map.zoomToObjects([...this.app.selection]); }),
+        B('Select by Attribute...', () => this.selectByAttr()), B('Select All', () => this.selMany(this.rows.objs, false)), B('Invert', () => { const s = new Set(this.rows.objs.filter(o => !this.isSel(o))); this.selMany([...s]); }),
+        B('Clear', () => this.mesh() ? AV.meshClearSel(this.app) : this.app.clearSelection()), h('label', null, this.selOnlyChk, ' Selected only'),
+        B('Zoom to Selected', () => this.zoomSel()),
         B('Copy', () => this.copy(), 'Copy selected rows (or all) as tab-separated text for Excel'), B('Paste', () => this.paste(), 'Paste tab-separated rows from Excel; first column = ID, header row = column names'),
         B('Export CSV', () => this.exportCSV()), this.count));
       this.scroll = h('div', { class: 'grid-scroll' });
@@ -49,16 +63,35 @@
       new ResizeObserver(() => this.renderRows()).observe(this.scroll);
       this.refresh();
     }
+    // ---- selection helpers (network objects, or 2D cells for the 2D Meshes table)
+    mesh() { return this.type === 'MESH'; }
+    isSel(o) { return this.mesh() ? !!(this.app.meshSelSet && this.app.meshSelSet.has(o)) : this.app.selection.has(o); }
+    selMany(objs, add) { if (this.mesh()) AV.meshSelect(this.app, objs, add); else this.app.selectMany(objs, add); if (this.mesh()) this.refreshSel(); }
+    sel1(o, add) { if (this.mesh()) { if (add && this.isSel(o)) { this.app.meshSelSet.delete(o); AV.meshSelect(this.app, [], true); } else AV.meshSelect(this.app, [o], add); this.refreshSel(); } else this.app.select(o, add); }
+    refreshSel() { if (this.selOnly) this.refresh(); else { this.updateSel(); this.count.textContent = this.view.length + ' of ' + this.rows.objs.length + ' rows, ' + this.rows.objs.filter(o => this.isSel(o)).length + ' selected'; } }
+    zoomSel() { this.app.activateView('map'); if (this.mesh()) { const S = [...(this.app.meshSelSet || [])]; if (!S.length) { AV.toast('No 2D cells are selected.', true); return; } let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const c of S) { x1 = Math.min(x1, c.x - c.s); y1 = Math.min(y1, c.y - c.s); x2 = Math.max(x2, c.x + c.s); y2 = Math.max(y2, c.y + c.s); } this.app.map.zoomToBox({ x1, y1, x2, y2 }); } else this.app.map.zoomToObjects([...this.app.selection]); }
+    // set a property of objects (network: setProps with undo; 2D cells: elevation / roughness with undo, mesh file saved)
+    setPropsAny(objs, key, vals) {
+      if (!this.mesh()) { this.app.setProps(objs, key, vals); return; }
+      const app = this.app; const old = objs.map(c => c[key]); const nw = vals.map(v => +v);
+      const save = () => { const mp = AV.meshPath(app); if (mp && app.mesh2d) window.host.writeText(mp, JSON.stringify(app.mesh2d)).catch(() => {}); app._meshRange = null; app.map.redraw(); this.refresh(); };
+      app.exec({ label: 'Edit 2D cells (' + key + ')', do: () => { objs.forEach((c, i) => { c[key] = nw[i]; }); save(); }, undo: () => { objs.forEach((c, i) => { c[key] = old[i]; }); save(); } });
+    }
     refresh() {
-      const app = this.app; this.rows = AV.tableRows(app, this.type);
+      const app = this.app;
+      // keep the "2D Meshes" entry in the layer list in step with the model
+      const hasMeshOpt = [...this.typeSel.options].some(o => o.value === 'MESH');
+      if (app.mesh2d && !hasMeshOpt) this.typeSel.appendChild(h('option', { value: 'MESH' }, '2D Meshes'));
+      if (!app.mesh2d && hasMeshOpt) { [...this.typeSel.options].find(o => o.value === 'MESH').remove(); if (this.type === 'MESH') { this.type = 'JUNCTION'; this.typeSel.value = 'JUNCTION'; } }
+      this.rows = AV.tableRows(app, this.type);
       let objs = this.rows.objs;
       if (this.filter) objs = objs.filter(o => o.id.toLowerCase().includes(this.filter));
-      if (this.selOnly) objs = objs.filter(o => app.selection.has(o));
+      if (this.selOnly) objs = objs.filter(o => this.isSel(o));
       if (this.sortCol) { const c = this.rows.cols.find(x => x.k === this.sortCol); if (c) { const d = this.sortDir; objs = objs.slice().sort((a, b) => { let x = c.get(a), y = c.get(b); if (c.num) { x = parseFloat(x); y = parseFloat(y); x = isFinite(x) ? x : -Infinity; y = isFinite(y) ? y : -Infinity; return (x - y) * d; } return String(x).localeCompare(String(y), undefined, { numeric: true }) * d; }); } }
       this.view = objs;
       this.thead.innerHTML = '';
       this.thead.appendChild(h('tr', null, h('th', { class: 'rowh' }, '#'), this.rows.cols.map(c => h('th', { title: c.l + (c.ro ? ' (read-only)' : '') + '\nClick to sort, right-click for statistics / calculator', onclick: () => { if (this.sortCol === c.k) this.sortDir *= -1; else { this.sortCol = c.k; this.sortDir = 1; } this.refresh(); }, oncontextmenu: (e) => { e.preventDefault(); this.colMenu(e, c); } }, c.l + (this.sortCol === c.k ? (this.sortDir > 0 ? ' ▲' : ' ▼') : '')))));
-      this.count.textContent = objs.length + ' of ' + this.rows.objs.length + ' rows, ' + this.rows.objs.filter(o => app.selection.has(o)).length + ' selected';
+      this.count.textContent = objs.length + ' of ' + this.rows.objs.length + ' rows, ' + this.rows.objs.filter(o => this.isSel(o)).length + ' selected';
       this.renderRows(true);
     }
     renderRows() {
@@ -70,7 +103,7 @@
       if (first > 0) this.tbody.appendChild(h('tr', { style: { height: (first * ROW_H) + 'px' } }, h('td', { colspan: ncol, style: { padding: 0, border: 0 } })));
       for (let i = first; i < last; i++) {
         const o = this.view[i];
-        const tr = h('tr', { class: this.app.selection.has(o) ? 'sel' : '' }); tr.__obj = o;
+        const tr = h('tr', { class: this.isSel(o) ? 'sel' : '' }); tr.__obj = o;
         tr.appendChild(h('td', { class: 'rowh' }, String(i + 1)));
         for (const c of this.rows.cols) {
           const v = c.get(o);
@@ -82,15 +115,15 @@
         tr.addEventListener('click', (e) => {
           if (e.target.tagName === 'INPUT') return;
           // Shift+click: select the range from the last clicked row; Ctrl+click: toggle one row
-          if (e.shiftKey && this.anchor !== undefined && this.anchor < this.view.length) { const a = Math.min(this.anchor, i), b = Math.max(this.anchor, i); this.app.selectMany(this.view.slice(a, b + 1), e.ctrlKey); return; }
-          this.anchor = i; this.app.select(o, e.ctrlKey);
+          if (e.shiftKey && this.anchor !== undefined && this.anchor < this.view.length) { const a = Math.min(this.anchor, i), b = Math.max(this.anchor, i); this.selMany(this.view.slice(a, b + 1), e.ctrlKey); return; }
+          this.anchor = i; this.sel1(o, e.ctrlKey);
         });
         this.tbody.appendChild(tr);
       }
       const rest = this.view.length - last;
       if (rest > 0) this.tbody.appendChild(h('tr', { style: { height: (rest * ROW_H) + 'px' } }, h('td', { colspan: ncol, style: { padding: 0, border: 0 } })));
     }
-    updateSel() { for (const tr of this.tbody.children) if (tr.__obj) tr.classList.toggle('sel', this.app.selection.has(tr.__obj)); }
+    updateSel() { for (const tr of this.tbody.children) if (tr.__obj) tr.classList.toggle('sel', this.isSel(tr.__obj)); }
     editCell(td, o, c) {
       const old = c.get(o);
       const inp = h('input', { type: 'text', value: old === undefined ? '' : old });
@@ -105,6 +138,7 @@
     }
     setValue(o, c, val) {
       const app = this.app, m = app.model;
+      if (c.mesh) { const v = parseFloat(val); if (!isFinite(v) || (c.k === 'n' && !(v > 0))) { AV.toast(c.l + ' must be a ' + (c.k === 'n' ? 'positive ' : '') + 'number.', true); return false; } this.setPropsAny([o], c.k, [v]); return true; }
       if (c.id) { val = val.trim(); if (!val || /\s/.test(val) || m.idExists(val)) { AV.toast('Invalid or duplicate ID.', true); return false; } const old = o.id; app.exec({ label: 'Rename', do: () => m.renameObject(o, val), undo: () => m.renameObject(o, old) }); return true; }
       if (c.ends) { if (!m.nodes.has(val)) { AV.toast('Node ' + val + ' not found.', true); return false; } const old = o[c.k]; app.exec({ label: 'Reconnect', do: () => o[c.k] = val, undo: () => o[c.k] = old }); return true; }
       if (c.xy) { const x = parseFloat(val); if (!isFinite(x)) return false; const old = o[c.k]; app.exec({ label: 'Move', do: () => o[c.k] = x, undo: () => o[c.k] = old }); return true; }
@@ -124,13 +158,15 @@
       this.app.contextMenu(e.clientX, e.clientY, items);
     }
     themeBy(c) {
+      if (this.mesh()) { const f = { elev: 'elev', _maxdepth: 'maxdepth', _tpond: 'tpond', _trecede: 'trecede', _depth: 'depth' }[c.k]; if (!f) { AV.toast('This field is not available for map rendering.', true); return; }
+        const P = this.app.prefs.mesh2d || (this.app.prefs.mesh2d = {}); if (AV.MESH_DYNAMIC[f]) P.playField = f; else P.field = f; this.app.savePrefs(); this.app._meshRange = null; this.app.activateView('map'); this.app.map.redraw(); this.app.symPane.open({ mesh: true }); return; }
       const layer = this.rows.kind === 'NODE' ? 'node' : this.rows.kind === 'LINK' ? 'link' : this.rows.kind === 'SUBCATCH' ? 'sub' : null; if (!layer) return;
       const map = { elev: 'elev', maxDepth: 'maxDepth', _rim: 'rim', g1: 'diam', length: 'length', rough: 'rough', _slope: 'slope', area: 'area', imperv: 'imperv', width: 'width', slope: 'slope', _r0: 'm:0', _r1: 'm:1', _r2: 'm:2', _r4: 'm:4', _r5: 'm:5', _nc: 'nc' };
       const a = map[c.k]; if (!a || !AV.THEME_ATTRS[layer].some(x => x[0] === a)) { AV.toast('This field is not available for map rendering.', true); return; }
       this.app.theme.setAttr(layer, a); this.app.activateView('map');
     }
     stats(c) {
-      const objs = this.rows.objs.some(o => this.app.selection.has(o)) ? this.rows.objs.filter(o => this.app.selection.has(o)) : this.rows.objs;
+      const objs = this.rows.objs.some(o => this.isSel(o)) ? this.rows.objs.filter(o => this.isSel(o)) : this.rows.objs;
       const vals = objs.map(o => parseFloat(c.get(o))).filter(isFinite);
       if (!vals.length) { AV.alert('No numeric values in this column.'); return; }
       const n = vals.length, sum = vals.reduce((a, b) => a + b, 0), mean = sum / n, sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
@@ -138,10 +174,10 @@
     }
     async calculator(c) {
       const keys = this.rows.cols.filter(x => x.num).map(x => x.k.replace(/^_/, ''));
-      const r = await AV.formDialog('Field Calculator - ' + c.l, [{ k: 'expr', l: c.k + ' =', t: 'text', w: 300 }, { k: 'scope', l: 'Rows', t: 'choice', o: [['sel', 'Selected rows'], ['all', 'All rows']], d: this.rows.objs.some(o => this.app.selection.has(o)) ? 'sel' : 'all' },
+      const r = await AV.formDialog('Field Calculator - ' + c.l, [{ k: 'expr', l: c.k + ' =', t: 'text', w: 300 }, { k: 'scope', l: 'Rows', t: 'choice', o: [['sel', 'Selected rows'], ['all', 'All rows']], d: this.rows.objs.some(o => this.isSel(o)) ? 'sel' : 'all' },
       { t: 'note', l: 'Use + - * / ^ ( ), numbers and numeric field names: ' + keys.join(', ') + '. Text fields: enter a literal value.' }], { expr: '' });
       if (!r || r.expr === '') return;
-      const objs = r.scope === 'sel' ? this.rows.objs.filter(o => this.app.selection.has(o)) : this.rows.objs;
+      const objs = r.scope === 'sel' ? this.rows.objs.filter(o => this.isSel(o)) : this.rows.objs;
       let fn = null;
       if (c.num) {
         const safe = /^[\w\s+\-*/().^]+$/.test(r.expr) && r.expr.split(/[^A-Za-z_]+/).filter(Boolean).every(w => keys.includes(w) || /^e$/i.test(w));
@@ -153,16 +189,27 @@
       const vals = objs.map(o => fn ? fn(o) : r.expr);
       if (fn && vals.some(v => !isFinite(v))) { if (!await AV.confirm('Some results are not finite numbers and will be skipped. Continue?')) return; }
       const pairs = objs.map((o, i) => [o, vals[i]]).filter(([, v]) => !fn || isFinite(v));
-      this.app.setProps(pairs.map(p => p[0]), tagCol ? 'tag' : key, pairs.map(p => fn && c.f && c.f.t !== 'num' ? String(+(+p[1]).toFixed(6)) : (fn ? +(+p[1]).toFixed(6) : p[1])));
+      this.setPropsAny(pairs.map(p => p[0]), tagCol ? 'tag' : key, pairs.map(p => fn && c.f && c.f.t !== 'num' ? String(+(+p[1]).toFixed(6)) : (fn ? +(+p[1]).toFixed(6) : p[1])));
       AV.toast(pairs.length + ' value(s) updated.');
     }
     async selectByAttr() {
-      const t = this.type; const kind = t === 'SUBCATCH' ? 'sub' : AV.NODE_TYPES.includes(t) ? 'node' : AV.LINK_TYPES.includes(t) ? 'link' : null;
+      const t = this.type;
+      if (t === 'MESH') { // numeric condition on the cell columns, e.g.  elev < 60 and maxdepth > 0.3
+        const cols = this.rows.cols.filter(x => x.num); const keys = cols.map(x => x.k.replace(/^_/, ''));
+        const r = await AV.formDialog('Select by Attribute - 2D Meshes', [{ k: 'expr', l: 'Where', t: 'text', w: 340 }, { k: 'mode', l: 'Selection', t: 'choice', o: [['new', 'New selection'], ['add', 'Add to selection'], ['sub', 'Select from current selection']], d: 'new' },
+          { t: 'note', l: 'Fields: ' + keys.join(', ') + '. Operators: < <= > >= = != and or not ( ) + - * /. Example: maxdepth > 0.3 and elev < 60' }], { expr: this._meshWhere || '' });
+        if (!r || !r.expr.trim()) return; this._meshWhere = r.expr;
+        const src = r.expr.replace(/\band\b/gi, '&&').replace(/\bor\b/gi, '||').replace(/\bnot\b/gi, '!').replace(/([^<>!=])=([^=])/g, '$1==$2');
+        if (!/^[\w\s+\-*/().<>=!&|]+$/.test(src) || src.split(/[^A-Za-z_]+/).filter(Boolean).some(w => !keys.includes(w))) { AV.alert('Invalid condition. Use the numeric field names listed and comparison operators only.'); return; }
+        let fn; try { fn = Function(...keys, 'return (' + src + ');'); } catch (e) { AV.alert('Invalid condition: ' + e.message); return; }
+        const pool = r.mode === 'sub' ? this.rows.objs.filter(o => this.isSel(o)) : this.rows.objs;
+        const hit = pool.filter(o => { try { return !!fn(...cols.map(x => parseFloat(x.get(o)))); } catch (e) { return false; } });
+        this.selMany(hit, r.mode === 'add'); AV.toast(hit.length + ' cell(s) selected.'); return; } const kind = t === 'SUBCATCH' ? 'sub' : AV.NODE_TYPES.includes(t) ? 'node' : AV.LINK_TYPES.includes(t) ? 'link' : null;
       if (!kind) { AV.toast('Select by Attribute is available for nodes, links and subcatchments.', true); return; }
       await AV.selectByAttribute(this.app, { kind, kindFixed: true, objs: this.rows.objs, zoom: false });
     }
     copy() {
-      const objs = this.view.some(o => this.app.selection.has(o)) ? this.view.filter(o => this.app.selection.has(o)) : this.view;
+      const objs = this.view.some(o => this.isSel(o)) ? this.view.filter(o => this.isSel(o)) : this.view;
       const cols = this.rows.cols;
       const text = [cols.map(c => c.k).join('\t')].concat(objs.map(o => cols.map(c => { const v = c.get(o); return v === undefined || v === null ? '' : String(v); }).join('\t'))).join('\n');
       navigator.clipboard.writeText(text).then(() => AV.toast(objs.length + ' row(s) copied.'));
@@ -175,10 +222,11 @@
       const changes = new Map(); let n = 0, miss = 0;
       for (const line of lines.slice(1)) {
         const t = line.split('\t'); const o = byId.get(t[0].trim()); if (!o) { miss++; continue; }
-        cols.forEach((c, i) => { if (!i || !c || c.ro || c.res || c.id) return; const v = (t[i] || '').trim(); if (!changes.has(c)) changes.set(c, []); changes.get(c).push([o, v]); n++; });
+        cols.forEach((c, i) => { if (!i || !c || (c.ro && !c.mesh) || c.res || c.id) return; const v = (t[i] || '').trim(); if (!changes.has(c)) changes.set(c, []); changes.get(c).push([o, v]); n++; });
       }
       for (const [c, list] of changes) {
-        if (c.tag) this.app.setProps(list.map(x => x[0]), 'tag', list.map(x => x[1]));
+        if (c.mesh) { const ok = list.filter(x => isFinite(parseFloat(x[1]))); if (ok.length) this.setPropsAny(ok.map(x => x[0]), c.k, ok.map(x => parseFloat(x[1]))); }
+        else if (c.tag) this.app.setProps(list.map(x => x[0]), 'tag', list.map(x => x[1]));
         else if (c.f) this.app.setProps(list.map(x => x[0]), c.k, list.map(x => c.f.t === 'num' ? (isFinite(parseFloat(x[1])) ? parseFloat(x[1]) : x[0].p[c.k]) : x[1]));
         else if (c.xy || c.ends) for (const [o, v] of list) this.setValue(o, c, v);
       }
@@ -186,7 +234,7 @@
     }
     exportCSV() {
       const cols = this.rows.cols; const lines = [cols.map(c => AV.csvCell(c.l)).join(',')].concat(this.view.map(o => cols.map(c => AV.csvCell(c.get(o))).join(',')));
-      AV.downloadText(lines.join('\n'), this.type.toLowerCase() + '.csv');
+      AV.downloadText(lines.join('\n'), (this.type === 'MESH' ? '2d_meshes' : this.type.toLowerCase()) + '.csv');
     }
   }
 
@@ -199,5 +247,5 @@
     view.table = t;
   };
   AV.refreshTables = function (app) { const v = app.views.get('table'); if (v && v.table && app.activeView === 'table') v.table.refresh(); };
-  AV.syncTableSelection = function (app) { const v = app.views.get('table'); if (v && v.table && app.activeView === 'table') { if (v.table.selOnly) v.table.refresh(); else { v.table.updateSel(); v.table.count.textContent = v.table.view.length + ' of ' + v.table.rows.objs.length + ' rows, ' + v.table.rows.objs.filter(o => app.selection.has(o)).length + ' selected'; } } };
+  AV.syncTableSelection = function (app) { const v = app.views.get('table'); if (v && v.table && v.table.view) v.table.refreshSel(); };
 })(window.AV);

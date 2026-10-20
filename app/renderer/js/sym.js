@@ -284,8 +284,10 @@
         const S = AV.meshStyle(app); const F = S.field; const cont = !!AV.MESH_CONTINUOUS[F];
         const redraw = () => { app._meshRange = null; this.changed(); };
         sec('Display');
-        const fSel = h('select', { onchange: () => { P.field = fSel.value; redraw(); this.render(); } }, [['Dynamic results (current time step)', ['depth', 'wse']], ['Statistic results (whole run)', ['maxdepth', 'tpond', 'trecede']], ['Static properties', ['elev']]].map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k]))))); fSel.value = F;
-        rowE('Variable', fSel);
+        const fSel = h('select', { onchange: () => { P.field = fSel.value; redraw(); this.render(); } }, [['Statistic results (whole run)', ['maxdepth', 'tpond', 'trecede']], ['Static properties', ['elev']]].map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k]))))); fSel.value = AV.MESH_DYNAMIC[P.field] || !P.field ? 'maxdepth' : P.field;
+        const pSel = h('select', { onchange: () => { P.playField = pSel.value; redraw(); this.render(); } }, ['depth', 'wse'].map(k => h('option', { value: k }, AV.MESH_FIELDS[k]))); pSel.value = AV.MESH_DYNAMIC[P.playField] ? P.playField : 'depth';
+        rowE('Variable', fSel); rowE('Variable in play mode', pSel);
+        form.appendChild(h('div', { class: 'note' }, 'Now showing: ' + AV.MESH_FIELDS[F] + (app.playMode ? ' (play mode)' : '') + '. The ranges below apply to this variable.'));
         rowE('Transparency', opac(P, 'opacity')); rowE('', check(P, 'outline', 'Cell outlines')); rowE('', check(P, 'visible', 'Visible'));
         sec(cont ? 'Colour ramp (continuous)' : 'Ranges');
         const setRamp = (v) => { P.ramp = P.ramp || {}; P.ramp[F] = v; if (!cont) { const cls = (P.classes && P.classes[F]) || S.breaks.map(b => ({ v: b })); const c = AV.rampColors(v, cls.length, !!(P.invert && P.invert[F])); P.classes = P.classes || {}; P.classes[F] = cls.map((x, i) => ({ v: x.v, color: c[i] })); } redraw(); this.render(); };

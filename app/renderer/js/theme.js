@@ -29,7 +29,7 @@
     // ---------- compatibility shim for older callers (single "quick" theme per layer)
     get cfg() {
       const self = this; const mk = (layer) => ({
-        get attr() { const t = self.layers[layer].subs.find(s => s.enabled); return t ? t.field : 'none'; },
+        get attr() { const t = self.layers[layer].subs.find(s => self.active(s)); return t ? t.field : 'none'; },
         set attr(v) { self.setAttr(layer, v); },
       });
       return { node: mk('node'), link: mk('link'), sub: mk('sub') };
@@ -41,6 +41,9 @@
       if (!this._cc.has(k)) { try { this._cc.set(k, AV.compileExpr(src, AV.exprFields(this.app, layer))); } catch (e) { this._cc.set(k, null); } }
       return this._cc.get(k);
     }
+    // dynamic-result themes (r: fields) are shown in play mode only, all other themes outside play mode only
+    isDynamic(t) { const f = t.field || ''; if (f.startsWith('r:')) return true; if (f.startsWith('x:')) return /\brpt(Depth|Hgl|Volume|LatInflow|TotInflow|Flooding|Flow|Vel|Velocity|Capacity|Surcharge|Rainfall|SnowDepth|Evaporation|Infiltration|Runoff|GWFlow|GWElevation|SoilMoisture)\b/.test(f); return false; }
+    active(t) { return !!t.enabled && (!!this.app.playMode === this.isDynamic(t)); }
     passWhere(layer, t, o) { if (!t.where) return true; const c = this.compiled(layer, t.where); return c ? !!c.fn(o) : true; }
     fieldName(layer, f) { if (f && f.startsWith('x:')) { const ef = AV.exprFields(this.app, layer).find(x => x.n === f.slice(2)); return ef ? ef.l : 'ƒ ' + f.slice(2); } const a = (AV.THEME_ATTRS[layer] || []).find(x => x[0] === f); return a ? a[1] : f; }
     raw(layer, o, field) {
@@ -86,7 +89,7 @@
     style(layer, o) {
       const out = { color: null, size: null, hide: false };
       for (const t of this.layers[layer].subs) {
-        if (!t.enabled || !t.ranges.length) continue;
+        if (!this.active(t) || !t.ranges.length) continue;
         if (t.where && !this.passWhere(layer, t, o)) continue;
         const r = this.rowFor(t, this.value(layer, o, t));
         if (!r) continue;
@@ -170,12 +173,12 @@
     label() { return ''; }
     tooltip(o) {
       const layer = o.kind === 'NODE' ? 'node' : o.kind === 'LINK' ? 'link' : o.kind === 'SUBCATCH' ? 'sub' : null; if (!layer) return '';
-      return this.layers[layer].subs.filter(t => t.enabled).slice(0, 4).map(t => { const v = this.value(layer, o, t); return this.fieldName(layer, t.field) + ': ' + (typeof v === 'number' ? AV.fmt(v) : v === null ? 'n/a' : v); }).join('\n');
+      return this.layers[layer].subs.filter(t => this.active(t)).slice(0, 4).map(t => { const v = this.value(layer, o, t); return this.fieldName(layer, t.field) + ': ' + (typeof v === 'number' ? AV.fmt(v) : v === null ? 'n/a' : v); }).join('\n');
     }
     updateLegend() {
       const el = AV.$('#legend'); if (!el) return; el.innerHTML = ''; let any = false;
       for (const layer of ['node', 'link', 'sub']) for (const t of this.layers[layer].subs) {
-        if (!t.enabled || !t.legend || !t.ranges.length) continue; any = true;
+        if (!this.active(t) || !t.legend || !t.ranges.length) continue; any = true;
         el.appendChild(h('div', { class: 'lt' }, LAYER_NAME[layer] + ': ' + t.name));
         t.ranges.slice(0, 14).forEach((r, i) => {
           const txt = t.kind === 'individual' ? String(r.v) : (i === 0 ? '≤ ' + AV.fmt(+r.v) : AV.fmt(+t.ranges[i - 1].v) + ' – ' + AV.fmt(+r.v));
@@ -216,10 +219,10 @@
           B('↓', 'Move down', () => { const a = subs(); if (cur < a.length - 1) { [a[cur + 1], a[cur]] = [a[cur], a[cur + 1]]; cur++; render(); } }),
           B('Duplicate', 'Duplicate', () => { const t = subs()[cur]; if (t) { const c = JSON.parse(JSON.stringify(t)); c.name += ' (copy)'; subs().splice(cur, 0, c); render(); } })));
         const list = h('div', { class: 'te-list' });
-        subs().forEach((t, i) => list.appendChild(h('div', { class: 'te-item' + (i === cur ? ' sel' : '') + (t.enabled ? '' : ' off'), onclick: () => { cur = i; render(); } }, h('input', { type: 'checkbox', class: 'te-on', title: 'Render this theme on the map', checked: !!t.enabled, onclick: (e) => e.stopPropagation(), onchange: (e) => { t.enabled = e.target.checked; cur = i; render(); } }), h('span', { class: 'pal', style: { background: 'linear-gradient(90deg,' + (t.ranges.length ? t.ranges.map(r => r.color).join(',') : '#ccc,#ccc') + ')' } }), h('span', null, t.name))));
+        subs().forEach((t, i) => list.appendChild(h('div', { class: 'te-item' + (i === cur ? ' sel' : '') + (t.enabled ? '' : ' off'), onclick: () => { cur = i; render(); } }, h('input', { type: 'checkbox', class: 'te-on', title: 'Render this theme on the map', checked: !!t.enabled, onclick: (e) => e.stopPropagation(), onchange: (e) => { t.enabled = e.target.checked; cur = i; render(); } }), h('span', { class: 'pal', style: { background: 'linear-gradient(90deg,' + (t.ranges.length ? t.ranges.map(r => r.color).join(',') : '#ccc,#ccc') + ')' } }), h('span', null, t.name + (this.isDynamic(t) ? '  ▶' : '')), h('span', { style: { flex: 0 } }))));
         list.appendChild(h('div', { class: 'te-item', style: { cursor: 'default', color: 'var(--muted)' } }, h('span', { class: 'pal', style: { background: '#b0bec5' } }), 'Base Theme (object type colours)'));
         left.appendChild(list);
-        left.appendChild(h('div', { class: 'note', style: { padding: '6px 8px', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.4 } }, 'Themes are applied top-down: the first enabled theme that sets colour (or size/width) for an object wins. The Base Theme is always last.'));
+        left.appendChild(h('div', { class: 'note', style: { padding: '6px 8px', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.4 } }, 'Themes are applied top-down: the first enabled theme that sets colour (or size/width) for an object wins. The Base Theme is always last. Themes marked ▶ (dynamic results at the current time step) are shown only in play mode; the other themes only outside play mode.'));
       };
       const renderEditor = () => {
         right.innerHTML = '';

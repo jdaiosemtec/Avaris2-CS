@@ -494,7 +494,7 @@
       this.onSelectionChanged();
     }
     selectMany(list, add) { if (!add) this.selection.clear(); for (const o of list) this.selection.add(o); this.onSelectionChanged(); }
-    clearSelection() { if (!this.selection.size) return; this.selection.clear(); this.onSelectionChanged(); }
+    clearSelection() { if (this.meshSelSet && this.meshSelSet.size) AV.meshClearSel(this); if (!this.selection.size) return; this.selection.clear(); this.onSelectionChanged(); }
     selectAll() { this.selection.clear(); for (const c of [this.model.nodes, this.model.links, this.model.subcatchments, this.model.gages]) for (const o of c.values()) this.selection.add(o); this.onSelectionChanged(); }
     // Layer View "Attribute Table" button: open the table of the selected objects' layer, or choose a layer
     attrTableMenu(e) {
@@ -518,7 +518,7 @@
       const tp = AV.$('#tsPane'); if (tp) tp.style.display = this.tsOpen ? '' : 'none';
     }
     toggleLogPane() { this.prefs.logPane = this.prefs.logPane === false; this.savePrefs(); this.updateRightPanes(); this.refreshRibbon(); }
-    onSelectionChanged() { if (this.selection.size && this.rightTab === 'sym') this.showRightTab('props'); this.updateRightPanes(); this.emit('selection', [...this.selection]); this.panels.showProps(); this.map.redrawOverlay(); AV.syncTableSelection(this); const n = this.selection.size; this.status(n ? n + ' object(s) selected' : 'Ready'); this.updateSelStats(); }
+    onSelectionChanged() { if (this.selection.size && !this._keepMesh && this.meshSelSet && this.meshSelSet.size) { this.meshSelSet.clear(); this.meshSel = -1; } if (this.selection.size && this.rightTab === 'sym') this.showRightTab('props'); this.updateRightPanes(); this.emit('selection', [...this.selection]); this.panels.showProps(); this.map.redrawOverlay(); AV.syncTableSelection(this); const n = this.selection.size; this.status(n ? n + ' object(s) selected' : 'Ready'); this.updateSelStats(); }
     // status bar "Selection Statistics": total area of the selected subcatchments and total length of the selected links,
     // in a unit the user picks with the small button next to it
     updateSelStats() {
