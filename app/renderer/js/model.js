@@ -380,6 +380,7 @@ window.AV = window.AV || {};
       for (const sc of m.subcatchments.values()) if (sc.p.impCoef === undefined) sc.p.impCoef = 1;
       for (const [key, id, v] of ext) {
         if (key === 'CHAMBER') { const n = m.nodes.get(id); if (n) n.p.chamberArea = num(v, 0); }
+        else if (key === 'RAINUNITS') { const g = m.gages.get(id); if (g) g.p.tsUnits = String(v).toUpperCase(); }
         else if (key === 'IMPCOEF') { const sc = m.subcatchments.get(id); if (sc) sc.p.impCoef = Math.max(0, Math.min(1, num(v, 1))); }
       }
       m.warnings = warn;
@@ -422,6 +423,11 @@ window.AV = window.AV || {};
     // ---------- writing
     toINP(opts = {}) {
       const o = [];
+      // rain gages fed by a time series in other rain units than the project (IN for US, MM for SI): for a run the
+      // series is written once more, converted to the project units (EPA SWMM reads time-series rain in project units)
+      const projRU = (opts.runSI !== undefined ? opts.runSI : this.isSI) ? 'MM' : 'IN'; const rainConv = new Map();
+      if (opts.reportAll) for (const g of this.gages.values()) { const u = String(g.p.tsUnits || '').toUpperCase();
+        if (g.p.source !== 'FILE' && (u === 'IN' || u === 'MM') && u !== projRU && this.timeseries.has(g.p.series)) rainConv.set(g.p.series, { name: g.p.series + '__' + u + '_TO_' + projRU, f: u === 'MM' ? 1 / 25.4 : 25.4 }); }
       const W = (s) => o.push(s);
       const pad = (s, n) => { s = q(s); return s.length >= n ? s + ' ' : s + ' '.repeat(n - s.length); };
       const fmt = (v) => (typeof v === 'number') ? String(v) : (v === undefined || v === null ? '' : String(v));
@@ -450,7 +456,7 @@ window.AV = window.AV || {};
               W('[RAINGAGES]'); W(';;Name           Format    Interval SCF      Source');
               for (const g of this.gages.values()) {
                 const p = g.p; const a = [g.id, p.format, p.interval, p.scf, p.source];
-                if (p.source === 'FILE') a.push(p.series, p.station, p.units); else a.push(p.series);
+                if (p.source === 'FILE') a.push(p.series, p.station, p.units); else a.push(rainConv.has(p.series) ? rainConv.get(p.series).name : p.series);
                 WO(g, row(XW(g, 'RAINGAGES', a)));
               }
               W('');
@@ -574,6 +580,8 @@ window.AV = window.AV || {};
                 for (const r of ts.rows) W(pad(name, 17) + pad(r[0] || '', 11) + pad(r[1], 11) + fmt(r[2]));
                 W(';');
               }
+              for (const [name, cv] of rainConv) { const ts = this.timeseries.get(name); if (!ts || ts.file) continue; W(';OsemCM: ' + name + ' converted to ' + projRU);
+                for (const r of ts.rows) W(pad(cv.name, 17) + pad(r[0] || '', 11) + pad(r[1], 11) + fmt(+(+r[2] * cv.f).toPrecision(8))); W(';'); }
               W('');
             }
             break;
@@ -616,6 +624,7 @@ window.AV = window.AV || {};
       // OsemCM extensions as comment lines: EPA SWMM and Avaris DS ignore them, the OsemCM engine reads them
       const ext = [];
       for (const n of this.nodes.values()) if (+n.p.chamberArea > 0) ext.push(';;@OSEM CHAMBER ' + n.id + ' ' + (+n.p.chamberArea));
+      for (const g of this.gages.values()) { const u = String(g.p.tsUnits || '').toUpperCase(); if (g.p.source !== 'FILE' && (u === 'IN' || u === 'MM') && u !== (this.isSI ? 'MM' : 'IN')) ext.push(';;@OSEM RAINUNITS ' + g.id + ' ' + u); }
       for (const sc of this.subcatchments.values()) if (sc.p.impCoef !== undefined && sc.p.impCoef !== '' && +sc.p.impCoef !== 1 && isFinite(+sc.p.impCoef)) ext.push(';;@OSEM IMPCOEF ' + sc.id + ' ' + Math.max(0, Math.min(1, +sc.p.impCoef)));
       if (ext.length) { W(';;OsemCM extensions (chamber area, impervious runoff coefficient) - ignored by EPA SWMM / Avaris DS'); for (const l of ext) W(l); W(''); }
       // OsemCM V2.0 2D flood settings (paths relative to the model folder when possible)

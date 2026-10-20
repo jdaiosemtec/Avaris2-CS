@@ -13,12 +13,12 @@
       node: [['maxDepth', 'Max. Depth'], ['maxHGL', 'Max. HGL'], ['minFree', 'Min. Freeboard'], ['nOcc', 'Occ. Date/Time'], ['maxLat', 'Max. Lateral Inflow'], ['maxTot', 'Max. Total Inflow'],
         ['latVol', 'Lateral Inflow Volume'], ['totVol', 'Total Inflow Volume'], ['balErr', 'Flow Balance Error %'], ['hrsSur', 'Hours Surcharged'], ['aboveCrown', 'Max. Height Above Crown'], ['belowRim', 'Min. Depth Below Rim'],
         ['hrsFlood', 'Hours Flooded'], ['maxFlood', 'Max. Flood Rate'], ['floodVol', 'Total Flood Volume'], ['pondDepth', 'Max. Ponded Depth']],
-      link: [['maxFlow', 'Max. Flow'], ['maxVel', 'Max. Velocity'], ['maxCap', 'Max. Capacity d/D'], ['mfFlow', 'Max. / Full Flow'], ['lOcc', 'Occ. Date/Time'], ['maxLDepth', 'Max. Link Depth'],
+      link: [['maxFlow', 'Max. Flow'], ['maxVel', 'Max. Velocity'], ['maxCap', 'Max. Capacity'], ['mfFlow', 'Max. / Full Flow'], ['lOcc', 'Occ. Date/Time'], ['maxLDepth', 'Max. Link Depth'],
         ['hfBoth', 'Hours Full (Both Ends)'], ['hfUp', 'Hours Full (Upstream)'], ['hfDn', 'Hours Full (Downstream)'], ['hAboveNormal', 'Hours Above Full Normal Flow'], ['hCapLim', 'Hours Capacity Limited']],
     },
     dyn: {
       node: [['depth', 'Depth'], ['hgl', 'HGL'], ['vol', 'Volume'], ['lat', 'Lateral Inflow'], ['tot', 'Total Inflow'], ['flood', 'Flooding']],
-      link: [['flow', 'Flow'], ['ldepth', 'Link Depth'], ['vel', 'Velocity'], ['cap', 'Capacity d/D']],
+      link: [['flow', 'Flow'], ['ldepth', 'Link Depth'], ['vel', 'Velocity'], ['cap', 'Capacity']],
     },
   };
   const NODE_KEYS = new Set([].concat(...['general', 'stats', 'dyn'].map(k => COLS[k].node.map(x => x[0]))));

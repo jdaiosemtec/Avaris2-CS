@@ -292,9 +292,9 @@
       ['r:0', 'Depth', 'D'], ['r:1', 'HGL', 'D'], ['r:full', 'Depth / Chamber Depth', 'D'], ['r:2', 'Volume', 'D'], ['r:3', 'Lateral Inflow', 'D'], ['r:4', 'Total Inflow', 'D'], ['r:5', 'Flooding', 'D']],
     link: [
       ['none', 'Default (by type)', 'S'], ['type', 'Link Type', 'S'], ['tag', 'Tag', 'S'], ['diam', 'Diameter / Height', 'S'], ['length', 'Length', 'S'], ['rough', 'Roughness', 'S'], ['slope', 'Slope', 'S'], ['shape', 'Cross-Section Shape', 'S'],
-      ['m:0', 'Max. Flow', 'T'], ['m:1', 'Max. Depth', 'T'], ['m:2', 'Max. Velocity', 'T'], ['m:4', 'Max. Capacity d/D', 'T'],
+      ['m:0', 'Max. Flow', 'T'], ['m:1', 'Max. Depth', 'T'], ['m:2', 'Max. Velocity', 'T'], ['m:4', 'Max. Capacity', 'T'],
       ['m:sur', 'Max. Surcharge (0/1)', 'T'], ['m:surh', 'Surcharged Duration (hr)', 'T'],
-      ['r:0', 'Flow', 'D'], ['r:1', 'Depth', 'D'], ['r:2', 'Velocity', 'D'], ['r:4', 'Capacity d/D', 'D'], ['r:sur', 'Surcharge (0/1)', 'D']],
+      ['r:0', 'Flow', 'D'], ['r:1', 'Depth', 'D'], ['r:2', 'Velocity', 'D'], ['r:4', 'Capacity', 'D'], ['r:sur', 'Surcharge (0/1)', 'D']],
     sub: [
       ['none', 'Default', 'S'], ['tag', 'Tag', 'S'], ['area', 'Area', 'S'], ['imperv', '% Impervious', 'S'], ['width', 'Width', 'S'], ['slope', '% Slope', 'S'], ['gage', 'Rain Gage', 'S'], ['outlet', 'Outlet', 'S'],
       ['m:4', 'Max. Runoff', 'T'], ['m:0', 'Max. Rainfall', 'T'],

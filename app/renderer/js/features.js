@@ -681,7 +681,7 @@
 
   // ================================================================== ICM-style graph panel
   const GVARS = {
-    link: [['Flow', 0, true], ['Depth', 1, true], ['Velocity', 2, true], ['Capacity d/D', 4, false], ['Volume', 3, false]],
+    link: [['Flow', 0, true], ['Depth', 1, true], ['Velocity', 2, true], ['Capacity', 4, false], ['Volume', 3, false]],
     node: [['Level (HGL)', 1, true], ['Depth', 0, false], ['Total Inflow', 4, true], ['Flooding', 5, true], ['Lateral Inflow', 3, false], ['Volume', 2, false]],
     subcatch: [['Rainfall', 0, true], ['Runoff', 4, true], ['Infiltration', 3, false], ['Evaporation', 2, false]],
   };

@@ -293,9 +293,29 @@
     if (app.crs && app.crs.wkt) await window.host.writeText(base + '.prj', app.crs.wkt);
     AV.toast('Mesh exported to ' + base + '.shp');
   };
+  // attribute table of the 2D cells (read only): sort by a column, click a row to select / zoom to the cell, copy to Excel
+  AV.meshTable = function (app) {
+    const mesh = app.mesh2d; if (!mesh) { AV.toast('Create the 2D mesh first.', true); return; }
+    const L = AV.meshSI(app) ? 'm' : 'ft'; const has = !!app.meshResults; const per = app.results ? app.results.timeLabel(app.results.period) : '';
+    const cols = [['id', 'ID'], ['x', 'X'], ['y', 'Y'], ['elev', 'Ground Elev. (' + L + ')'], ['n', 'Roughness'], ['deg', 'Neighbours']].concat(has ? [['depth', 'Depth (' + L + ') ' + per], ['wse', 'Water Surface (' + L + ')'], ['maxdepth', 'Max. Depth (' + L + ')'], ['tpond', 'Time Ponded (hr)'], ['trecede', 'Time to Recede (hr)']] : []);
+    const rows = mesh.cells.map((c, k) => { const r = { k, id: c.id, x: c.x, y: c.y, elev: c.elev, n: c.n, deg: c.deg }; if (has) for (const f of ['depth', 'wse', 'maxdepth', 'tpond', 'trecede']) r[f] = AV.cellValue(app, k, f); return r; });
+    let sortK = null, sortD = 1; const MAXR = 5000;
+    const holder = h('div', { class: 'grid-scroll', style: { flex: 1, overflow: 'auto' } }); const info = h('span', { class: 'note' });
+    const fmtv = (v, k) => v === null || v === undefined || (typeof v === 'number' && !isFinite(v)) ? '' : typeof v === 'number' ? (k === 'x' || k === 'y' ? v.toFixed(2) : AV.fmt(v, 4)) : String(v);
+    const render = () => {
+      const R = rows.slice(); if (sortK) R.sort((a, b) => { const x = a[sortK], y = b[sortK]; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true })) * sortD; });
+      const t = h('table', { class: 'grid' }, h('thead', null, h('tr', null, cols.map(([k, l]) => h('th', { style: { cursor: 'pointer', whiteSpace: 'nowrap' }, onclick: () => { sortD = sortK === k ? -sortD : 1; sortK = k; render(); } }, l + (sortK === k ? (sortD > 0 ? ' ▲' : ' ▼') : ''))))));
+      const tb = h('tbody'); for (const r of R.slice(0, MAXR)) { const tr = h('tr', { style: { cursor: 'pointer' } }, cols.map(([k]) => h('td', { class: k === 'id' ? '' : 'num' }, fmtv(r[k], k)))); tr.addEventListener('click', () => { app.clearSelection(); app.meshSel = r.k; AV.showCellInfo(app, r.k); const c = mesh.cells[r.k]; app.map.zoomToBox({ x1: c.x - c.s * 4, y1: c.y - c.s * 4, x2: c.x + c.s * 4, y2: c.y + c.s * 4 }, 0); app.map.redrawOverlay(); }); tb.appendChild(tr); }
+      t.appendChild(tb); holder.innerHTML = ''; holder.appendChild(t); info.textContent = rows.length + ' cells' + (rows.length > MAXR ? ' (first ' + MAXR + ' shown; Copy exports all)' : '') + (has ? '' : ' - run the 1D-2D model to add the flooding results');
+    };
+    const copy = () => AV.copyTSV(cols.map(c => c[1]), rows.map(r => cols.map(([k]) => fmtv(r[k], k))));
+    const body = h('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } }, h('div', { class: 'followbar' }, h('button', { class: 'btn small', onclick: copy }, '⧉ Copy (Excel)'), info), holder);
+    AV.floatPanel({ id: 'meshtable', title: 'Attribute Table - 2D Meshes', w: 760, h: 420, body }); render();
+  };
   // pseudo node used to plot the depth of a cell with the normal graph tools
   AV.cellNode = (app, k) => { const c = app.mesh2d.cells[k]; return { id: c.id, kind: 'NODE', type: 'JUNCTION', x: c.x, y: c.y, p: { elev: c.elev, maxDepth: 0 }, tag: '', mesh: true }; };
-  AV.showCellInfo = function (app, k) {
+  AV.showCellInfo = function (app, k, quiet) {
+    if (!quiet) { app.meshSel = k; app.map.redrawOverlay(); }
     const el = AV.$('#props'); if (!el) return; const c = app.mesh2d.cells[k]; el.innerHTML = '';
     const L = AV.meshSI(app) ? 'm' : 'ft'; const f = (v, d) => v === null || v === undefined || !isFinite(v) ? '-' : AV.fmt(v, d);
     el.appendChild(h('div', { class: 'phead' }, h('div', { class: 'pt' }, '2D Cell ' + c.id), h('div', { class: 'ps' }, 'X ' + AV.fmt(c.x, 2) + '   Y ' + AV.fmt(c.y, 2))));
@@ -306,6 +326,7 @@
       res.length ? h('tr', { class: 'pg0' }, h('td', { colspan: 2 }, 'Flooding Results')) : null, res.map(([a, b]) => h('tr', { class: 'st' }, h('td', { class: 'k' }, a), h('td', { class: 'v' }, h('div', { class: 'ro' }, b)))));
     el.appendChild(tb);
     if (MR) el.appendChild(h('div', { style: { padding: '8px 10px' } }, h('button', { class: 'btn', onclick: () => app.feat.graphTool([AV.cellNode(app, k)]) }, 'Graph Depth')));
+    if (quiet) return;
     if (app.showRightTab) app.showRightTab('props');
     app.emit('cellselect', k);
   };

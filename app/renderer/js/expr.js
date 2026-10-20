@@ -101,7 +101,7 @@
     // results
     const RV = AV.RESULT_VARS || {};
     const rk = kind === 'sub' ? 'subcatch' : kind;
-    const short = { 'Head (HGL)': 'Hgl', 'Capacity (d/D)': 'Capacity', 'Lateral Inflow': 'LatInflow', 'Total Inflow': 'TotInflow', 'Velocity': 'Vel' };
+    const short = { 'Head (HGL)': 'Hgl', 'Lateral Inflow': 'LatInflow', 'Total Inflow': 'TotInflow', 'Velocity': 'Vel' };
     (RV[rk] || []).forEach((vn, v) => {
       const nm = (short[vn] || vn.replace(/[^A-Za-z]/g, ''));
       add('rptMax' + nm, 'Max. ' + vn + ' (result)', o => R ? R.valueOf(o, v, true, rk === 'link' && v === 0) : null, 'Results', nm === 'Vel' ? ['rptMaxVelocity'] : []);

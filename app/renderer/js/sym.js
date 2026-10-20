@@ -188,7 +188,7 @@
       ic.addEventListener('click', (e) => { e.stopPropagation(); app.symPane.open({ mesh: true }); });
       row(1, [sp(), chk(S.visible, v => { app.prefs.mesh2d.visible = v; app.savePrefs(); }), ic, h('span', { class: 'lname', title: '2D flood surface, coloured by ' + AV.MESH_FIELDS[S.field] }, '2D Meshes'), h('span', { class: 'lcnt' }, String(mesh.cells.length))], {
         drag: 'mesh', dbl: () => app.symPane.open({ mesh: true }),
-        menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox(meshBox()) }, '-', { label: 'Symbology...', fn: () => app.symPane.open({ mesh: true }) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') },
+        menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox(meshBox()) }, '-', { label: 'Attribute Table', fn: () => AV.meshTable(app) }, { label: 'Symbology...', fn: () => app.symPane.open({ mesh: true }) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') },
           { label: 'Export as Shapefile...', fn: () => AV.exportMeshShapefile(app) }, '-', { label: 'Rebuild Meshes', fn: () => AV.createMeshes(app) },
           { label: 'Remove Meshes', fn: async () => { if (!await AV.confirm('Remove the 2D mesh of this model? The next run is then 1D only until the mesh is created again.', 'Remove Meshes', 'Remove')) return; app.mesh2d = null; app.meshResults = null; app.meshSel = -1; const mp = AV.meshPath(app); if (mp) { try { await window.host.writeText(mp, 'null'); } catch (e) { } } this.refreshLayers(); map.redraw(); } }] });
       } };

@@ -542,7 +542,7 @@
   // ====================================================================== Rain gages
   AV.rainGageEditor = (app, selName) => listEditor(app, { title: 'Rain Gage Editor', one: 'rain gage', prefix: 'RG_', width: 640,
     read: (m) => [...m.gages.values()].map(g => ({ name: g.id, desc: g.desc || '', format: g.p.format || 'INTENSITY', interval: g.p.interval || '1:00', scf: g.p.scf === undefined ? 1 : g.p.scf, source: g.p.source || 'TIMESERIES',
-      series: g.p.source === 'FILE' ? '' : g.p.series || '', file: g.p.source === 'FILE' ? g.p.series || '' : '', station: g.p.station || '', units: (g.p.units || (m.isSI ? 'MM' : 'IN')).toUpperCase() })),
+      series: g.p.source === 'FILE' ? '' : g.p.series || '', file: g.p.source === 'FILE' ? g.p.series || '' : '', station: g.p.station || '', units: ((g.p.source === 'FILE' ? g.p.units : g.p.tsUnits) || (m.isSI ? 'MM' : 'IN')).toUpperCase() })),
     blank: (name, m) => ({ name, desc: '', format: 'INTENSITY', interval: '1:00', scf: 1, source: 'TIMESERIES', series: [...m.timeseries.keys()][0] || '', file: '', station: '*', units: m.isSI ? 'MM' : 'IN' }),
     check: (items, m) => { for (const it of items) { if (it.source === 'TIMESERIES' && !it.series) return 'Rain gage ' + it.name + ': choose a time series.'; if (it.source === 'FILE' && !it.file) return 'Rain gage ' + it.name + ': choose the rainfall file.'; if (!/^\d+(:\d{1,2})?(:\d{1,2})?$/.test(String(it.interval))) return 'Rain gage ' + it.name + ': time interval must look like 0:05 or 1:00.'; }
       const keep = new Set(items.map(x => x._orig)); const used = [...m.subcatchments.values()].filter(s => s.p.gage && m.gages.has(s.p.gage) && !keep.has(s.p.gage));
@@ -551,7 +551,7 @@
       const old = [...m.gages.entries()]; const b = m.bounds(true) || { x1: 0, y2: 0 };
       const nw = items.map((it, i) => { const g0 = it._orig !== undefined ? m.gages.get(it._orig) : null; const g = g0 ? Object.assign({}, g0, { p: Object.assign({}, g0.p) }) : { kind: 'GAGE', x: b.x1, y: b.y2, tag: '', p: AV.defaults('GAGE') };
         g.id = it.name; if (it.desc) g.desc = it.desc; else delete g.desc;
-        Object.assign(g.p, { format: it.format, interval: it.interval, scf: num(it.scf, 1), source: it.source, series: it.source === 'FILE' ? it.file : it.series, station: it.source === 'FILE' ? it.station || '*' : '', units: it.source === 'FILE' ? it.units : '' });
+        Object.assign(g.p, { format: it.format, interval: it.interval, scf: num(it.scf, 1), source: it.source, series: it.source === 'FILE' ? it.file : it.series, station: it.source === 'FILE' ? it.station || '*' : '', units: it.source === 'FILE' ? it.units : '', tsUnits: it.source === 'FILE' ? '' : it.units });
         return [it.name, g]; });
       const oc = objRen(m.subcatchments.values(), 'gage', ren); const secs = AV.renameRaw(m, ren, [['HYDROGRAPHS', 1]]);
       // only the header line "name gage" of a unit hydrograph names a gage
@@ -562,11 +562,12 @@
     },
     form: (it, ctx) => { const m = ctx.m; const nm = inp(it.name, 200), ds = inp(it.desc, 200); const fmt = sel(['INTENSITY', 'VOLUME', 'CUMULATIVE'], it.format, 200);
       const iv = inp(it.interval, 200), scf = inp(it.scf, 200), src = sel(['TIMESERIES', 'FILE'], it.source, 200), ts = refSel([...m.timeseries.keys()], it.series, 200);
-      const fp = inp(it.file, 170); const fb = h('button', { class: 'btn small', onclick: async () => { const p = await window.host.openDialog({ title: 'Rainfall file', filters: [{ name: 'Rainfall files', extensions: ['dat', 'txt', 'csv'] }, { name: 'All files', extensions: ['*'] }] }); if (p) fp.value = p; } }, '…');
+      // choosing a rainfall file switches the data source to FILE; rain units apply to both sources
+      const fp = inp(it.file, 170); const fb = h('button', { class: 'btn small', onclick: async () => { const p = await window.host.openDialog({ title: 'Rainfall file', filters: [{ name: 'Rainfall files', extensions: ['dat', 'txt', 'csv', 'prn'] }, { name: 'All files', extensions: ['*'] }] }); if (p) { fp.value = p; src.value = 'FILE'; sync(); } } }, '…');
       const st = inp(it.station, 200), un = sel(['IN', 'MM'], it.units, 200);
-      const sync = () => { const f = src.value === 'FILE'; ts.disabled = f; fp.disabled = fb.disabled = st.disabled = un.disabled = !f; }; src.onchange = sync; sync();
+      const sync = () => { const f = src.value === 'FILE'; ts.disabled = f; fp.disabled = st.disabled = !f; }; src.onchange = sync; sync();
       return { el: form(fld('Gage Name', nm), fld('Description', ds), fld('Rain Format', fmt), fld('Time Interval (H:MM)', iv), fld('Snow Catch Factor', scf), fld('Data Source', src), fld('Time Series', AV.refEdit(app, ts, 'ts')), fld('File Name', h('span', { class: 'prow' }, fp, fb)), fld('Station ID', st), fld('Rain Units', un),
-          h('div', { class: 'note' }, 'Station ID and Rain Units apply to rainfall files only; a time series is read in the project rain units.')),
+          h('div', { class: 'note' }, 'Rain Units: units of the rainfall values (time series or file). A time series in other units than the project (' + (m.isSI ? 'MM' : 'IN') + ') is converted when the model is run. Station ID applies to rainfall files only.')),
         save: () => { Object.assign(it, { name: nm.value.trim(), desc: ds.value.trim(), format: fmt.value, interval: iv.value.trim(), scf: scf.value.trim() || '1', source: src.value, series: ts.value, file: fp.value.trim(), station: st.value.trim(), units: un.value }); } }; } }, selName);
 
   // ====================================================================== Pollutants

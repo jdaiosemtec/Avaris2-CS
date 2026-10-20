@@ -19,7 +19,7 @@ graphs, reports, export, history, users.
 | 1D-2D run (`.finp/.frpt/.fout`) | Simulation → Run (when 2D is enabled and a mesh exists) | `sim.js` run → `AV.mesh2DToINP`; `main.js` engine:run `flood2d` |
 | 2D results (depth, max depth, time ponded, time to recede, elevation), animation, legend | Layer View → 2D Meshes (drag to reorder; Symbology pane); time slider | `mesh2d.js` computeMeshResults / drawMesh / drawMeshLegend / meshStyleDialog; `outreader.js` pondStats (`out:pondStats`) |
 | Cell hover / click info, Graph Depth | map | `map.js` (meshHit hooks), `app.js` onHoverCell, `mesh2d.js` showCellInfo |
-| Export mesh shapefile | Meshes layer menu | `mesh2d.js` exportMeshShapefile |
+| Export mesh shapefile, attribute table, Tag all nodes Link2D | Meshes layer menu; Simulation Options → 2D Flood | `mesh2d.js` exportMeshShapefile |
 | Load `.fout` results | Catalog / Load results | `sim.js` loadResults, `catalog.js` |
 
 ## Licence hooks prepared (inactive)

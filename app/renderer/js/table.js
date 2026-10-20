@@ -19,7 +19,7 @@
     const R = app.results;
     if (R && (kind === 'NODE' || kind === 'LINK' || kind === 'SUBCATCH')) {
       const t = kind === 'NODE' ? 'node' : kind === 'LINK' ? 'link' : 'subcatch';
-      const vars = t === 'node' ? [[0, 'Max Depth'], [1, 'Max HGL'], [4, 'Max Inflow'], [5, 'Max Flooding']] : t === 'link' ? [[0, 'Max |Flow|', true], [2, 'Max |Velocity|', true], [4, 'Max d/D']] : [[4, 'Max Runoff']];
+      const vars = t === 'node' ? [[0, 'Max Depth'], [1, 'Max HGL'], [4, 'Max Inflow'], [5, 'Max Flooding']] : t === 'link' ? [[0, 'Max |Flow|', true], [2, 'Max |Velocity|', true], [4, 'Max Capacity']] : [[4, 'Max Runoff']];
       for (const [v, l, abs] of vars) cols.push({ k: '_r' + v, l: l + ' (result)', get: (o) => { const x = R.valueOf(o, v, true, abs); return x === null ? '' : +x.toFixed(4); }, num: true, ro: true, res: true });
       if (t === 'node' && R.nonconv) cols.push({ k: '_nc', l: 'Nonconverging %', get: (o) => R.nonconv.get(o.id) || 0, num: true, ro: true, res: true });
     }

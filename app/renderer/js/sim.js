@@ -5,7 +5,7 @@
   const VARS = {
     subcatch: ['Rainfall', 'Snow Depth', 'Evaporation', 'Infiltration', 'Runoff', 'GW Flow', 'GW Elevation', 'Soil Moisture'],
     node: ['Depth', 'Head (HGL)', 'Volume', 'Lateral Inflow', 'Total Inflow', 'Flooding'],
-    link: ['Flow', 'Depth', 'Velocity', 'Volume', 'Capacity (d/D)'],
+    link: ['Flow', 'Depth', 'Velocity', 'Volume', 'Capacity'],
     system: ['Temperature', 'Rainfall', 'Snow Depth', 'Infiltration', 'Runoff', 'DW Inflow', 'GW Inflow', 'RDII Inflow', 'Direct Inflow', 'Total Lateral Inflow', 'Flooding', 'Outflow', 'Storage Volume', 'Evaporation', 'PET'],
   };
   AV.RESULT_VARS = VARS;
@@ -96,7 +96,7 @@
           h('div', { class: 'tsrow' }, B('«', 'First time step', () => R() && app.sim.setPeriod(0)), B('‹', 'Previous time step', () => R() && app.sim.setPeriod(R().period - 1)), this.timeEl,
             B('›', 'Next time step', () => R() && app.sim.setPeriod(R().period + 1)), B('»', 'Last time step', () => R() && app.sim.setPeriod(R().meta.nPeriods - 1)))),
         this.table);
-      app.on('selection', () => this.refresh());
+      app.on('selection', () => this.refresh()); app.on('cellselect', () => this.refresh());
     }
     toggle(force) {
       const app = this.app; app.tsOpen = force === undefined ? !app.tsOpen : force;
@@ -108,12 +108,14 @@
       const R = this.app.results, T = this.table; T.innerHTML = '';
       if (!R) { this.slider.disabled = true; this.timeEl.textContent = '-'; T.appendChild(h('div', { class: 'empty' }, 'Run a simulation (or load a results file) first.')); return; }
       this.slider.disabled = false; this.slider.max = R.meta.nPeriods - 1; this.slider.value = R.period; this.timeEl.textContent = R.timeLabel(R.period);
-      const sel = [...this.app.selection].filter(o => R.index(o)).slice(0, 6);
-      if (!sel.length) { T.appendChild(h('div', { class: 'empty' }, 'An object must be selected to show results.')); return; }
+      let sel = [...this.app.selection].filter(o => R.index(o)).slice(0, 6);
+      // a selected 2D cell (nothing else selected): its depth, water level, inflow ... at this time step
+      if (!sel.length && this.app.mesh2d && this.app.meshSel >= 0 && this.app.mesh2d.cells[this.app.meshSel]) { const c = AV.cellNode(this.app, this.app.meshSel); if (R.index(c)) sel = [c]; }
+      if (!sel.length) { T.appendChild(h('div', { class: 'empty' }, 'An object (or a 2D cell) must be selected to show results.')); return; }
       const r0 = R.index(sel[0]); const objs = sel.filter(o => R.index(o).t === r0.t);
       const nv = R.meta.nVars[r0.t]; const names = R.varNames[r0.t];
       const t = h('table', { class: 'histtbl tstbl' });
-      t.appendChild(h('tr', null, [h('th', null, 'Variable')].concat(objs.map(o => h('th', null, objs.length > 1 ? o.id : 'Value')))));
+      t.appendChild(h('tr', null, [h('th', null, 'Variable')].concat(objs.map(o => h('th', null, objs.length > 1 ? o.id : o.mesh ? '2D Cell ' + o.id : 'Value')))));
       for (let v = 0; v < Math.min(nv, names.length); v++) {
         t.appendChild(h('tr', null, [h('td', null, names[v] + ' (' + R.unitsFor(r0.t, v) + ')')].concat(objs.map(o => { const r = R.index(o); return h('td', { class: 'num' }, AV.fmt(R.snap[r.t][r.i * nv + v])); }))));
       }
@@ -155,7 +157,7 @@
         UNDER_RELAXATION: g('UNDER_RELAXATION', '0.5'), NONCONV_REPORT_COUNT: g('NONCONV_REPORT_COUNT', '100'), detail: !!this.detailReport,
       };
       const D = this.app.defaults; for (const k in D) v['def_' + k] = D[k];
-      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model);
+      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false;
       const YN = ['NO', 'YES'];
       const tabs = {
         General: [
@@ -195,6 +197,7 @@
           { t: 'note', l: 'Applied to objects you add from now on; saved with your OsemCM settings, not in the .inp file.' }],
         '2D Flood': [
           { k: 'f2d_ENABLED', l: 'Enable 1D-2D flood simulation', t: 'check' },
+          { k: 'f2d_TAGALL', l: 'Tag all nodes "Link2D"', t: 'check', note: 'Writes the tag Link2D on every junction, storage unit and divider, so that all manholes are coupled to the 2D surface (only nodes tagged Link2D are coupled when any node has that tag). Rebuild the mesh afterwards.' },
           { t: 'h', l: 'Input layers' },
           { k: 'f2d_BOUNDARY', l: '2D Boundary (polygon)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Polygon(s) of the area to flood. Attribute "length" = cell size (map units), "roughness" = Manning n of the ground surface.' },
           { k: 'f2d_DEM', l: 'Digital Elevation Model', t: 'file', ext: ['tif', 'tiff', 'asc'], note: 'GeoTIFF or ASCII grid in the map coordinate system; cell elevations are read at the cell centres.' },
@@ -238,6 +241,12 @@
       const nd = {}; for (const k of Object.keys(r)) if (k.startsWith('def_')) { const key = k.slice(4), val = r[k]; delete r[k]; if (typeof val === 'boolean') nd[key] = val; else { const x = parseFloat(val); if (!isFinite(x)) { AV.alert('Object default "' + key + '" must be a number.'); return; } nd[key] = x; } }
       Object.assign(this.app.defaults, nd); this.app.settings.defaults = this.app.defaults; window.host.setSettings(this.app.settings);
       // 2D flood settings (stored in the model as ;;@OSEM2D lines)
+      // "Tag all nodes Link2D" (one-off action, undoable)
+      if (r.f2d_TAGALL) { const m = this.model; const objs = [...m.nodes.values()].filter(n => n.type !== 'OUTFALL' && String(n.tag || '') !== 'Link2D'); const old = objs.map(n => n.tag || '');
+        if (objs.length) { this.app.exec({ label: 'Tag ' + objs.length + ' nodes Link2D', do: () => objs.forEach(n => { n.tag = 'Link2D'; }), undo: () => objs.forEach((n, i) => { n.tag = old[i]; }), changes: objs.map((n, i) => ({ o: n, key: 'tag', old: old[i], nw: 'Link2D' })) });
+          AV.toast(objs.length + ' node(s) tagged Link2D. Rebuild the 2D mesh to couple them.', false, 6000); if (this.app.mesh2d) setTimeout(async () => { if (await AV.confirm('Nodes were tagged Link2D. Rebuild the 2D mesh now so that they are coupled to the surface?', 'Create Meshes', 'Rebuild', 'Later')) AV.createMeshes(this.app); }, 60); }
+        else AV.toast('All nodes already have the tag Link2D.'); }
+      delete r.f2d_TAGALL;
       if (Object.keys(r).some(k => k.startsWith('f2d_'))) { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
         n2.ENABLED = n2.ENABLED ? 'YES' : 'NO';
         for (const k of ['ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS']) if (n2[k] !== '' && !(parseFloat(n2[k]) >= 0)) { AV.alert('2D Flood: "' + k.replace('_', ' ').toLowerCase() + '" must be a number.'); return; }
@@ -292,7 +301,7 @@
           if (a === 'mesh') { await AV.createMeshes(app); if (app.mesh2d && app.mesh2d.cells.length) return this.run(); return; }
           if (a !== '1d') return;
           this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false });
-        } else { inpText = AV.mesh2DToINP(inpText, app.mesh2d, m); flood2d = true; pct.textContent = 'Starting engine (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' surface cells)...'; }
+        } else { inpText = AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m); flood2d = true; pct.textContent = 'Starting engine (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' surface cells)...'; }
       }
       const res = await window.host.runEngine({ inpText, dir, base, detail: !!this.detailReport, encoding, flood2d });
       this.runDlg.close(); this.runDlg = null;
@@ -361,7 +370,7 @@
         if (this.app.timeStep) setTimeout(() => this.app.timeStep.refresh(), 0);
         AV.$('#sbResults').textContent = 'Results: ' + meta.nPeriods + ' steps @ ' + AV.secToHms(meta.reportStep);
         const th = this.app.theme;
-        if (!th.layers.link.subs.length) th.layers.link.subs.push(th.newSub('link', 'm:4', 'Max. capacity d/D'));
+        if (!th.layers.link.subs.length) th.layers.link.subs.push(th.newSub('link', 'm:4', 'Max. capacity'));
         if (!th.layers.node.subs.length) th.layers.node.subs.push(th.newSub('node', 'm:full', 'Max. depth / max depth'));
         th.refreshAutoRanges();
         // start at time of peak system total inflow
@@ -424,8 +433,18 @@
       if (!sel.length) items.push('-', { label: 'Select an object to jump to its own peaks', disabled: true, fn: () => {} });
       const b = e.currentTarget.getBoundingClientRect(); this.app.contextMenu(b.left, b.top - 8 - items.length * 26, items);
     }
-    togglePlaybar(force) {
-      if (!this.results) { AV.toast('Run a simulation (or load a results file) first.'); return; }
+    // results file of the last run (or next to the model): Play reloads it after Quit instead of asking for a new run
+    async lastResultsFile() {
+      const ex = (f) => f ? window.host.exists(f) : false; const lr = this.lastRun;
+      if (lr && lr.out && await ex(lr.out)) return { out: lr.out, rpt: lr.rpt };
+      const fp = this.app.filePath; if (!fp) return null;
+      const two = this.app.mesh2d && AV.has2D(this.app) ? [[fp.replace(/\.inp$/i, '.fout'), fp.replace(/\.inp$/i, '.frpt')]] : [];
+      for (const [o, r] of two.concat([[fp.replace(/\.inp$/i, '.out'), fp.replace(/\.inp$/i, '.rpt')]])) if (o !== fp && await ex(o)) return { out: o, rpt: r };
+      return null;
+    }
+    async togglePlaybar(force) {
+      if (!this.results) { const f = await this.lastResultsFile(); if (f) { await this.loadResults(f.out, f.rpt, false); if (force === undefined && this.results) this.play(); return; }
+        AV.toast('Run a simulation (or load a results file) first.'); return; }
       const pb = AV.$('#playbar'); const show = force === undefined ? !pb.classList.contains('show') : force;
       pb.classList.toggle('show', show); if (show && !this.playing && force === undefined) this.play();
       this.app.activateView('map'); this.app.map.resize();
@@ -441,7 +460,8 @@
       for (const c of AV.openCharts || []) { c.markerX = c.dateMode ? R.meta.startDate + (R.period + 1) * R.meta.reportStep / 86400 : R.times[R.period]; c.draw(); }
       if (this._pending !== undefined) { const q = this._pending; this._pending = undefined; if (q !== R.period) this.setPeriod(q); }
     }
-    updatePropsResults() { const el = AV.$('#rescard-live'); if (el && this._liveObj) this.fillLive(el, this._liveObj); }
+    updatePropsResults() { const el = AV.$('#rescard-live'); if (el && this._liveObj) this.fillLive(el, this._liveObj);
+      const a = this.app; if (a.mesh2d && a.meshSel >= 0 && !a.selection.size && AV.$('#props .pt') && /^2D Cell /.test(AV.$('#props .pt').textContent)) AV.showCellInfo(a, a.meshSel, true); }
     playIcons() { const ic = this.playing ? 'pause' : 'play'; this.playBtn && this.playBtn.replaceChildren(AV.icon(ic)); for (const b of [...(this.playBtns || [])]) { if (b.isConnected) b._seen = true; else if (b._seen) { this.playBtns.delete(b); continue; } b.replaceChildren(AV.icon(ic), h('span', null, this.playing ? ' Pause' : ' Play')); } }
     // a Play/Pause button for plot / graph windows (animates the time marker together with the map)
     makePlayButton() { const b = h('button', { class: 'btn small playbtn', title: 'Play / pause the results animation', onclick: () => { if (!this.results) { AV.toast('No results loaded.'); return; } this.playing ? this.stop() : this.play(); } }); (this.playBtns = this.playBtns || new Set()).add(b); this.playIcons(); return b; }
