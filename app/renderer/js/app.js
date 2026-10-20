@@ -92,7 +92,7 @@
       const mk = (side) => { const s = h('div', { class: 'splitter' }); this.makeSplitter(s, side === 'L' ? left : right, side); return s; };
       const main = h('div', { id: 'main' }, left, mk('L'), center, mk('R'), right);
       const sb = h('div', { id: 'statusbar' },
-        h('div', { class: 'sb' }, 'Flow Units: ', h('span', { id: 'sbUnits' }, 'CFS')),
+        h('div', { class: 'sb sbclick', title: 'Click to change the flow units (US / SI)', onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); this.contextMenu(r.left, r.top - 6 * 26 - 8, AV.FLOW_UNIT_NAMES.map(u => ({ label: (u === this.model.flowUnits ? '● ' : '   ') + u + '  ' + ({ CFS: 'ft³/s', GPM: 'gal/min', MGD: 'Mgal/day', CMS: 'm³/s', LPS: 'L/s', MLD: 'ML/day' })[u], fn: () => AV.changeFlowUnits(this, u) }))); } }, 'Flow Units: ', h('span', { id: 'sbUnits' }, 'CFS'), ' ▾'),
         h('div', { class: 'sb' }, 'Offsets: ', h('span', { id: 'sbOffsets' }, 'DEPTH')),
         h('div', { class: 'sb' }, 'Map Units: ', h('select', { id: 'sbMapUnits', onchange: (e) => { const m = this.model, old = m.mapInfo.units, nw = e.target.value; const sync = () => { AV.$('#sbMapUnits').value = m.mapInfo.units; }; this.exec({ label: 'Map units ' + nw, light: true, do: () => { m.mapInfo.units = nw; sync(); }, undo: () => { m.mapInfo.units = old; sync(); } }); } }, ['None', 'Feet', 'Meters', 'Degrees'].map(u => h('option', { value: u }, u)))),
         h('div', { class: 'sb' }, 'Edit: ', h('span', { id: 'sbEdit' }, 'OFF')),

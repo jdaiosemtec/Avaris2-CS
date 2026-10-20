@@ -263,6 +263,8 @@
       const ur = parseFloat(r.UNDER_RELAXATION); if (!(ur >= 0.1 && ur <= 1)) { AV.alert('Under-relaxation factor must be between 0.1 and 1.0.'); return; }
       for (const k of ['START_DATE', 'END_DATE', 'REPORT_START_DATE']) if (AV.parseSwmmDate(r[k]) === null) { AV.alert('Invalid date for ' + k + ': ' + r[k]); return; }
       this.detailReport = r.detail; delete r.detail;
+      // flow units: changed through the units switch (asks whether the values are converted)
+      const newFU = r.FLOW_UNITS; delete r.FLOW_UNITS; if (newFU && newFU !== this.model.flowUnits) setTimeout(() => AV.changeFlowUnits(this.app, newFU), 50);
       const old = Object.assign({}, this.model.options); const nw = Object.assign({}, this.model.options);
       for (const k in r) {
         if (k === 'UNDER_RELAXATION' && +r[k] === 0.5 && old[k] === undefined) continue;
@@ -416,6 +418,7 @@
     setPlayMode(on) {
       const app = this.app; if (!on) this.stop();
       app.playMode = !!on && !!this.results;
+      { const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); if (app.playMode && !AV.MESH_DYNAMIC[P.playField]) P.playField = AV.MESH_DYNAMIC[P.lastPlay] ? P.lastPlay : 'depth'; app._meshRange = null; }
       const pb = AV.$('#playbar'); if (pb) pb.classList.toggle('show', app.playMode);
       app.theme.invalidate(); app.map.redraw(); app.panels.showProps(); app.refreshRibbon && app.refreshRibbon();
       if (app.meshSel >= 0 && app.mesh2d && !app.selection.size) AV.showCellInfo(app, app.meshSel, true);
@@ -464,7 +467,7 @@
       this._busy = true;
       try { await R.setPeriod(p); } finally { this._busy = false; }
       if (this.slider) { this.slider.value = R.period; this.timeEl.textContent = R.timeLabel(R.period); }
-      this.app.map.redraw(); this.updatePropsResults(); if (this.app.timeStep) this.app.timeStep.refresh();
+      this.app._meshRange = null; this.app.map.redraw(); this.updatePropsResults(); if (this.app.timeStep) this.app.timeStep.refresh();
       for (const pv of this.profileViews) pv.draw();
       for (const c of AV.openCharts || []) { c.markerX = c.dateMode ? R.meta.startDate + (R.period + 1) * R.meta.reportStep / 86400 : R.times[R.period]; c.draw(); }
       if (this._pending !== undefined) { const q = this._pending; this._pending = undefined; if (q !== R.period) this.setPeriod(q); }

@@ -675,3 +675,4 @@ table.edtbl th { background: #f3f5f7; font-weight: 600; }
 .refrow .refed { padding: 1px 7px; line-height: 18px; }
 .lidtop { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
 .lidsketch { width: 300px; height: 164px; flex: 0 0 300px; border: 1px solid var(--border); border-radius: 4px; background: #fbfcfd; padding: 2px; }
+.sbclick { cursor: pointer; } .sbclick:hover { background: rgba(255,255,255,.12); }

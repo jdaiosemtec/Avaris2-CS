@@ -15,7 +15,7 @@
     if (app.meshResults) cols.push({ k: '_maxdepth', l: 'Max. Depth (' + L + ') (result)', get: (c) => r4(AV.cellValue(app, K(c), 'maxdepth')), num: true, ro: true, res: true },
       { k: '_tpond', l: 'Time Ponded (hr) (result)', get: (c) => r4(AV.cellValue(app, K(c), 'tpond')), num: true, ro: true, res: true },
       { k: '_trecede', l: 'Time to Recede (hr) (result)', get: (c) => r4(AV.cellValue(app, K(c), 'trecede')), num: true, ro: true, res: true });
-    if (app.meshResults && app.playMode) cols.push({ k: '_depth', l: 'Depth (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'depth')), num: true, ro: true, res: true });
+    if (app.meshResults && app.playMode) cols.push({ k: '_depth', l: 'Depth (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'depth')), num: true, ro: true, res: true }, { k: '_wse', l: 'Water Surface (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'wse')), num: true, ro: true, res: true });
     return { kind: 'MESH', cols, objs };
   }
   AV.tableRows = function (app, type) {
@@ -158,7 +158,7 @@
       this.app.contextMenu(e.clientX, e.clientY, items);
     }
     themeBy(c) {
-      if (this.mesh()) { const f = { elev: 'elev', _maxdepth: 'maxdepth', _tpond: 'tpond', _trecede: 'trecede', _depth: 'depth' }[c.k]; if (!f) { AV.toast('This field is not available for map rendering.', true); return; }
+      if (this.mesh()) { const f = { elev: 'elev', _maxdepth: 'maxdepth', _tpond: 'tpond', _trecede: 'trecede', _depth: 'depth', _wse: 'wse' }[c.k]; if (!f) { AV.toast('This field is not available for map rendering.', true); return; }
         const P = this.app.prefs.mesh2d || (this.app.prefs.mesh2d = {}); if (AV.MESH_DYNAMIC[f]) P.playField = f; else P.field = f; this.app.savePrefs(); this.app._meshRange = null; this.app.activateView('map'); this.app.map.redraw(); this.app.symPane.open({ mesh: true }); return; }
       const layer = this.rows.kind === 'NODE' ? 'node' : this.rows.kind === 'LINK' ? 'link' : this.rows.kind === 'SUBCATCH' ? 'sub' : null; if (!layer) return;
       const map = { elev: 'elev', maxDepth: 'maxDepth', _rim: 'rim', g1: 'diam', length: 'length', rough: 'rough', _slope: 'slope', area: 'area', imperv: 'imperv', width: 'width', slope: 'slope', _r0: 'm:0', _r1: 'm:1', _r2: 'm:2', _r4: 'm:4', _r5: 'm:5', _nc: 'nc' };

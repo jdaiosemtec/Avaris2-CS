@@ -224,13 +224,20 @@
   AV.RAMPS['Flood Time'] = ['#fff3b0', '#ffd166', '#f8961e', '#e85d04', '#c1121f', '#6a040f'];
   AV.RAMPS['Terrain'] = ['#2e7d32', '#aed581', '#fff176', '#bc8c5c', '#f5f5f5'];
   const DEF_RAMP = { depth: 'Flood Depth', maxdepth: 'Flood Depth', tpond: 'Flood Time', trecede: 'Flood Time', wse: 'Terrain', elev: 'Terrain' };
-  AV.MESH_CONTINUOUS = { wse: true, elev: true };
+  AV.MESH_CONTINUOUS = {}; // every variable is shown by ranges (classes) that can be edited
   AV.MESH_DYNAMIC = { depth: true, wse: true };
-  AV.meshField = (app) => { const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); return app.playMode ? (AV.MESH_DYNAMIC[P.playField] ? P.playField : 'depth') : (FIELDS[P.field] && !AV.MESH_DYNAMIC[P.field] ? P.field : 'maxdepth'); };
+  // variable shown: in play mode a current-time variable (depth / water surface) unless a static / statistic one was
+  // chosen while playing; outside play mode only statistic and static variables (current-time values need Play)
+  AV.meshField = (app) => { const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); const stat = FIELDS[P.field] && !AV.MESH_DYNAMIC[P.field] ? P.field : 'maxdepth';
+    return app.playMode && AV.MESH_DYNAMIC[P.playField] ? P.playField : stat; };
   AV.meshDefaultBreaks = (app, field) => { const si = AV.meshSI(app);
-    return { depth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], maxdepth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], tpond: [0.25, 0.5, 1, 2, 4], trecede: [0.25, 0.5, 1, 2, 4] }[field] || null; };
+    const fixed = { depth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], maxdepth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], tpond: [0.25, 0.5, 1, 2, 4], trecede: [0.25, 0.5, 1, 2, 4] }[field];
+    if (fixed) return fixed;
+    // elevation / water surface: 5 equal classes over the ground elevations of the mesh
+    let [a, b] = app.mesh2d ? AV.meshRange(app, 'elev') : [0, 1]; if (!isFinite(a) || !(b > a)) { a = 0; b = 100; }
+    const st = (b - a) / 5; return [0, 1, 2, 3, 4].map(i => +(a + i * st).toPrecision(4)); };
   // style of the Meshes layer (set in the Symbology pane). Class i colours values from breaks[i] up to breaks[i+1];
-  // values below the first break are not coloured (dry). Elevation / water surface use a continuous ramp.
+  // values below the first break are not coloured (dry).
   AV.meshStyle = function (app) {
     // play mode shows a dynamic variable (depth / water surface), otherwise a statistic or static one
     const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); const field = AV.meshField(app);
@@ -330,7 +337,7 @@
     el.appendChild(tb);
     // play mode: depth at the current time step (blue card, like the nodes / links)
     if (MR && app.playMode) el.appendChild(h('div', { class: 'rescard' }, h('div', { class: 'rh' }, 'Results at ' + app.results.timeLabel(app.results.period)),
-      h('table', null, h('tr', null, h('td', null, 'Depth (' + L + ')'), h('td', { class: 'num' }, f(AV.cellValue(app, k, 'depth'), 3))))));
+      h('table', null, h('tr', null, h('td', null, 'Depth (' + L + ')'), h('td', { class: 'num' }, f(AV.cellValue(app, k, 'depth'), 3))), h('tr', null, h('td', null, 'Water Surface Elev. (' + L + ')'), h('td', { class: 'num' }, f(AV.cellValue(app, k, 'wse'), 3))))));
     if (MR) el.appendChild(h('div', { style: { padding: '8px 10px' } }, h('button', { class: 'btn', onclick: () => app.feat.graphTool([AV.cellNode(app, k)]) }, 'Graph')));
     if (quiet) return;
     if (app.showRightTab) app.showRightTab('props');

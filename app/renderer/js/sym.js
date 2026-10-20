@@ -284,10 +284,13 @@
         const S = AV.meshStyle(app); const F = S.field; const cont = !!AV.MESH_CONTINUOUS[F];
         const redraw = () => { app._meshRange = null; this.changed(); };
         sec('Display');
-        const fSel = h('select', { onchange: () => { P.field = fSel.value; redraw(); this.render(); } }, [['Statistic results (whole run)', ['maxdepth', 'tpond', 'trecede']], ['Static properties', ['elev']]].map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k]))))); fSel.value = AV.MESH_DYNAMIC[P.field] || !P.field ? 'maxdepth' : P.field;
-        const pSel = h('select', { onchange: () => { P.playField = pSel.value; redraw(); this.render(); } }, ['depth', 'wse'].map(k => h('option', { value: k }, AV.MESH_FIELDS[k]))); pSel.value = AV.MESH_DYNAMIC[P.playField] ? P.playField : 'depth';
-        rowE('Variable', fSel); rowE('Variable in play mode', pSel);
-        form.appendChild(h('div', { class: 'note' }, 'Now showing: ' + AV.MESH_FIELDS[F] + (app.playMode ? ' (play mode)' : '') + '. The ranges below apply to this variable.'));
+        // one variable list: current-time variables (depth, water surface) need play mode; the others always show
+        const fSel = h('select', { onchange: () => { const v = fSel.value;
+            if (AV.MESH_DYNAMIC[v]) { if (!app.playMode) { AV.toast(AV.MESH_FIELDS[v] + ' is a current-time result: click Play (play mode) to show it. Statistic and static variables can be shown at any time.', true, 6000); fSel.value = F; return; } P.playField = v; }
+            else { P.field = v; if (app.playMode) { P.lastPlay = P.playField || P.lastPlay; P.playField = null; } }
+            redraw(); this.render(); } },
+          [['Current time step (play mode)', ['depth', 'wse']], ['Statistic results (whole run)', ['maxdepth', 'tpond', 'trecede']], ['Static properties', ['elev']]].map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k].replace(' (current time)', '') + (AV.MESH_DYNAMIC[k] && !app.playMode ? '  (play mode only)' : ''))))));
+        fSel.value = F; rowE('Variable', fSel);
         rowE('Transparency', opac(P, 'opacity')); rowE('', check(P, 'outline', 'Cell outlines')); rowE('', check(P, 'visible', 'Visible'));
         sec(cont ? 'Colour ramp (continuous)' : 'Ranges');
         const setRamp = (v) => { P.ramp = P.ramp || {}; P.ramp[F] = v; if (!cont) { const cls = (P.classes && P.classes[F]) || S.breaks.map(b => ({ v: b })); const c = AV.rampColors(v, cls.length, !!(P.invert && P.invert[F])); P.classes = P.classes || {}; P.classes[F] = cls.map((x, i) => ({ v: x.v, color: c[i] })); } redraw(); this.render(); };
@@ -298,7 +301,7 @@
           const cls = () => { P.classes = P.classes || {}; if (!P.classes[F]) P.classes[F] = S.breaks.map((b, i) => ({ v: b, color: S.colors[i] })); return P.classes[F]; };
           const nIn = h('input', { type: 'number', min: 2, max: 12, value: S.breaks.length, style: { width: '56px' } });
           const auto = () => { const n = Math.max(2, Math.min(12, +nIn.value || 5)); let br;
-            if (app.meshResults || F === 'elev') { const [a, b] = AV.meshRange(app, F); const lo = Math.max(a, 0) || 0, hi = b; if (isFinite(hi) && hi > lo) { const d0 = AV.meshDefaultBreaks(app, F)[0]; const st = (hi - Math.max(lo, d0)) / n; br = [...Array(n).keys()].map(i => +((Math.max(lo, d0)) + i * st).toPrecision(3)); } }
+            if (app.meshResults || F === 'elev') { const [a, b] = AV.meshRange(app, F); const elevLike = F === 'elev' || F === 'wse'; const lo = elevLike ? a : (Math.max(a, 0) || 0), hi = b; if (isFinite(hi) && hi > lo) { const d0 = elevLike ? lo : AV.meshDefaultBreaks(app, F)[0]; const st = (hi - Math.max(lo, d0)) / n; br = [...Array(n).keys()].map(i => +((Math.max(lo, d0)) + i * st).toPrecision(4)); } }
             if (!br) { const d = AV.meshDefaultBreaks(app, F); br = [...Array(n).keys()].map(i => i < d.length ? d[i] : +(d[d.length - 1] * Math.pow(2, i - d.length + 1)).toPrecision(3)); }
             const c = AV.rampColors(S.ramp, n, !!(P.invert && P.invert[F])); P.classes = P.classes || {}; P.classes[F] = br.map((v, i) => ({ v, color: c[i] })); redraw(); this.render(); };
           rowE('Ranges', h('span', { class: 'symnum' }, nIn, h('button', { class: 'btn small', title: 'Equal intervals from the first break to the largest value of the current results', onclick: auto }, 'Auto-Theme'),

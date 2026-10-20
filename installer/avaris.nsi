@@ -6,7 +6,7 @@ ManifestDPIAware true
 
 !define APPNAME "OsemCMV2.0"
 !define COMPANY "OSEMTEC"
-!define VERSION "2.0.5"
+!define VERSION "2.0.6"
 !define EXENAME "OsemCM.exe"
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OsemCMV2.0"
 
@@ -17,7 +17,7 @@ InstallDirRegKey HKLM "Software\${COMPANY}\${APPNAME}" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "${COMPANY} - ${APPNAME} ${VERSION}"
 
-VIProductVersion "2.0.5.0"
+VIProductVersion "2.0.6.0"
 VIAddVersionKey "ProductName" "${APPNAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "FileDescription" "${APPNAME} Setup"
