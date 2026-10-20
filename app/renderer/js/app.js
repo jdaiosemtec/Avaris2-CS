@@ -349,8 +349,8 @@
     setDirty() { this.dirty = true; this.model.touch(); this.updateTitle(); this.refreshRibbon(); }
     updateTitle() {
       const name = this.filePath ? AV.basename(this.filePath) : 'Untitled';
-      window.host.setTitle('OsemCM V2.0 ' + AV.editionLabel(this) + ' -- ' + name + (this.dirty ? ' *' : ''));
-      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'OsemCM V2.0 ' + AV.editionLabel(this) + ' -- ' + name + (this.dirty ? ' *' : '');
+      window.host.setTitle('OsemCM V2.0 ' + (AV.editionLabel(this) ? AV.editionLabel(this) + ' ' : '') + '-- ' + name + (this.dirty ? ' *' : ''));
+      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'OsemCM V2.0 ' + (AV.editionLabel(this) ? AV.editionLabel(this) + ' ' : '') + '-- ' + name + (this.dirty ? ' *' : '');
       const m = this.model;
       AV.$('#modelCount').textContent = m ? `${m.nodes.size} nodes · ${m.links.size} links` : '';
     }
@@ -772,7 +772,7 @@
         'Space + drag / middle mouse  Pan', 'Mouse wheel  Zoom', 'Ctrl+click  Add to selection', 'Shift+click  Choose from overlapping objects (Default Settings)', 'Drag a selected node  Move it (Edit mode ON)', 'Backspace  Remove last vertex while drawing', 'Enter / double-click  Finish polygon'].join('\n'), 'Keyboard Shortcuts');
     }
     about() {
-      AV.alert('OsemCM V2.0 (' + this.info.version + ')\nEdition: ' + (this.license && this.license.valid ? AV.EDITIONS[this.license.edition] + ' — licensed to ' + this.license.licensee : 'OsemCM 1D (unregistered)') + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
+      AV.alert('OsemCM V2.0 (' + this.info.version + ')' + (AV.LICENSING ? '\nEdition: ' + (this.license && this.license.valid ? AV.EDITIONS[this.license.edition] + ' — licensed to ' + this.license.licensee : 'OsemCM 1D (unregistered)') : '') + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
         + '  - user-set dynamic-wave under-relaxation (UNDER_RELAXATION option)\n  - OpenMP parallel node-depth solution with per-node convergence flags\n'
         + '  - extended "Most Frequent Nonconverging Nodes" list (NONCONV_REPORT_COUNT)\n  - outfalls excluded from nonconvergence statistics\n\nCPU threads available: ' + this.info.cpus, 'About OsemCM');
     }

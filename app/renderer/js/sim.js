@@ -138,7 +138,7 @@
     sources() { const out = []; const cur = this.app.filePath ? AV.basename(this.app.filePath).replace(/\.inp$/i, '') : 'Current'; if (this.results) out.push({ name: cur, res: this.results, current: true }); for (const s of this.scen) if (s.scenName !== cur || !this.results) out.push({ name: s.scenName, res: s }); if (this.compare) out.push({ name: 'Compare (' + AV.basename(this.compare.meta.file || 'run') + ')', res: this.compare }); return out; }
 
     // =============================================================== options
-    // Simulation Options (1D). only2D: the 2D Options dialog of the 2D Flood ribbon tab (OsemCM 1D-2D licence)
+    // Simulation Options. The '2D Flood' tab belongs to the 2D module (AV.has2D); only2D opens that tab alone
     async optionsDialog(startTab, only2D) {
       if (only2D && !AV.has2D(this.app)) { AV.need2D(this.app, '2D Options'); return; }
       const o = this.model.options; const g = (k, d) => (o[k] !== undefined ? o[k] : d);
@@ -205,9 +205,9 @@
           { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
           { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['AUTO', 'MODEL'], note: 'AUTO (as Avaris DS): a model in US units with a map in metres is run in SI (FLOW_UNITS CMS, values unchanged), so the metre-based mesh and DEM match. MODEL: keep the model units and convert the mesh lengths.' },
           { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
-          { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (2D Flood ribbon tab, or the 2D Flood group in the Layer View). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
+          { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (Simulation ribbon, or the 2D Flood group in the Layer View). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
       };
-      if (only2D) { for (const k of Object.keys(tabs)) if (k !== '2D Flood') delete tabs[k]; } else delete tabs['2D Flood'];
+      if (only2D) { for (const k of Object.keys(tabs)) if (k !== '2D Flood') delete tabs[k]; } else if (!AV.has2D(this.app)) delete tabs['2D Flood'];
       const body = h('div', { style: { width: only2D ? '600px' : '560px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
       const inputs = {}; const pages = [];
       const t0 = Math.max(0, Object.keys(tabs).indexOf(startTab));
@@ -238,7 +238,7 @@
       const nd = {}; for (const k of Object.keys(r)) if (k.startsWith('def_')) { const key = k.slice(4), val = r[k]; delete r[k]; if (typeof val === 'boolean') nd[key] = val; else { const x = parseFloat(val); if (!isFinite(x)) { AV.alert('Object default "' + key + '" must be a number.'); return; } nd[key] = x; } }
       Object.assign(this.app.defaults, nd); this.app.settings.defaults = this.app.defaults; window.host.setSettings(this.app.settings);
       // 2D flood settings (stored in the model as ;;@OSEM2D lines)
-      if (only2D) { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
+      if (Object.keys(r).some(k => k.startsWith('f2d_'))) { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
         n2.ENABLED = n2.ENABLED ? 'YES' : 'NO';
         for (const k of ['ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS']) if (n2[k] !== '' && !(parseFloat(n2[k]) >= 0)) { AV.alert('2D Flood: "' + k.replace('_', ' ').toLowerCase() + '" must be a number.'); return; }
         const m = this.model; const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = {}; for (const k of AV.F2D_KEYS) if (n2[k] !== '' && n2[k] !== undefined) nw2[k] = String(n2[k]);

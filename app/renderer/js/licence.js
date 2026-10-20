@@ -6,9 +6,11 @@
 'use strict';
 (function (AV) {
   const h = AV.h;
+  // Licensing is not active yet: every function (1D and 2D) is available. Set to true when editions are introduced.
+  AV.LICENSING = false;
   AV.EDITIONS = { '1D': 'OsemCM 1D', '2D': 'OsemCM 1D-2D' };
-  AV.has2D = (app) => !!(app && app.license && app.license.valid && app.license.edition === '2D');
-  AV.editionLabel = (app) => { const L = app && app.license; if (!L || !L.valid) return '1D (unregistered)'; return L.edition === '2D' ? '1D-2D' : '1D'; };
+  AV.has2D = (app) => !AV.LICENSING || !!(app && app.license && app.license.valid && app.license.edition === '2D');
+  AV.editionLabel = (app) => { if (!AV.LICENSING) return ''; const L = app && app.license; if (!L || !L.valid) return '1D (unregistered)'; return L.edition === '2D' ? '1D-2D' : '1D'; };
   // shown when a 2D function is used without a 1D-2D licence
   AV.need2D = function (app, what) {
     return AV.modal({ title: 'OsemCM 1D-2D licence required', width: 480, body: h('div', { style: { lineHeight: 1.55 } },
@@ -29,7 +31,20 @@
     if (this.results && on && this.mesh2d) await AV.computeMeshResults(this);
     this.refreshRibbon(); this.panels.refreshLayers(); this.map.redraw(); this.updateTitle();
   };
+  // simple registration form used while licensing is not active (details are kept on this computer)
+  AV.App.prototype.registerSimple = async function () {
+    const P = this.prefs.registration || {};
+    const r = await AV.formDialog('Register OsemCM', [
+      { t: 'note', l: 'Register your copy of OsemCM ' + ((this.info && this.info.version) || '') + '. Online activation will be enabled in a later version; your details are stored on this computer until then.' },
+      { k: 'name', l: 'Name', t: 'text' }, { k: 'company', l: 'Company / Organisation', t: 'text' }, { k: 'email', l: 'E-mail', t: 'text' }],
+      { name: P.name || '', company: P.company || '', email: P.email || '' }, { okLabel: 'Register', width: 520 });
+    if (!r) return;
+    if (!String(r.name || '').trim() || !/^\S+@\S+\.\S+$/.test(String(r.email || '').trim())) { AV.toast('Enter your name and a valid e-mail address.', true); return; }
+    this.prefs.registration = Object.assign({}, r, { date: new Date().toISOString() }); this.savePrefs();
+    AV.toast('Registration details saved.', false, 4000);
+  };
   AV.App.prototype.registerDialog = async function () {
+    if (!AV.LICENSING) return this.registerSimple();
     const app = this; const L = this.license || {}; const P = this.prefs.registration || {};
     const cur = L.valid ? AV.EDITIONS[L.edition] + ' — ' + L.licensee + (L.expiry ? ' (valid until ' + L.expiry + ')' : ' (perpetual)') + (L.serial ? ', serial ' + L.serial : '') : 'OsemCM 1D — unregistered' + (L.error ? ' (' + L.error + ')' : '');
     const name = h('input', { type: 'text', value: P.name || '', style: { width: '100%' } }), company = h('input', { type: 'text', value: P.company || '', style: { width: '100%' } }), email = h('input', { type: 'text', value: P.email || '', style: { width: '100%' } });
@@ -50,6 +65,6 @@
       delete this.settings.license; window.host.setSettings(this.settings); this.license = { valid: false, edition: null }; await this.applyLicence(); AV.toast('Licence removed.'); return; }
     if (!r || !r.k) return;
     this.settings.license = { key: r.k, activated: new Date().toISOString() }; window.host.setSettings(this.settings); this.license = r.v; await this.applyLicence();
-    AV.alert('Licence activated: ' + AV.EDITIONS[r.v.edition] + '\nLicensed to: ' + r.v.licensee + (r.v.expiry ? '\nValid until: ' + r.v.expiry : '') + (r.v.edition === '2D' ? '\n\nThe 2D Flood functions are now enabled (ribbon tab "2D Flood").' : ''), 'Register OsemCM');
+    AV.alert('Licence activated: ' + AV.EDITIONS[r.v.edition] + '\nLicensed to: ' + r.v.licensee + (r.v.expiry ? '\nValid until: ' + r.v.expiry : '') + (r.v.edition === '2D' ? '\n\nThe 2D Flood functions are now enabled.' : ''), 'Register OsemCM');
   };
 })(window.AV);
