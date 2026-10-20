@@ -4,11 +4,11 @@ SetCompressor /SOLID lzma
 SetCompressorDictSize 64
 ManifestDPIAware true
 
-!define APPNAME "OsemCM"
+!define APPNAME "OsemCMV2.0"
 !define COMPANY "OSEMTEC"
-!define VERSION "1.23.0"
+!define VERSION "2.0.0"
 !define EXENAME "OsemCM.exe"
-!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OsemCM"
+!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OsemCMV2.0"
 
 Name "${APPNAME} ${VERSION}"
 OutFile "${OUTFILE}"
@@ -17,7 +17,7 @@ InstallDirRegKey HKLM "Software\${COMPANY}\${APPNAME}" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "${COMPANY} - ${APPNAME} ${VERSION}"
 
-VIProductVersion "1.23.0.0"
+VIProductVersion "2.0.0.0"
 VIAddVersionKey "ProductName" "${APPNAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "FileDescription" "${APPNAME} Setup"
@@ -33,7 +33,7 @@ VIAddVersionKey "LegalCopyright" "(c) 2026 ${COMPANY}"
 !define MUI_UNICON "${ICON}"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Welcome to ${APPNAME} ${VERSION} Setup"
-!define MUI_WELCOMEPAGE_TEXT "This will install ${APPNAME} on your computer.$\r$\n$\r$\nUrban drainage and sewer network modeling. Opens Avaris DS and EPA SWMM models; engine: EPA SWMM 5.2.4 core with Avaris convergence modifications.$\r$\n$\r$\nRequirements: Windows 10 or 11, 64-bit.$\r$\n$\r$\nClick Next to continue."
+!define MUI_WELCOMEPAGE_TEXT "This will install ${APPNAME} on your computer.$\r$\n$\r$\nUrban drainage and sewer network modeling with 1D-2D surface flood simulation (V2.0; installs next to OsemCM V1.0). Opens Avaris DS and EPA SWMM models; engine: EPA SWMM 5.2.4 core with Avaris convergence modifications.$\r$\n$\r$\nRequirements: Windows 10 or 11, 64-bit.$\r$\n$\r$\nClick Next to continue."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${EXENAME}"
 !define MUI_FINISHPAGE_RUN_TEXT "Launch ${APPNAME}"
 
@@ -86,10 +86,10 @@ Section "Desktop shortcut" SecDesktop
 SectionEnd
 
 Section /o "Open .inp files with OsemCM (file association)" SecAssoc
-  WriteRegStr HKCR ".inp\OpenWithProgids" "OsemCM.Model" ""
-  WriteRegStr HKCR "OsemCM.Model" "" "OsemCM / SWMM Model"
-  WriteRegStr HKCR "OsemCM.Model\DefaultIcon" "" "$INSTDIR\resources\app\icon.ico"
-  WriteRegStr HKCR "OsemCM.Model\shell\open\command" "" '"$INSTDIR\${EXENAME}" "%1"'
+  WriteRegStr HKCR ".inp\OpenWithProgids" "OsemCMV2.Model" ""
+  WriteRegStr HKCR "OsemCMV2.Model" "" "OsemCM / SWMM Model"
+  WriteRegStr HKCR "OsemCMV2.Model\DefaultIcon" "" "$INSTDIR\resources\app\icon.ico"
+  WriteRegStr HKCR "OsemCMV2.Model\shell\open\command" "" '"$INSTDIR\${EXENAME}" "%1"'
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 SectionEnd
 
@@ -108,6 +108,6 @@ Section "Uninstall"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKLM "${UNINSTKEY}"
   DeleteRegKey HKLM "Software\${COMPANY}\${APPNAME}"
-  DeleteRegValue HKCR ".inp\OpenWithProgids" "OsemCM.Model"
-  DeleteRegKey HKCR "OsemCM.Model"
+  DeleteRegValue HKCR ".inp\OpenWithProgids" "OsemCMV2.Model"
+  DeleteRegKey HKCR "OsemCMV2.Model"
 SectionEnd

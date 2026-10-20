@@ -12,3 +12,4 @@ Rules
 
 ## CHANGELOG
 - v1.23.0 — V1.0 baseline (last 1D-only build).
+- v2.0.0 — First V2.0 build: 2D Flood module (Options → 2D Flood, Create Meshes, 1D-2D run to .finp/.frpt/.fout, Meshes layer coloured by depth / max depth / time ponded / time to recede / elevation, cell properties + graph, mesh shapefile export, Avaris DS .ini [2D] import). Mesh rules reproduce Avaris DS (verified on demo3: 1497 cells, 2852 surface links, 551 manhole couplings, 15 water-front outfalls, identical cell elevations and link lengths). Fix: Avaris .ini [Reference] coordinate system index.

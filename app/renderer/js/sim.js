@@ -153,6 +153,7 @@
         UNDER_RELAXATION: g('UNDER_RELAXATION', '0.5'), NONCONV_REPORT_COUNT: g('NONCONV_REPORT_COUNT', '100'), detail: !!this.detailReport,
       };
       const D = this.app.defaults; for (const k in D) v['def_' + k] = D[k];
+      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model);
       const YN = ['NO', 'YES'];
       const tabs = {
         General: [
@@ -190,8 +191,21 @@
           { t: 'h', l: 'Subcatchments' }, { k: 'def_subArea', l: 'Area (if no map units)', t: 'text' }, { k: 'def_subWidth', l: 'Width', t: 'text' },
           { k: 'def_subImperv', l: '% Impervious', t: 'text' }, { k: 'def_subSlope', l: '% Slope', t: 'text' },
           { t: 'note', l: 'Applied to objects you add from now on; saved with your OsemCM settings, not in the .inp file.' }],
+        '2D Flood': [
+          { k: 'f2d_ENABLED', l: 'Enable 1D-2D flood simulation', t: 'check' },
+          { t: 'h', l: 'Input layers' },
+          { k: 'f2d_BOUNDARY', l: '2D Boundary (polygon)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Polygon(s) of the area to flood. Attribute "length" = cell size (map units), "roughness" = Manning n of the ground surface.' },
+          { k: 'f2d_DEM', l: 'Digital Elevation Model', t: 'file', ext: ['tif', 'tiff', 'asc'], note: 'GeoTIFF or ASCII grid in the map coordinate system; cell elevations are read at the cell centres.' },
+          { k: 'f2d_WATERFRONT', l: 'Water Front (line)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Lines where surface water leaves the model (river bank, coast); attribute "elev" = outlet elevation.' },
+          { k: 'f2d_CUTOFF', l: 'Cut-off Lines', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Walls / embankments: no surface flow across them.' },
+          { k: 'f2d_EXCLUSION', l: 'Exclusion Polygons', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Buildings and other areas without cells.' },
+          { t: 'h', l: 'Mesh and run' },
+          { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
+          { k: 'f2d_UNITS', l: 'Run Units', t: 'choice', o: ['AUTO', 'MODEL'], note: 'AUTO (as Avaris DS): a model in US units with a map in metres is run in SI (FLOW_UNITS CMS, values unchanged), so the metre-based mesh and DEM match. MODEL: keep the model units and convert the mesh lengths.' },
+          { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
+          { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (2D Flood group in the Layer View, or the Simulation ribbon). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
       };
-      const body = h('div', { style: { width: '560px' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
+      const body = h('div', { style: { width: '640px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
       const inputs = {}; const pages = [];
       const t0 = Math.max(0, Object.keys(tabs).indexOf(startTab));
       Object.keys(tabs).forEach((name, ti) => {
@@ -202,6 +216,12 @@
           let inp;
           if (f.t === 'choice') { inp = h('select', null, f.o.map(x => h('option', { value: x }, x))); inp.value = String(v[f.k]).toUpperCase(); }
           else if (f.t === 'check') inp = h('input', { type: 'checkbox', checked: !!v[f.k] });
+          else if (f.t === 'file') { const ti = h('input', { type: 'text', value: v[f.k] || '', style: { width: '190px' }, placeholder: '(none)' }); ti.title = v[f.k] || '';
+            const app = this.app; inputs[f.k] = ti;
+            form.appendChild(h('label', null, f.l)); form.appendChild(h('div', { class: 'fpick' }, ti,
+              h('button', { class: 'btn small', title: 'Browse', onclick: async () => { const p = await window.host.openDialog({ title: f.l, filters: [{ name: f.l, extensions: f.ext }] }); if (p) ti.value = AV.f2dRelative(app, p); } }, '...'),
+              h('button', { class: 'btn small', title: 'Clear', onclick: () => { ti.value = ''; } }, '✕')));
+            if (f.note) form.appendChild(h('div', { class: 'note' }, f.note)); continue; }
           else inp = h('input', { type: 'text', value: v[f.k], style: { width: '160px' } });
           inputs[f.k] = inp; form.appendChild(h('label', null, f.l)); form.appendChild(inp);
           if (f.note) form.appendChild(h('div', { class: 'note' }, f.note));
@@ -214,6 +234,18 @@
       // object defaults (app settings, not part of the model)
       const nd = {}; for (const k of Object.keys(r)) if (k.startsWith('def_')) { const key = k.slice(4), val = r[k]; delete r[k]; if (typeof val === 'boolean') nd[key] = val; else { const x = parseFloat(val); if (!isFinite(x)) { AV.alert('Object default "' + key + '" must be a number.'); return; } nd[key] = x; } }
       Object.assign(this.app.defaults, nd); this.app.settings.defaults = this.app.defaults; window.host.setSettings(this.app.settings);
+      // 2D flood settings (stored in the model as ;;@OSEM2D lines)
+      { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
+        n2.ENABLED = n2.ENABLED ? 'YES' : 'NO';
+        for (const k of ['ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS']) if (n2[k] !== '' && !(parseFloat(n2[k]) >= 0)) { AV.alert('2D Flood: "' + k.replace('_', ' ').toLowerCase() + '" must be a number.'); return; }
+        const m = this.model; const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = {}; for (const k of AV.F2D_KEYS) if (n2[k] !== '' && n2[k] !== undefined) nw2[k] = String(n2[k]);
+        if (JSON.stringify(AV.f2d(m)) !== JSON.stringify(AV.f2d({ osem2d: nw2 }))) {
+          const ch = AV.F2D_KEYS.filter(k => AV.f2d(m)[k] !== AV.f2d({ osem2d: nw2 })[k]).map(k => ({ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: '2D ' + k, old: AV.f2d(m)[k], nw: AV.f2d({ osem2d: nw2 })[k] }));
+          this.app.exec({ label: '2D flood settings', do: () => { m.osem2d = Object.assign({}, nw2); }, undo: () => { m.osem2d = old2 ? Object.assign({}, old2) : undefined; }, changes: ch });
+          this.app.panels.refreshLayers();
+          const geo = ['BOUNDARY', 'DEM', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'CELL_SIZE', 'ROUGHNESS'].some(k => ch.some(c => c.key === '2D ' + k));
+          if (AV.f2dEnabled(m) && geo && nw2.BOUNDARY && nw2.DEM) setTimeout(async () => { if (await AV.confirm((this.app.mesh2d ? 'The 2D input layers changed. Rebuild the mesh now?' : 'Create the 2D mesh now?'), 'Create Meshes', 'Create Meshes', 'Later')) AV.createMeshes(this.app); }, 50);
+        } }
       // validation
       const ur = parseFloat(r.UNDER_RELAXATION); if (!(ur >= 0.1 && ur <= 1)) { AV.alert('Under-relaxation factor must be between 0.1 and 1.0.'); return; }
       for (const k of ['START_DATE', 'END_DATE', 'REPORT_START_DATE']) if (AV.parseSwmmDate(r[k]) === null) { AV.alert('Invalid date for ' + k + ': ' + r[k]); return; }
@@ -247,7 +279,17 @@
       this.progEls = { bar, pct, t0 };
       app.status('Running simulation...');
       const encoding = app.filePath ? await window.host.encoding(app.filePath) : 'utf8';
-      const res = await window.host.runEngine({ inpText: m.toINP({ reportAll: true }), dir, base, detail: !!this.detailReport, encoding });
+      // 2D flood module: the mesh cells / surface links / couplings are added to a copy of the model (<model>.finp)
+      let inpText = m.toINP({ reportAll: true }); let flood2d = false;
+      if (AV.f2dEnabled(m)) {
+        if (!app.mesh2d || !app.mesh2d.cells.length) { this.runDlg.close(); this.runDlg = null;
+          const a = await AV.modal({ title: 'Run Simulation', body: h('div', { style: { maxWidth: '480px', lineHeight: 1.5 } }, '2D flooding is enabled but no mesh has been created for this model yet.'), buttons: [{ label: 'Cancel', value: null }, { label: 'Run 1D only', value: '1d' }, { label: 'Create Meshes', primary: true, value: 'mesh' }] }).done;
+          if (a === 'mesh') { await AV.createMeshes(app); if (app.mesh2d && app.mesh2d.cells.length) return this.run(); return; }
+          if (a !== '1d') return;
+          this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false });
+        } else { inpText = AV.mesh2DToINP(inpText, app.mesh2d, m); flood2d = true; pct.textContent = 'Starting engine (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' surface cells)...'; }
+      }
+      const res = await window.host.runEngine({ inpText, dir, base, detail: !!this.detailReport, encoding, flood2d });
       this.runDlg.close(); this.runDlg = null;
       const secs = ((Date.now() - t0) / 1000).toFixed(1);
       if (res.canceled) { app.status('Simulation stopped by user.'); AV.toast('Simulation stopped.'); return; }
@@ -295,8 +337,8 @@
       if (await AV.confirm('Results from a previous run were found next to this model:\n' + out + '\n\nLoad them?', 'Load Results', 'Load', 'No')) this.loadResults(out, rpt, false);
     }
     async loadOutDialog() {
-      const p = await window.host.openDialog({ title: 'Load results', filters: [{ name: 'Binary output', extensions: ['out'] }] });
-      if (p) this.loadResults(p, p.replace(/\.out$/i, '.rpt'), false);
+      const p = await window.host.openDialog({ title: 'Load results', filters: [{ name: 'Binary output', extensions: ['out', 'fout'] }] });
+      if (p) this.loadResults(p, p.replace(/\.out$/i, '.rpt').replace(/\.fout$/i, '.frpt'), false);
     }
     async loadResults(out, rpt, fresh) {
       try {
@@ -305,6 +347,7 @@
         const R = new Results(this, meta, rpt);
         this.app.status('Reading results...');
         await R.load();
+        this.results = this.app.results = R; await AV.computeMeshResults(this.app); this.app._meshRange = null;
         try { const t = await window.host.readText(rpt); R.nonconv = this.parseNonconv(t); R.reportText = t; } catch (e) { R.nonconv = new Map(); }
         // unmatched IDs check
         const missing = [...this.model.nodes.keys()].filter(id => !R.idx.node.has(id)).length;
@@ -326,7 +369,7 @@
     async clearResults(silent) {
       this.stop();
       if (this.results) { try { await window.host.outClose(this.results.handle); } catch (e) { } }
-      this.results = this.app.results = null;
+      this.results = this.app.results = null; this.app.meshResults = null;
       if (this.app.timeStep) this.app.timeStep.refresh();
       if (this.compare) { try { await window.host.outClose(this.compare.handle); } catch (e) { } this.compare = null; }
       const pb = AV.$('#playbar'); if (pb) { pb.classList.remove('show'); pb.innerHTML = ''; }

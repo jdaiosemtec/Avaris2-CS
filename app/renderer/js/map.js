@@ -371,7 +371,8 @@
       }
       };
       const DRAW = { subcatchments: drawSubs, links: drawLinks, nodes: drawNodes };
-      for (const k of this.netOrder().slice().reverse()) DRAW[k]();
+      // the 2D mesh is drawn right above the subcatchments (dry cells are only outlined)
+      for (const k of this.netOrder().slice().reverse()) { DRAW[k](); if (k === 'subcatchments' && this.app.mesh2d) { try { AV.drawMesh(this, ctx); } catch (e) { console.warn('mesh', e); } } }
       // ---- ID labels
       const lon = (k) => st.labelsOn ? st.labelsOn(k) : false;
       const showN = (this.showNodeLabels || lon('node')) && visObjs.n.length < 4000, showL = (this.showLinkLabels || lon('link')) && visObjs.l.length < 4000;
@@ -454,6 +455,9 @@
       // vertex handles for the selected link while editing geometry
       if (this.app.editEnabled) for (const o of sel) if (o.kind === 'LINK') { ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ff6d00'; ctx.lineWidth = 1.5; for (const v of o.verts) { const [x, y] = this.toScreen(v[0], v[1]); ctx.fillRect(x - 3.5, y - 3.5, 7, 7); ctx.strokeRect(x - 3.5, y - 3.5, 7, 7); } }
       if (this.dragObj) { const o = this.dragObj; const [x, y] = this.toScreen(o.x, o.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fillStyle = SC.node; ctx.fill(); ctx.strokeStyle = '#263238'; ctx.stroke(); }
+      // selected 2D cell
+      if (this.app.meshSel >= 0 && this.app.mesh2d && this.app.mesh2d.cells[this.app.meshSel]) { const c = this.app.mesh2d.cells[this.app.meshSel]; const [x, y] = this.toScreen(c.x - c.s / 2, c.y + c.s / 2); ctx.save(); ctx.strokeStyle = SC.sub; ctx.lineWidth = 2.5; ctx.strokeRect(x, y, c.s * S, c.s * S); ctx.restore(); }
+      if (this.app.mesh2d) AV.drawMeshLegend(this, ctx);
       this.drawTemp();
       this.drawScaleBar();
       if (this.basemapAttr) { ctx.save(); ctx.font = '10px Segoe UI'; const tw = ctx.measureText(this.basemapAttr).width; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillRect(this.w - tw - 10, this.hgt - 15, tw + 10, 15); ctx.fillStyle = '#455a64'; ctx.textBaseline = 'middle'; ctx.fillText(this.basemapAttr, this.w - tw - 5, this.hgt - 7.5); ctx.restore(); }
@@ -595,6 +599,9 @@
         }
         if (mode === 'select') {
           const hit = this.hitTest(sx, sy);
+          // the 2D mesh is drawn above the subcatchments, so a click inside a cell picks the cell (hide Meshes to pick subcatchments)
+          if ((!hit || hit.kind === 'SUBCATCH') && this.app.mesh2d && !e.ctrlKey && !e.shiftKey) { const k = AV.meshHit(this, wx, wy);
+            if (k >= 0) { this.app.clearSelection(); this.app.meshSel = k; AV.showCellInfo(this.app, k); this.redrawOverlay(); return; } }
           if (hit && this.app.selection.has(hit) && (hit.kind === 'NODE' || hit.kind === 'GAGE' || hit.kind === 'LABEL') && !e.ctrlKey && !e.shiftKey) {
             drag = { type: 'move', obj: hit, sx, sy, ox: hit.x, oy: hit.y, moved: false };
           } else if (hit) {
@@ -658,7 +665,8 @@
         // hover tooltip
         if (this.mode === 'select' || this.mode === 'pick' || this.mode.startsWith('add-')) {
           const hit = this.hitTest(sx, sy);
-          this.app.onHover(hit, e.clientX, e.clientY);
+          if ((!hit || hit.kind === 'SUBCATCH') && this.app.mesh2d && this.mode === 'select' && AV.meshHit(this, ...this.toWorld(sx, sy)) >= 0) { const [wx, wy] = this.toWorld(sx, sy); this.app.onHoverCell(AV.meshHit(this, wx, wy), e.clientX, e.clientY); }
+          else this.app.onHover(hit, e.clientX, e.clientY);
         }
       });
       window.addEventListener('mouseup', (e) => {
@@ -668,8 +676,9 @@
         if (drag.type === 'pan') { c.style.cursor = this.mode === 'pan' ? 'grab' : this.mode === 'select' ? 'default' : 'crosshair'; this.interacting = false; this._schedule(); }
         else if (drag.type === 'box') {
           this.temp = null;
-          if (Math.hypot(sx - drag.sx, sy - drag.sy) < 4) { if (!drag.add) this.app.clearSelection(); }
-          else { const a = this.toWorld(Math.min(sx, drag.sx), Math.max(sy, drag.sy)), b = this.toWorld(Math.max(sx, drag.sx), Math.min(sy, drag.sy)); this.app.selectMany(this.objectsInBox(a[0], a[1], b[0], b[1]), drag.add); }
+          if (Math.hypot(sx - drag.sx, sy - drag.sy) < 4) { if (!drag.add) this.app.clearSelection();
+            const k = this.app.mesh2d ? AV.meshHit(this, ...this.toWorld(sx, sy)) : -1; this.app.meshSel = k; if (k >= 0) AV.showCellInfo(this.app, k); }
+          else { this.app.meshSel = -1; const a = this.toWorld(Math.min(sx, drag.sx), Math.max(sy, drag.sy)), b = this.toWorld(Math.max(sx, drag.sx), Math.min(sy, drag.sy)); this.app.selectMany(this.objectsInBox(a[0], a[1], b[0], b[1]), drag.add); }
           this.redrawOverlay();
         } else if (drag.type === 'zoombox') {
           this.temp = null;

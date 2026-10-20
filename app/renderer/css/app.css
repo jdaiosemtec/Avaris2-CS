@@ -652,3 +652,7 @@ tr.surch td { color: #c62828; font-weight: 600; }
 .ptrans .ptgrid .pgridtab input { width: 100%; box-sizing: border-box; }
 .ptrans .tcanvas { width: 100%; max-width: none; height: 270px; display: block; margin-top: 8px; }
 .ptrans .ptprops { width: 280px; }
+.fpick { display: flex; gap: 4px; align-items: center; }
+.fpick input { flex: 1; min-width: 0; }
+.fpick .btn.small { padding: 2px 7px; }
+.fpick { min-width: 0; max-width: 270px; }

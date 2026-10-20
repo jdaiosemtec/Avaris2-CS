@@ -337,7 +337,7 @@
       for (const id of [...this.views.keys()]) if (id !== 'map') this.closeView(id);
       if (this.sim) { this.sim.clearResults(true); this.sim.clearScenarios(); }
       if (this.tools) this.tools.clearTrace(true);
-      this.map.grid = null;
+      this.map.grid = null; this.mesh2d = null; this.meshResults = null; this._meshRange = null;
       this.refreshAll();
       setTimeout(() => this.map.zoomAll(), 0);
     }
@@ -360,8 +360,8 @@
     setDirty() { this.dirty = true; this.model.touch(); this.updateTitle(); this.refreshRibbon(); }
     updateTitle() {
       const name = this.filePath ? AV.basename(this.filePath) : 'Untitled';
-      window.host.setTitle('OsemCM -- ' + name + (this.dirty ? ' *' : ''));
-      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'OsemCM -- ' + name + (this.dirty ? ' *' : '');
+      window.host.setTitle('OsemCM V2.0 -- ' + name + (this.dirty ? ' *' : ''));
+      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'OsemCM V2.0 -- ' + name + (this.dirty ? ' *' : '');
       const m = this.model;
       AV.$('#modelCount').textContent = m ? `${m.nodes.size} nodes · ${m.links.size} links` : '';
     }
@@ -412,8 +412,10 @@
         for (const ext of ['.ini', '.sw']) {
           const pp = p.replace(/\.inp$/i, ext);
           if (pp !== p && await window.host.exists(pp)) {
-            const t = await window.host.readText(pp); const cur = /\[Reference\][\s\S]*?current=(\d+)/.exec(t);
-            if (cur) { const mm = new RegExp('^' + cur[1] + '="(.+)"\\s*$', 'm').exec(t); if (mm) { this.crsWKT = mm[1].replace(/\\"/g, '"'); break; } }
+            // [Reference] keeps a list 1="WKT", 2="WKT" ... and current = 0-based index of the one in use
+            const t = await window.host.readText(pp); const sec = /\[Reference\]([\s\S]*?)(?:\n\[|$)/.exec(t); const cur = sec && /^\s*current=(\d+)/m.exec(sec[1]);
+            if (cur) { const get = (k) => { const mm = new RegExp('^' + k + '="(.+)"\\s*$', 'm').exec(sec[1]); const w = mm ? mm[1].replace(/\\"/g, '"') : null; return w && /^\s*(PROJCS|GEOGCS|PROJCRS|GEOGCRS|COMPD_CS)/i.test(w) ? w : null; };
+              const w = get(+cur[1] + 1) || get(cur[1]); if (w) { this.crsWKT = w; break; } }
           }
         }
         if (!this.crsWKT) { const pp = p.replace(/\.inp$/i, '.prj'); if (pp !== p && await window.host.exists(pp)) { try { this.crsWKT = (await window.host.readText(pp)).trim(); } catch (e) { } } }
@@ -421,9 +423,14 @@
         if (this.crsWKT && (m.mapInfo.units || 'None').toUpperCase() === 'NONE') {
           try { const P = AV.Proj.parse(this.crsWKT); m.mapInfo.units = P.type === 'geographic' ? 'Degrees' : (Math.abs(P.unit - 1) < 1e-6 ? 'Meters' : 'Feet'); this.refreshAll(); } catch (e) { }
         }
-        // auto-load previous results if they exist next to the model
-        const out = p.replace(/\.inp$/i, '.out');
-        if (out !== p && await window.host.exists(out)) this.sim.offerExistingResults(out, p.replace(/\.inp$/i, '.rpt'));
+        // 2D flood module: settings from an Avaris DS project, mesh from <model>.mesh2d.json (rebuilt when missing)
+        await AV.importAvaris2D(this); await AV.loadMesh2D(this);
+        if (!this.mesh2d && !this._meshRemoved && AV.f2dEnabled(m) && AV.f2d(m).BOUNDARY && AV.f2d(m).DEM) await AV.createMeshes(this, true);
+        if (this.mesh2d) { this.panels.refreshLayers(); this.map.redraw(); }
+        // auto-load previous results if they exist next to the model (1D-2D results first)
+        const fout = p.replace(/\.inp$/i, '.fout'), out = p.replace(/\.inp$/i, '.out');
+        if (this.mesh2d && fout !== p && await window.host.exists(fout)) this.sim.offerExistingResults(fout, p.replace(/\.inp$/i, '.frpt'));
+        else if (out !== p && await window.host.exists(out)) this.sim.offerExistingResults(out, p.replace(/\.inp$/i, '.rpt'));
       } catch (e) { AV.alert('Could not open file:\n' + e.message, 'Error'); this.status('Ready'); }
     }
     async save(as) {
@@ -435,7 +442,8 @@
       if (!this.canModify()) return false;
       try {
         await window.host.writeText(p, this.model.toINP());
-        this.filePath = p; this.dirty = false; this.updateTitle(); this.addRecent(p);
+        const moved = this.filePath !== p; this.filePath = p;
+        if (this.mesh2d && moved) { try { await window.host.writeText(AV.meshPath(this), JSON.stringify(this.mesh2d)); } catch (e) { } } this.dirty = false; this.updateTitle(); this.addRecent(p);
         if (this.hist) await this.hist.commit(p);
         this.status('Saved ' + p); return true;
       } catch (e) { AV.alert('Could not save:\n' + e.message, 'Error'); return false; }
@@ -572,6 +580,12 @@
       if (!hit || hit.kind === 'LABEL') { tt.style.display = 'none'; return; }
       let s = (hit.kind === 'NODE' || hit.kind === 'LINK' ? hit.type.charAt(0) + hit.type.slice(1).toLowerCase() : hit.kind === 'SUBCATCH' ? 'Subcatchment' : 'Rain Gage') + ' ' + hit.id;
       const tv = this.theme.tooltip(hit); if (tv) s += '\n' + tv;
+      tt.textContent = s; tt.style.display = 'block'; tt.style.left = (cx + 14) + 'px'; tt.style.top = (cy + 12) + 'px';
+    }
+    onHoverCell(k, cx, cy) {
+      const tt = AV.$('#tooltip'); if (k < 0) { tt.style.display = 'none'; return; }
+      const c = this.mesh2d.cells[k]; const L = AV.meshSI(this) ? ' m' : ' ft'; let s = '2D Cell ' + c.id + '\nGround ' + AV.fmt(c.elev, 2) + L;
+      if (this.meshResults) { const d = AV.cellValue(this, k, 'depth'), mx = AV.cellValue(this, k, 'maxdepth'); s += '\nDepth ' + (d === null || !isFinite(d) ? '-' : AV.fmt(d, 3) + L) + '\nMax. depth ' + (mx === null || !isFinite(mx) ? '-' : AV.fmt(mx, 3) + L); }
       tt.textContent = s; tt.style.display = 'block'; tt.style.left = (cx + 14) + 'px'; tt.style.top = (cy + 12) + 'px';
     }
     onMapContext(e, hit) {
@@ -769,7 +783,7 @@
         'Space + drag / middle mouse  Pan', 'Mouse wheel  Zoom', 'Ctrl+click  Add to selection', 'Shift+click  Choose from overlapping objects (Default Settings)', 'Drag a selected node  Move it (Edit mode ON)', 'Backspace  Remove last vertex while drawing', 'Enter / double-click  Finish polygon'].join('\n'), 'Keyboard Shortcuts');
     }
     about() {
-      AV.alert('OsemCM ' + this.info.version + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
+      AV.alert('OsemCM V2.0 (' + this.info.version + ')' + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
         + '  - user-set dynamic-wave under-relaxation (UNDER_RELAXATION option)\n  - OpenMP parallel node-depth solution with per-node convergence flags\n'
         + '  - extended "Most Frequent Nonconverging Nodes" list (NONCONV_REPORT_COUNT)\n  - outfalls excluded from nonconvergence statistics\n\nCPU threads available: ' + this.info.cpus, 'About OsemCM');
     }

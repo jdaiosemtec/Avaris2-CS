@@ -115,11 +115,11 @@
   }
   function packbits(src) { const out = []; let i = 0; while (i < src.length) { const n = (src[i] << 24) >> 24; i++; if (n >= 0) { for (let k = 0; k <= n; k++) out.push(src[i++]); } else if (n !== -128) { const v = src[i++]; for (let k = 0; k < 1 - n; k++) out.push(v); } } return new Uint8Array(out); }
   async function inflate(src) { const ds = new DecompressionStream('deflate'); const r = new Response(new Blob([src]).stream().pipeThrough(ds)); return new Uint8Array(await r.arrayBuffer()); }
-  async function readTIFF(buf, path) {
+  async function readTIFF(buf, path, maxD) {
     const { le, ifds } = parseTIFF(buf); const t0 = ifds[0];
     const W0 = t0[256][0], H0 = t0[257][0];
     // pick an overview (reduced IFD) no larger than needed
-    const MAXD = 3000; let tg = t0;
+    const MAXD = maxD || 3000; let tg = t0;
     for (const t of ifds) { if (!t[256] || !t[257] || (t[254] && (t[254][0] & 4))) continue; const w = t[256][0]; if (w >= Math.min(W0, MAXD) && w < tg[256][0]) tg = t; }
     const w = tg[256][0], h = tg[257][0], spp = (tg[277] || [1])[0], bps = (tg[258] || [8])[0], comp = (tg[259] || [1])[0], photo = (tg[262] || [1])[0], fmt = (tg[339] || [1])[0], pred = (tg[317] || [1])[0], planar = (tg[284] || [1])[0];
     if (planar !== 1 && spp > 1) throw new Error('Band-separate (planar) TIFFs are not supported.');
@@ -245,6 +245,15 @@
   }
 
   // ---------------------------------------------------------------- entry point
+  // full-resolution GeoTIFF / ASCII grid (no overview, no decimation) for sampling elevations (2D mesh)
+  AV.readRasterFull = async function (path) {
+    const e = ext(path); let L;
+    if (e === 'tif' || e === 'tiff') L = await readTIFF(await window.host.readBinary(path), path, 12000);
+    else if (e === 'asc') L = await readASC(path);
+    else throw new Error('The DEM must be a GeoTIFF (.tif) or ASCII grid (.asc).');
+    if (!L.corners) throw new Error('The DEM has no georeferencing (no GeoTIFF tags and no world file).');
+    return L;
+  };
   AV.loadDataFile = async function (app, path) {
     if (AV.GDB.isGdbLayerPath(path)) {
       const { gdb, layer } = AV.GDB.splitPath(path); const L = await AV.GDB.readLayer(gdb, layer);

@@ -183,6 +183,24 @@
       for (const k of map.netOrder()) NET[k]();
       row(1, [sp(), chk(map.layerVis.labels, v => map.layerVis.labels = v), h('span', { class: 'symicon txt' }, 'Aa'), h('span', { class: 'lname' }, 'Map Labels')], { add: 'LABEL', menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomAll() }, ZS('LABEL')] });
     }
+    // ---- 2D flood surface (OsemCM V2.0)
+    if (m && (app.mesh2d || AV.f2dEnabled(m))) {
+      const mesh = app.mesh2d; const S = AV.meshStyle(app);
+      const meshBox = () => { const c = mesh.cells; let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const q of c) { x1 = Math.min(x1, q.x - q.s / 2); y1 = Math.min(y1, q.y - q.s / 2); x2 = Math.max(x2, q.x + q.s / 2); y2 = Math.max(y2, q.y + q.s / 2); } return { x1, y1, x2, y2 }; };
+      const gmenu = () => [{ label: 'Create Meshes', fn: () => AV.createMeshes(app) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') }];
+      row(0, [tw('f2d'), h('b', null, '2D Flood')], { cls: 'lgrp', menu: gmenu });
+      if (open.f2d !== false) {
+        if (mesh) {
+          const ic = h('canvas', { class: 'symicon', width: 56, height: 32, title: 'Mesh style' }); { const g = ic.getContext('2d'); g.scale(2, 2); const C = ['#bdeeff', '#1e9bff', '#0d2fc4']; for (let i = 0; i < 3; i++) { g.fillStyle = C[i]; g.fillRect(4 + i * 7, 3, 6, 10); } g.strokeStyle = '#78909c'; g.strokeRect(4.5, 3.5, 20, 10); }
+          ic.addEventListener('click', (e) => { e.stopPropagation(); AV.meshStyleDialog(app); });
+          row(1, [sp(), chk(S.visible, v => { app.prefs.mesh2d.visible = v; app.savePrefs(); }), ic, h('span', { class: 'lname', title: 'Coloured by ' + AV.MESH_FIELDS[S.field] }, 'Meshes'), h('span', { class: 'lcnt' }, String(mesh.cells.length))], {
+            dbl: () => AV.meshStyleDialog(app),
+            menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox(meshBox()) }, '-', ...Object.keys(AV.MESH_FIELDS).map(k => ({ label: (S.field === k ? '● ' : '   ') + AV.MESH_FIELDS[k], fn: () => { app.prefs.mesh2d.field = k; app.savePrefs(); app._meshRange = null; map.redraw(); this.refreshLayers(); } })),
+              '-', { label: 'Style...', fn: () => AV.meshStyleDialog(app) }, { label: 'Export as Shapefile...', fn: () => AV.exportMeshShapefile(app) }, { label: 'Rebuild Meshes', fn: () => AV.createMeshes(app) },
+              { label: 'Remove Meshes', fn: async () => { if (!await AV.confirm('Remove the 2D mesh of this model? The next run is then 1D only until the mesh is created again.', 'Remove Meshes', 'Remove')) return; app.mesh2d = null; app.meshResults = null; app.meshSel = -1; const mp = AV.meshPath(app); if (mp) { try { await window.host.writeText(mp, 'null'); } catch (e) { } } this.refreshLayers(); map.redraw(); } }] });
+        } else row(1, [sp(), h('span', { class: 'lwarn', onclick: () => AV.createMeshes(app) }, 'No mesh yet — click to Create Meshes')]);
+      }
+    }
     // ---- external layers
     if (map.extLayers.length) {
       row(0, [tw('ext'), h('b', null, 'Layers'), h('span', { class: 'lcnt' }, String(map.extLayers.length))], { cls: 'lgrp' });

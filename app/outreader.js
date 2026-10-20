@@ -184,6 +184,25 @@ class OutReader {
     return res;
   }
 
+  // 2D flood statistics for a set of nodes (depth variable 0): hours above thr, hours from the peak until the depth
+  // falls back to thr (to the end of the run when it never does)
+  pondStats(idx, thr) {
+    const L = this._layout('node'); const per = this.bytesPerPeriod; const n = idx.length; const dt = this.reportStep / 3600;
+    const tpond = new Float32Array(n), trecede = new Float32Array(n), pk = new Float32Array(n).fill(-Infinity), tpk = new Int32Array(n), tdry = new Int32Array(n).fill(-1);
+    const blockPeriods = Math.max(1, Math.floor((32 << 20) / per));
+    for (let p0 = 0; p0 < this.nPeriods; p0 += blockPeriods) {
+      const np = Math.min(blockPeriods, this.nPeriods - p0);
+      let b = this._read(this.outputPos + p0 * per, np * per); if (b.byteOffset % 4) b = Buffer.from(b);
+      const f = new Float32Array(b.buffer, b.byteOffset, Math.floor(b.byteLength / 4));
+      for (let k = 0; k < np; k++) { const o = (k * per + L.off) / 4; const p = p0 + k;
+        for (let j = 0; j < n; j++) { const d = f[o + idx[j] * L.nv];
+          if (d > thr) tpond[j] += dt;
+          if (d > pk[j]) { pk[j] = d; tpk[j] = p; tdry[j] = -1; } else if (tdry[j] < 0 && d <= thr && pk[j] > thr) tdry[j] = p; } }
+    }
+    for (let j = 0; j < n; j++) trecede[j] = pk[j] > thr ? ((tdry[j] < 0 ? this.nPeriods - 1 : tdry[j]) - tpk[j]) * dt : 0;
+    return { tpond, trecede };
+  }
+
   // max / min / mean / time-of-max for every object of a type, for one variable
   stats(type, v) {
     const key = type + ':' + v;

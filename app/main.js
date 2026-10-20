@@ -192,9 +192,11 @@ ipcMain.handle('engine:run', async (e, job) => {
   catch (err) { dir = path.join(os.tmpdir(), 'avaris'); }
   fs.mkdirSync(dir, { recursive: true });
   const base = (job.base || 'model').replace(/[^\w\-. ]/g, '_');
-  const inp = path.join(dir, base + '.run.inp');
-  const rpt = path.join(dir, base + '.rpt');
-  const out = path.join(dir, base + '.out');
+  // 2D runs use the Avaris DS file names: <model>.finp / .frpt / .fout
+  const f2 = !!job.flood2d;
+  const inp = path.join(dir, base + (f2 ? '.finp' : '.run.inp'));
+  const rpt = path.join(dir, base + (f2 ? '.frpt' : '.rpt'));
+  const out = path.join(dir, base + (f2 ? '.fout' : '.out'));
   // release any open handle on the old output file (Windows file locking)
   for (const [h, r] of outFiles) if (path.resolve(r.file) === path.resolve(out)) { r.close(); outFiles.delete(h); }
   fs.writeFileSync(inp, job.inpText, job.encoding === 'latin1' && !/[^\x00-\xff]/.test(job.inpText) ? 'latin1' : 'utf8');
@@ -244,3 +246,4 @@ ipcMain.handle('out:snapshot', async (e, h, period, type, v) => outFiles.get(h).
 ipcMain.handle('out:stats', async (e, h, type, v) => outFiles.get(h).stats(type, v));
 ipcMain.handle('out:snapshotAll', async (e, h, period, type) => outFiles.get(h).snapshotAll(period, type));
 ipcMain.handle('out:statsAll', async (e, h) => outFiles.get(h).statsAll());
+ipcMain.handle('out:pondStats', async (e, h, idx, thr) => outFiles.get(h).pondStats(idx, thr));

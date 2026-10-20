@@ -64,7 +64,7 @@
         name: 'Simulation', groups: [
           { name: 'Simulation', items: [
             { id: 'options', label: 'Options', img: 'options', fn: () => S().optionsDialog() },
-            { id: 'meshes', label: 'Create Meshes', img: 'meshes', fn: () => F().notAvailable('Create Meshes', '2D surface meshes') },
+            { id: 'meshes', label: 'Create Meshes', img: 'meshes', fn: () => AV.createMeshes(this), tip: 'Create the 2D surface mesh from the boundary, DEM and lines set in Options → 2D Flood' },
             { id: 'run', label: 'Run', img: 'run', fn: () => S().run(), tip: 'Run simulation (F5)' }] },
           { name: 'Result', items: [
             { id: 'report', label: 'Report', img: 'report', fn: () => S().showReport() },

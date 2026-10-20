@@ -235,6 +235,7 @@ window.AV = window.AV || {};
         let line = lines[ln];
         const tl = line.trim();
         if (!tl) continue;
+        if (tl.startsWith(';;@OSEM2D')) { const mm = /^;;@OSEM2D\s+(\S+)\s*(.*)$/.exec(tl); if (mm) { m.osem2d = m.osem2d || {}; m.osem2d[mm[1].toUpperCase()] = mm[2].trim(); } continue; }
         if (tl.startsWith(';;@OSEM')) { const k = tl.slice(7).trim().split(/\s+/); if (k.length >= 3) ext.push(k); continue; }
         if (tl[0] === '[') {
           sec = tl.slice(1, tl.indexOf(']') > 0 ? tl.indexOf(']') : undefined).toUpperCase().trim();
@@ -617,6 +618,12 @@ window.AV = window.AV || {};
       for (const n of this.nodes.values()) if (+n.p.chamberArea > 0) ext.push(';;@OSEM CHAMBER ' + n.id + ' ' + (+n.p.chamberArea));
       for (const sc of this.subcatchments.values()) if (sc.p.impCoef !== undefined && sc.p.impCoef !== '' && +sc.p.impCoef !== 1 && isFinite(+sc.p.impCoef)) ext.push(';;@OSEM IMPCOEF ' + sc.id + ' ' + Math.max(0, Math.min(1, +sc.p.impCoef)));
       if (ext.length) { W(';;OsemCM extensions (chamber area, impervious runoff coefficient) - ignored by EPA SWMM / Avaris DS'); for (const l of ext) W(l); W(''); }
+      // OsemCM V2.0 2D flood settings (paths relative to the model folder when possible)
+      if (this.osem2d && Object.keys(this.osem2d).some(k => this.osem2d[k] !== '' && this.osem2d[k] !== undefined)) {
+        W(';;OsemCM 2D flood module settings - ignored by EPA SWMM / Avaris DS');
+        for (const k of Object.keys(this.osem2d)) { const v = this.osem2d[k]; if (v !== '' && v !== undefined && v !== null) W(';;@OSEM2D ' + k + ' ' + v); }
+        W('');
+      }
       return o.join('\r\n') + '\r\n';
     }
 
