@@ -62,7 +62,14 @@
       const r = this.canvas.getBoundingClientRect(); const W = Math.round(r.width) || 200, H = Math.round(r.height) || 140; const dpr = window.devicePixelRatio || 1;
       if (this.canvas.width !== W * dpr || this.canvas.height !== H * dpr) { this.canvas.width = W * dpr; this.canvas.height = H * dpr; }
       const c = this.canvas.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
-      const ov = this._overview(W, H, dpr); if (!ov) { this.tf = null; c.fillStyle = '#90a4ae'; c.font = '11px Segoe UI'; c.fillText('No model', 8, 18); return; }
+      // large models: reuse the map's overview bitmap instead of drawing every link again
+      let ov = null; const MO = map._ov;
+      if (MO && !MO.partial && MO.model === app.model && map._objCount && map._objCount() >= 60000) {
+        const B = MO.box, bw = B.x2 - B.x1, bh = B.y2 - B.y1, s = Math.min((W - 8) / bw, (H - 8) / bh), ox = (W - bw * s) / 2, oy = (H - bh * s) / 2;
+        if (!this._ovc || this._ovcSrc !== MO.canvas || this._ovcGen !== MO.gen || this._ovcW !== W) { const cv = document.createElement('canvas'); cv.width = W * dpr; cv.height = H * dpr; const c = cv.getContext('2d'); c.imageSmoothingQuality = 'high'; c.drawImage(MO.canvas, ox * dpr, oy * dpr, bw * s * dpr, bh * s * dpr); this._ovc = { cv, tf: { x1: B.x1, y2: B.y2, s, ox, oy } }; this._ovcSrc = MO.canvas; this._ovcGen = MO.gen; this._ovcW = W; }
+        ov = this._ovc;
+      } else if (map._objCount && map._objCount() >= 60000) ov = this._ovc || null;   // wait for the map overview (no second full drawing)
+      else ov = this._overview(W, H, dpr); if (!ov) { this.tf = null; c.fillStyle = '#90a4ae'; c.font = '11px Segoe UI'; c.fillText(app.model && app.model.nodes.size ? 'Preparing overview…' : 'No model', 8, 18); return; }
       c.drawImage(ov.cv, 0, 0, W, H); const T = ov.tf; this.tf = T;
       const vb = map.visibleBox(); let x1 = T.ox + (vb.x1 - T.x1) * T.s, x2 = T.ox + (vb.x2 - T.x1) * T.s, y1 = T.oy + (T.y2 - vb.y2) * T.s, y2 = T.oy + (T.y2 - vb.y1) * T.s;
       // a very small view still gets a visible marker

@@ -94,7 +94,7 @@
     x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(n - 1, x2); y2 = Math.min(n - 1, y2);
     if ((x2 - x1 + 1) * (y2 - y1 + 1) > 150) return;
     const url = (z, x, y) => src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', src.sub ? src.sub[(x + y) % src.sub.length] : '');
-    const redraw = () => { this.redraw(); };
+    const redraw = () => { this.redrawBackground(); };   // a loaded tile only changes the background, not the network
     ctx.save(); ctx.globalAlpha = bm.opacity; ctx.imageSmoothingQuality = 'high';
     const d = this.dpr || 1;
     const place = (img, sx0, sy0, sw, tx, ty, tz) => {

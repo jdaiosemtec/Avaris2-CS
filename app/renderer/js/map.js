@@ -38,6 +38,7 @@
   }
   AV.pointInPoly = pointInPoly;
 
+  AV.OV_MAX = 4096;   // longer side of the whole-model overview bitmap (device pixels)
   class MapView {
     constructor(container, app) {
       this.app = app;
@@ -217,6 +218,7 @@
     // drawn on top. Selecting, hovering and picking only redraw the overlay, which keeps large models responsive.
     redraw() { this.baseDirty = true; this._schedule(); }
     redrawOverlay() { this._schedule(); }
+    redrawBackground() { if (this._bgT) return; this._bgT = setTimeout(() => { this._bgT = null; this.baseCache = []; this.baseKey = null; this._schedule(); }, 60); }
     _schedule() { if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; this.draw(); }); }
     // geometry being dragged: full redraw on small models, overlay-only (re-render on release) on large ones
     liveEdit() { if ((this._baseMs || 0) > 70) { this.redrawOverlay(); } else { this.grid = null; this.redraw(); } }
@@ -258,7 +260,7 @@
       this.base = null;
     }
     renderBase() {
-      const t0 = performance.now();
+      const t0 = performance.now(); this.overviewShown = false;
       if (this.baseDirty) { this.baseGen = (this.baseGen || 0) + 1; this.baseCache = []; }
       else if (this.base && this.baseKey !== this.viewKey()) this.cachePut();
       if (!this.base) this.base = document.createElement('canvas');
@@ -270,15 +272,25 @@
       this._baseMs = performance.now() - t0; AV.perf.rec('Map: full redraw', this._baseMs);
     }
     drawBase() {
-      const ctx = this.ctx, m = this.model;
+      const ctx = this.ctx, m = this.model; const OV = !!this._ovRender;   // OV: rendering the whole-model overview bitmap
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--mapbg') || '#fff';
-      ctx.fillRect(0, 0, this.w, this.hgt);
-      this.basemapAttr = ''; try { if (this.drawBasemap) this.drawBasemap(); } catch (e) { console.warn('basemap', e); }
-      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      for (const L of this.extLayers) if (L.visible && L.order === 'below') this.drawExt(L);
+      if (!OV) {
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--mapbg') || '#fff';
+        ctx.fillRect(0, 0, this.w, this.hgt);
+        this.basemapAttr = ''; try { if (this.drawBasemap) this.drawBasemap(); } catch (e) { console.warn('basemap', e); }
+        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        for (const L of this.extLayers) if (L.visible && L.order === 'below') this.drawExt(L);
+      }
       if (!m) return;
       this.ensureIndex();
+      // large model seen from far: show the pre-rendered overview bitmap instead of drawing every object
+      if (!OV && this._overviewWanted()) { this._drawOverview(); for (const L of this.extLayers) if (L.visible && L.order !== 'below') this.drawExt(L); return; }
+      AV._drawing = true; AV.frameId = (AV.frameId || 0) + 1;
+      try { this._drawNetwork(OV); } finally { AV._drawing = false; }
+      if (!OV) for (const L of this.extLayers) if (L.visible && L.order !== 'below') this.drawExt(L);
+    }
+    _drawNetwork(OV) {
+      const ctx = this.ctx, m = this.model;
       const vb = this.visibleBox();
       const st = this.app.theme;
       const S = this.scale, CX = this.cx, CY = this.cy, HW = this.w / 2, HH = this.hgt / 2;
@@ -356,13 +368,14 @@
         if (simp) { const density = visObjs.n.length / Math.max(1, this.w * this.hgt); k = density > 1 / 900 ? Math.max(0.5, Math.sqrt(1 / (900 * density))) : 1; cell = Math.max(3, 2.4 * 5 * k); }
         const groups = new Map();
         const flushN = (key, G) => { const sy = SY[G.t]; ctx.globalAlpha = sy.opacity; ctx.fillStyle = G.c; ctx.fill(G.p); ctx.strokeStyle = sy.stroke; ctx.lineWidth = G.r > 3 ? 0.8 : 0.5; ctx.stroke(G.p); ctx.globalAlpha = 1; };
-        const perNode = visObjs.n.length <= 20000;
+        const perNode = visObjs.n.length <= 20000; const dots = OV && visObjs.n.length > 50000; const dotG = new Map();   // overview of a dense model: junctions as plain dots
         const order = simp && visObjs.n.length > 1 ? visObjs.n.filter(n => n.type !== 'JUNCTION').concat(visObjs.n.filter(n => n.type === 'JUNCTION')) : visObjs.n;
         for (const n of order) {
           const sy = SY[n.type] || SY.JUNCTION; if (!sy.visible || hid('node', n)) continue;
           const x = (n.x - CX) * S + HW, y = (CY - n.y) * S + HH;
           if (simp) { const ck = Math.floor(x / cell) * 100003 + Math.floor(y / cell); if (occ.has(ck)) continue; occ.add(ck); }
           const c = st.nodeColor(n); const r = (st.nodeSize ? st.nodeSize(n, sy.size) : sy.size) * k;
+          if (dots && n.type === 'JUNCTION') { let a = dotG.get(c); if (!a) dotG.set(c, a = []); a.push(x, y, r); continue; }
           if (!simp) { ctx.beginPath(); AV.nodeShape(ctx, sy.shape, x, y, r); ctx.globalAlpha = sy.opacity; ctx.fillStyle = c; ctx.fill(); ctx.strokeStyle = sy.stroke; ctx.lineWidth = 0.8; ctx.stroke(); ctx.globalAlpha = 1; continue; }
           // each symbol filled and outlined on its own so an overlapping symbol covers its neighbour's outline
           // (batched paths are only used for very large views, where it does not show)
@@ -372,11 +385,13 @@
           AV.nodeShape(G.p, sy.shape, x, y, r);
         }
         for (const [key, G] of groups) flushN(key, G);
+        for (const [c, a] of dotG) { ctx.globalAlpha = SY.JUNCTION.opacity; ctx.fillStyle = c; for (let i = 0; i < a.length; i += 3) { const s = Math.max(1.2, a[i + 2] * 1.2); ctx.fillRect(a[i] - s / 2, a[i + 1] - s / 2, s, s); } ctx.globalAlpha = 1; }
       }
       };
       const drawMeshL = () => { if (this.app.mesh2d) { try { AV.drawMesh(this, ctx); } catch (e) { console.warn('mesh', e); } } };
       const DRAW = { subcatchments: drawSubs, links: drawLinks, nodes: drawNodes, mesh: drawMeshL };
       for (const k of this.netOrder().slice().reverse()) DRAW[k]();
+      if (OV) return;
       // ---- ID labels
       const lon = (k) => st.labelsOn ? st.labelsOn(k) : false;
       const showN = (this.showNodeLabels || lon('node')) && visObjs.n.length < 4000, showL = (this.showLinkLabels || lon('link')) && visObjs.l.length < 4000;
@@ -395,7 +410,68 @@
         ctx.font = (lb.bold === 'YES' ? 'bold ' : '') + (lb.italic === 'YES' ? 'italic ' : '') + sz + 'px ' + (lb.font || 'Segoe UI');
         ctx.fillStyle = '#37474f'; ctx.fillText(lb.text, x, y);
       }
-      for (const L of this.extLayers) if (L.visible && L.order !== 'below') this.drawExt(L);
+    }
+    // ---------------------------------------------------------------- overview (level of detail for large models)
+    // The whole model is rendered once into a bitmap (longer side OV_MAX device pixels). While the view is zoomed out so far
+    // that one overview pixel is at most ~1.3 screen pixels, zooming and panning only redraw that bitmap. Content changes
+    // (edits, themes, time steps) show the previous bitmap at once and rebuild it a moment later.
+    _modelBox() {
+      const m = this.model; const key = (m.geomVersion || 0) + '|' + m.nodes.size + '|' + m.links.size + '|' + m.subcatchments.size + '|' + (this.app.mesh2d ? this.app.mesh2d.cells.length : 0);
+      if (this._mbModel === m && this._mbKey === key) return this._mb;
+      let b = m.bounds(false); const M = this.app.mesh2d;
+      if (M && M.cells.length) { let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const c of M.cells) { const s = c.s / 2; if (c.x - s < x1) x1 = c.x - s; if (c.y - s < y1) y1 = c.y - s; if (c.x + s > x2) x2 = c.x + s; if (c.y + s > y2) y2 = c.y + s; } b = b ? { x1: Math.min(b.x1, x1), y1: Math.min(b.y1, y1), x2: Math.max(b.x2, x2), y2: Math.max(b.y2, y2) } : { x1, y1, x2, y2 }; }
+      if (b) { const pw = Math.max(b.x2 - b.x1, b.y2 - b.y1, 1) * 0.02; b = { x1: b.x1 - pw, y1: b.y1 - pw, x2: b.x2 + pw, y2: b.y2 + pw }; }
+      this._mb = b; this._mbModel = m; this._mbKey = key; return b;
+    }
+    _objCount() { const m = this.model; return m.nodes.size + m.links.size + m.subcatchments.size + (this.app.mesh2d ? this.app.mesh2d.cells.length : 0); }
+    _overviewWanted() {
+      if (this.app.prefs.mapOverview === false || this._objCount() < 60000) return false;
+      const b = this._modelBox(); if (!b) return false;
+      const ovs = AV.OV_MAX / Math.max(b.x2 - b.x1, b.y2 - b.y1);         // overview device pixels per map unit
+      return this.scale * this.dpr <= ovs * 1.05;   // never enlarge the bitmap noticeably (no blur)
+    }
+    // the overview is rendered in tiles (TILE device px), a few per animation frame, into a back buffer that replaces the
+    // shown bitmap when complete: the map stays responsive while a large model is redrawn (edits, themes, time steps)
+    _ovStart(sync) {
+      const b = this._modelBox(); const ovs = AV.OV_MAX / Math.max(b.x2 - b.x1, b.y2 - b.y1);
+      const W = Math.max(1, Math.ceil((b.x2 - b.x1) * ovs)), H = Math.max(1, Math.ceil((b.y2 - b.y1) * ovs)); const T = 1024;
+      const tiles = []; for (let ty = 0; ty < H; ty += T) for (let tx = 0; tx < W; tx += T) tiles.push([tx, ty]);
+      // render the tiles nearest the screen centre first
+      const sc = this.toWorld(this.w / 2, this.hgt / 2); const cxp = (sc[0] - b.x1) * ovs, cyp = (b.y2 - sc[1]) * ovs; tiles.sort((p, q) => Math.hypot(p[0] + T / 2 - cxp, p[1] + T / 2 - cyp) - Math.hypot(q[0] + T / 2 - cxp, q[1] + T / 2 - cyp));
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      const job = { b, ovs, W, H, T, tiles, cv, gen: this.baseGen, model: this.model, t0: performance.now(), progressive: !this._ov || this._ov.model !== this.model || this._ov.box !== b };
+      if (this._ovJob) cancelAnimationFrame(this._ovJob.raf); this._ovJob = job;
+      if (job.progressive) this._ov = { canvas: cv, box: b, gen: job.gen, model: this.model, partial: true };   // first build: show tiles as they come
+      if (sync) { while (job.tiles.length) this._ovTile(job); this._ovFinish(job); return; }
+      const step = () => { if (this._ovJob !== job) return; const t1 = performance.now(); while (job.tiles.length && performance.now() - t1 < 40) this._ovTile(job);
+        if (job.progressive) { this.baseCache = []; this.baseKey = null; this._schedule(); }
+        if (job.tiles.length) job.raf = requestAnimationFrame(step); else this._ovFinish(job); };
+      job.raf = requestAnimationFrame(step);
+    }
+    _ovTile(job) {
+      const [tx, ty] = job.tiles.shift(); const pad = 24, T = job.T; const tw = Math.min(T, job.W - tx), th = Math.min(T, job.H - ty);
+      const tc = this._ovTc || (this._ovTc = document.createElement('canvas')); if (tc.width !== T + 2 * pad || tc.height !== T + 2 * pad) { tc.width = T + 2 * pad; tc.height = T + 2 * pad; } const c2 = tc.getContext('2d'); c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, tc.width, tc.height);
+      const wx = job.b.x1 + (tx + tw / 2) / job.ovs, wy = job.b.y2 - (ty + th / 2) / job.ovs;
+      const save = { cx: this.cx, cy: this.cy, scale: this.scale, w: this.w, hgt: this.hgt, dpr: this.dpr, ctx: this.ctx, visCount: this.visCount };
+      Object.assign(this, { cx: wx, cy: wy, scale: job.ovs, w: tw + 2 * pad, hgt: th + 2 * pad, dpr: 1, ctx: c2 }); this._ovRender = true;
+      try { this.drawBase(); } finally { this._ovRender = false; Object.assign(this, save); }
+      job.cv.getContext('2d').drawImage(tc, pad, pad, tw, th, tx, ty, tw, th);
+    }
+    _ovFinish(job) {
+      if (this._ovJob !== job) return; this._ovJob = null;
+      this._ov = { canvas: job.cv, box: job.b, gen: job.gen, model: job.model };
+      AV.perf.rec('Map: overview bitmap build', performance.now() - job.t0, job.W + ' x ' + job.H + ' px');
+      this.baseCache = []; this.baseKey = null; this._schedule();
+      if (this.baseGen !== job.gen && this._overviewWanted()) this._ovStart(false);
+    }
+    _drawOverview() {
+      const b = this._modelBox(); const ov = this._ov; const job = this._ovJob;
+      const fresh = ov && ov.model === this.model && ov.box === b;
+      if (!fresh) { if (!job || job.box !== b) this._ovStart(false); }
+      else if (ov.gen !== this.baseGen && !ov.partial && !job) this._ovStart(false);   // a running build is finished first, then redone if needed
+      const O = this._ov; if (!O) return; const B = O.box, ctx = this.ctx; const [x, y] = this.toScreen(B.x1, B.y2); const w = (B.x2 - B.x1) * this.scale, h = (B.y2 - B.y1) * this.scale;
+      ctx.save(); ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(O.canvas, x, y, w, h); ctx.restore();
+      this.visCount = this._objCount(); this.overviewShown = true;
     }
     // selection, traced objects, outlet arrows, vertex handles, rubber bands, scale bar
     // top-to-bottom order of the network layers (Layer View); stored in the preferences

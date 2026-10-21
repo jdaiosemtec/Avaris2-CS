@@ -18,5 +18,5 @@ cp $P/app/samples/* $ST/resources/samples/
 mkdir -p $ST/resources/gdal && cp -r $P/app/gdal/win/* $ST/resources/gdal/
 cp $P/installer/LICENSE.txt $ST/LICENSE-Avaris2.txt
 cd $P/installer
-NSISDIR=$S/dl/nsis $S/dl/nsis/linux/makensis -V2 -DSTAGE=$ST -DICON=$P/build/icon.ico -DOUTFILE=$P/dist/Avaris2-Setup-2.0.12.exe avaris.nsi
+NSISDIR=$S/dl/nsis $S/dl/nsis/linux/makensis -V2 -DSTAGE=$ST -DICON=$P/build/icon.ico -DOUTFILE=$P/dist/Avaris2-Setup-2.0.13.exe avaris.nsi
 ls -la $P/dist/*.exe

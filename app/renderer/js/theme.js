@@ -14,6 +14,7 @@
   const LAYER_NAME = { node: 'Nodes', link: 'Links', sub: 'Subcatchments' };
   const CATEGORICAL = new Set(['type', 'tag', 'shape', 'gage', 'outlet', 'group']);
 
+  const EMPTY_STYLE = Object.freeze({ color: null, size: null, hide: false }); const STY = Symbol('style');
   class Theme {
     constructor(app) {
       this.app = app;
@@ -86,9 +87,21 @@
       for (const r of t.ranges) if (v <= r.v) return r;
       return t.ranges[t.ranges.length - 1] || null;
     }
+    // while the map draws, each object's style is computed once per frame (colour, size and visibility all read it)
+    // and a layer without any active theme returns at once
     style(layer, o) {
+      if (this.app.themeHidden) return EMPTY_STYLE;
+      const fr = AV._drawing ? AV.frameId : 0;
+      if (fr) {
+        const c = o[STY]; if (c && c.f === fr && c.l === layer) return c.s;
+        if (this._actF !== fr) { this._actF = fr; this._act = {}; for (const k of ['node', 'link', 'sub']) this._act[k] = this.layers[k].subs.some(t => t.ranges && t.ranges.length && this.active(t)); }
+        if (!this._act[layer]) return EMPTY_STYLE;
+        const s = this._style(layer, o); o[STY] = { f: fr, l: layer, s }; return s;
+      }
+      return this._style(layer, o);
+    }
+    _style(layer, o) {
       const out = { color: null, size: null, hide: false };
-      if (this.app.themeHidden) return out;
       for (const t of this.layers[layer].subs) {
         if (!this.active(t) || !t.ranges.length) continue;
         if (t.where && !this.passWhere(layer, t, o)) continue;

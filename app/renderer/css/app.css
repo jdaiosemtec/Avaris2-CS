@@ -856,3 +856,5 @@ table.rptop td, table.rptop th { white-space: nowrap; }
 .rpcard .v { overflow-wrap: anywhere; }
 table.rpkv { table-layout: fixed; } table.rpkv td:first-child { width: 58%; } table.rpkv td:last-child { white-space: normal; overflow-wrap: anywhere; }
 @media (max-width: 1250px) { .rpnav { width: 180px; } .rppage { padding: 10px 10px 24px; } .rpcards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+/* v2.0.13: Run icon half size, label aligned with the other large buttons */
+.rbig.hero img { width: 24px; height: 24px; margin: 5px 0 4px; }
