@@ -192,17 +192,18 @@ function verifyLicence(raw) {
 }
 ipcMain.handle('license:verify', async (e, key) => verifyLicence(key));
 ipcMain.handle('license:machine', async () => machineInfo());
-// ---- licence issuing (OSEMTEC staff only: needs the private key file, which is never shipped)
-ipcMain.handle('license:issue', async (e, pemPath, lic) => {
-  const pem = fs.readFileSync(pemPath, 'utf8'); const key = crypto.createPrivateKey(pem);
-  const pub = crypto.createPublicKey(key).export({ type: 'spki', format: 'pem' }).toString().replace(/\r/g, '');
-  if (pub.trim() !== LIC_PUB.trim()) throw new Error('This private key does not belong to Avaris2 CS.');
-  const body = Buffer.from(JSON.stringify(Object.assign({ v: 2 }, lic)), 'utf8');
-  const k = 'AV2L-' + b64u(body) + '.' + b64u(crypto.sign(null, body, key));
-  const ledger = path.join(path.dirname(pemPath), 'licence_ledger.csv'); const q = (x) => '"' + String(x === undefined || x === null ? '' : x).replace(/"/g, '""') + '"';
-  if (!fs.existsSync(ledger)) fs.writeFileSync(ledger, 'issued,serial,user,name,company,email,edition,term,expiry,machine,host,key\n');
-  fs.appendFileSync(ledger, [lic.iss, lic.ser, lic.user, lic.name, lic.company, lic.email, lic.ed, lic.term, lic.exp, lic.mc, lic.host, k].map(q).join(',') + '\n');
-  return { key: k, ledger };
+// ---- direct licence request (optional). Licences are issued with tools/licence-manager (OSEMTEC only), never here.
+// With a Web3Forms access key (web3forms.com, registered to info@osemtec.com) the request is posted straight to OSEMTEC;
+// without one the Register dialog offers web-mail / e-mail program / copy / save only.
+const LIC_FORM_KEY = '';
+ipcMain.handle('license:canSubmit', async () => !!LIC_FORM_KEY);
+ipcMain.handle('license:submit', async (e, q) => {
+  if (!LIC_FORM_KEY) throw new Error('direct sending is not set up');
+  const r = await net.fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ access_key: LIC_FORM_KEY, subject: q.subject, from_name: 'Avaris2 CS - ' + q.user, email: q.email, replyto: q.email, message: q.body }) });
+  let j = {}; try { j = await r.json(); } catch (err) { }
+  if (!r.ok || j.success === false) throw new Error(j.message || ('HTTP ' + r.status));
+  return true;
 });
 ipcMain.handle('app:settings:get', async () => loadSettings());
 // ---- file browsing for the Catalog pane

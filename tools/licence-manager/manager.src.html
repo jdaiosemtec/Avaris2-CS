@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avaris2 CS Licence Manager</title>
+<!-- OSEMTEC internal tool. Issues and manages Avaris2 CS licences. Open in Microsoft Edge or Google Chrome.
+     The private key (private_key.pem) stays in the folder you open; it is never uploaded anywhere.
+     Signing: TweetNaCl.js (public domain), embedded below. -->
+<style>
+:root { --bg:#f4f6f9; --panel:#fff; --line:#d9dee5; --text:#1f2933; --muted:#637081; --accent:#1565c0; --accent2:#e3effc; --accent3:#0d47a1;
+  --danger:#c62828; --ok:#2e7d32; --warn:#ef6c00; --grey:#78858f; }
+* { box-sizing: border-box; }
+body { margin:0; font:13px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; color:var(--text); background:var(--bg); }
+header { display:flex; align-items:center; gap:14px; padding:10px 18px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+header h1 { font-size:16px; margin:0; font-weight:600; }
+header h1 span { color:var(--muted); font-weight:400; }
+.folder { margin-left:auto; display:flex; gap:8px; align-items:center; color:var(--muted); flex-wrap:wrap; }
+.pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; font-weight:600; white-space:nowrap; }
+.pill.active { background:#e5f4e7; color:var(--ok); } .pill.expiring { background:#fff1e0; color:var(--warn); }
+.pill.expired { background:#fde8e8; color:var(--danger); } .pill.void, .pill.released { background:#eceff1; color:var(--grey); }
+.pill.key { background:#e5f4e7; color:var(--ok); } .pill.nokey { background:#fde8e8; color:var(--danger); }
+button { font:inherit; padding:5px 12px; border:1px solid #b8c2cc; background:#fff; border-radius:3px; cursor:pointer; color:var(--text); }
+button:hover { background:var(--accent2); border-color:#9dbfe6; }
+button.primary { background:var(--accent); color:#fff; border-color:var(--accent3); font-weight:600; }
+button.primary:hover { background:var(--accent3); }
+button.danger { color:var(--danger); }
+button:disabled { opacity:.5; cursor:default; }
+input, select, textarea { font:inherit; padding:4px 6px; border:1px solid #b8c2cc; border-radius:3px; background:#fff; color:var(--text); }
+textarea { width:100%; resize:vertical; }
+.mono { font-family: Consolas, "Cascadia Mono", Menlo, monospace; font-size:12px; }
+main { padding:14px 18px 40px; max-width:1500px; margin:0 auto; }
+.cards { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.card { background:#fff; border:1px solid var(--line); border-radius:4px; padding:8px 14px; min-width:130px; cursor:pointer; }
+.card.on { border-color:var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
+.card b { display:block; font-size:22px; font-weight:600; } .card span { color:var(--muted); }
+.bar { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+.bar input[type=search] { width:300px; }
+.tablewrap { background:#fff; border:1px solid var(--line); border-radius:4px; overflow:auto; }
+table { border-collapse:collapse; width:100%; }
+th, td { padding:6px 10px; border-bottom:1px solid #edf0f3; text-align:left; white-space:nowrap; vertical-align:top; }
+th { background:#f7f9fb; font-weight:600; position:sticky; top:0; cursor:pointer; user-select:none; }
+th.sorted::after { content:" ▲"; font-size:10px; } th.sorted.desc::after { content:" ▼"; }
+tbody tr { cursor:pointer; } tbody tr:hover { background:#f3f8fe; }
+td.num { text-align:right; } td .sub { color:var(--muted); font-size:12px; }
+td.notes { white-space:normal; max-width:240px; color:var(--muted); }
+.empty { padding:30px; text-align:center; color:var(--muted); }
+.welcome { background:#fff; border:1px solid var(--line); border-radius:4px; padding:24px 28px; max-width:760px; margin:40px auto; line-height:1.6; }
+.welcome h2 { margin-top:0; font-size:18px; }
+.welcome ol { padding-left:20px; }
+.warnbox { background:#fff6e5; border:1px solid #f3c77a; border-radius:3px; padding:8px 10px; }
+.errbox { background:#fdecec; border:1px solid #f1aaaa; border-radius:3px; padding:8px 10px; }
+.note { color:var(--muted); font-size:12px; }
+/* dialog */
+.dlgbg { position:fixed; inset:0; background:rgba(20,30,40,.35); display:flex; align-items:flex-start; justify-content:center; padding:40px 12px; overflow:auto; z-index:10; }
+.dlg { background:#fff; border-radius:4px; box-shadow:0 10px 40px rgba(0,0,0,.25); width:760px; max-width:100%; }
+.dlg .t { padding:10px 16px; border-bottom:1px solid var(--line); font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px; }
+.dlg .t .x { margin-left:auto; border:0; font-size:18px; padding:0 6px; line-height:1; }
+.dlg .b { padding:12px 16px; display:flex; flex-direction:column; gap:10px; }
+.dlg .f { padding:10px 16px; border-top:1px solid var(--line); display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+.form { display:grid; grid-template-columns: 150px 1fr; gap:6px 10px; align-items:center; }
+.form > label { color:var(--muted); }
+.form input[type=text], .form input[type=email] { width:100%; }
+.sec { font-weight:600; color:var(--accent3); border-bottom:1px solid var(--line); padding-bottom:3px; margin-top:4px; }
+.row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.keybox { background:#f7f9fb; border:1px solid var(--line); border-radius:3px; padding:8px; word-break:break-all; max-height:90px; overflow:auto; }
+.hist td { font-size:12px; }
+.toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#263238; color:#fff; padding:8px 14px; border-radius:4px; z-index:20; max-width:90%; }
+.toast.err { background:var(--danger); }
+@media (max-width: 700px) { .form { grid-template-columns: 1fr; } .bar input[type=search] { width:100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Avaris2 CS <span>Licence Manager</span></h1>
+  <div class="folder" id="folder"></div>
+</header>
+<main id="main"></main>
+<script>/*NACL*/</script>
+<script>
+'use strict';
+// ------------------------------------------------------------------ constants (must match app/main.js)
+const LIC_PUB_SPKI = 'MCowBQYDK2VwAyEAY6AEfM7kFpdG4rajIfIEUwJA7Iw7nGIgUovmv9x++2g=';
+const EDITIONS = { '1D': 'Avaris2 CS 1D', '2D': 'Avaris2 CS 1D-2D' };
+const LEDGER = 'licences.json';
+const MAILERS = [['gmail', 'Gmail'], ['outlook', 'Outlook.com'], ['o365', 'Outlook (Microsoft 365)'], ['app', 'E-mail program']];
+
+// ------------------------------------------------------------------ helpers
+const $ = (s, r) => (r || document).querySelector(s);
+const h = (tag, attrs, ...kids) => { const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) { if (v == null || v === false) continue;
+    if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k in e && k !== 'list') e[k] = v; else e.setAttribute(k, v); }
+  for (const c of kids.flat(9)) if (c != null && c !== false) e.append(c.nodeType ? c : String(c)); return e; };
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const addTerm = (iso, term, n) => { const d = new Date(iso + 'T12:00:00'); if (term === '30d') d.setDate(d.getDate() + 30); else d.setFullYear(d.getFullYear() + (term === 'ny' ? n : 1)); return d.toISOString().slice(0, 10); };
+const daysLeft = (exp) => Math.floor((new Date(exp + 'T23:59:59') - Date.now()) / 86400e3);
+const termLabel = (t) => { if (!t) return ''; if (t === '30d') return '30 days'; const m = /^(\d+)y$/.exec(t); return m ? (m[1] === '1' ? '1 year' : m[1] + ' years') : t === 'custom' ? 'custom' : t; };
+const termFromDates = (iss, exp) => { if (addTerm(iss, '30d') === exp) return '30d'; for (let n = 1; n <= 30; n++) if (addTerm(iss, 'ny', n) === exp) return n + 'y'; return 'custom'; };
+const b64u = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64u = (s) => { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); s += '==='.slice((s.length + 3) % 4); const b = atob(s); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+const utf8 = (s) => new TextEncoder().encode(s), fromUtf8 = (u) => new TextDecoder().decode(u);
+const eqBytes = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+const PUB = unb64u(LIC_PUB_SPKI.replace(/=+$/, '')).slice(-32);
+let toastT = 0;
+const toast = (t, err) => { document.querySelectorAll('.toast').forEach(e => e.remove()); const e = h('div', { class: 'toast' + (err ? ' err' : '') }, t); document.body.append(e); clearTimeout(toastT); toastT = setTimeout(() => e.remove(), err ? 6000 : 3500); };
+const copy = (t, what) => navigator.clipboard.writeText(t).then(() => toast((what || 'Text') + ' copied.'), () => toast('Copy failed — select the text and press Ctrl+C.', true));
+const mailUrl = (via, to, subject, body) => { const e = encodeURIComponent;
+  if (via === 'gmail') return 'https://mail.google.com/mail/?view=cm&fs=1&to=' + e(to) + '&su=' + e(subject) + '&body=' + e(body);
+  if (via === 'outlook') return 'https://outlook.live.com/mail/0/deeplink/compose?to=' + e(to) + '&subject=' + e(subject) + '&body=' + e(body);
+  if (via === 'o365') return 'https://outlook.office.com/mail/deeplink/compose?to=' + e(to) + '&subject=' + e(subject) + '&body=' + e(body);
+  return 'mailto:' + to + '?subject=' + e(subject) + '&body=' + e(body); };
+const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('avlm.' + k); localStorage.setItem('avlm.' + k, v); } catch (e) { return null; } };
+
+// ------------------------------------------------------------------ state
+const S = { dir: null, seed: null, keyErr: '', ledger: null, filter: 'all', q: '', sort: { k: 'iss', desc: true } };
+
+// ------------------------------------------------------------------ licence keys
+function parsePem(text) {
+  const b = String(text).replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''); const der = unb64u(b.replace(/=+$/, ''));
+  // PKCS#8 Ed25519: 30 2e 02 01 00 30 05 06 03 2b 65 70 04 22 04 20 <32-byte seed>
+  if (der.length !== 48 || der[9] !== 0x2b || der[10] !== 0x65 || der[11] !== 0x70) throw new Error('not an Ed25519 private key');
+  const seed = der.slice(16); const kp = nacl.sign.keyPair.fromSeed(seed);
+  if (!eqBytes(kp.publicKey, PUB)) throw new Error('this private key does not belong to Avaris2 CS');
+  return seed;
+}
+function signLicence(lic) {
+  const body = utf8(JSON.stringify(lic)); const sk = nacl.sign.keyPair.fromSeed(S.seed).secretKey;
+  return 'AV2L-' + b64u(body) + '.' + b64u(nacl.sign.detached(body, sk));
+}
+function readKey(key) {
+  const m = /^AV2L-([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(String(key).replace(/\s+/g, '')); if (!m) return null;
+  const body = unb64u(m[1]); const ok = nacl.sign.detached.verify(body, unb64u(m[2]), PUB);
+  try { return { ok, lic: JSON.parse(fromUtf8(body)) }; } catch (e) { return null; }
+}
+// the request code may be wrapped over several lines; it ends at '--- end ---' or the first line that is not base64url
+function parseRequest(text) {
+  const lines = String(text).split(/\r?\n/).map(l => l.trim().replace(/^>+\s*/, '')); const i = lines.findIndex(l => /AVREQ-/.test(l)); if (i < 0) return null;
+  let c = lines[i].slice(lines[i].indexOf('AVREQ-')); for (let k = i + 1; k < lines.length && /^[A-Za-z0-9_-]+$/.test(lines[k]); k++) c += lines[k];
+  try { const R = JSON.parse(fromUtf8(unb64u(c.slice(6)))); if (!R.code || !R.hw) throw new Error('incomplete'); return R; } catch (e) { throw new Error('the request code is damaged (' + e.message + ')'); }
+}
+const releaseCode = async (serial, code) => { const d = new Uint8Array(await crypto.subtle.digest('SHA-256', utf8('avaris2-release|' + serial + '|' + code))); return 'REL-' + Array.from(d.slice(0, 6)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase(); };
+
+// ------------------------------------------------------------------ records
+const status = (r) => r.state === 'void' ? 'void' : r.state === 'released' ? 'released' : daysLeft(r.exp) < 0 ? 'expired' : daysLeft(r.exp) <= 30 ? 'expiring' : 'active';
+const STATUS_LABEL = { active: 'Active', expiring: 'Expiring', expired: 'Expired', void: 'Void', released: 'Released' };
+const nextSerial = () => { const y = new Date().getFullYear(); let n = 0; for (const r of S.ledger.records) { const m = /^A2-(\d{4})-(\d+)$/.exec(r.ser); if (m && +m[1] === y) n = Math.max(n, +m[2]); } return 'A2-' + y + '-' + String(n + 1).padStart(4, '0'); };
+function licOf(r) { // the signed licence content; field names must match verifyLicence() in app/main.js
+  const lic = { v: 2, ed: r.ed, term: r.term, user: r.user, name: r.name || '', company: r.company || '', email: r.email, iss: r.iss, exp: r.exp, ser: r.ser, mc: r.mc, hw: r.hw, host: r.host || '' };
+  if (r.rev) lic.rev = r.rev; return lic;
+}
+
+// ------------------------------------------------------------------ folder / storage (File System Access API)
+const idb = () => new Promise((res, rej) => { const q = indexedDB.open('avaris-licence-manager', 1); q.onupgradeneeded = () => q.result.createObjectStore('kv'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+const idbGet = async (k) => { try { const db = await idb(); return await new Promise(r => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => r(q.result); q.onerror = () => r(null); }); } catch (e) { return null; } };
+const idbSet = async (k, v) => { try { const db = await idb(); db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); } catch (e) { } };
+async function readFile(dir, name) { try { const fh = await dir.getFileHandle(name); return await (await fh.getFile()).text(); } catch (e) { if (e.name === 'NotFoundError') return null; throw e; } }
+async function writeFile(dir, name, text) { const fh = await dir.getFileHandle(name, { create: true }); const w = await fh.createWritable(); await w.write(text); await w.close(); }
+async function saveLedger() {
+  S.ledger.updated = new Date().toISOString(); const text = JSON.stringify(S.ledger, null, 1);
+  await writeFile(S.dir, LEDGER, text);
+  try { const bk = await S.dir.getDirectoryHandle('backups', { create: true }); const n = 'licences-' + today() + '.json'; await writeFile(bk, n, text); } catch (e) { }
+}
+async function saveKeyFile(r) { try { const kd = await S.dir.getDirectoryHandle('keys', { create: true }); await writeFile(kd, r.ser + (r.rev ? '-r' + r.rev : '') + '.avlic', r.key + '\r\n'); } catch (e) { } }
+async function openFolder(handle) {
+  S.dir = handle; S.seed = null; S.keyErr = '';
+  const pem = await readFile(handle, 'private_key.pem');
+  if (pem == null) S.keyErr = 'private_key.pem was not found in this folder — licences can be viewed but not issued.';
+  else { try { S.seed = parsePem(pem); } catch (e) { S.keyErr = 'private_key.pem: ' + e.message + '.'; } }
+  const t = await readFile(handle, LEDGER); S.ledger = t ? JSON.parse(t) : { format: 'avaris2-licences', version: 1, records: [] };
+  if (!Array.isArray(S.ledger.records)) S.ledger.records = [];
+  await idbSet('dir', handle); render();
+}
+async function chooseFolder() {
+  if (!window.showDirectoryPicker) { toast('Open this page in Microsoft Edge or Google Chrome.', true); return; }
+  try { const d = await window.showDirectoryPicker({ id: 'avaris-licences', mode: 'readwrite' }); await openFolder(d); }
+  catch (e) { if (e.name !== 'AbortError') toast('Could not open the folder: ' + e.message, true); }
+}
+async function reopen(handle) {
+  try { const p = handle.requestPermission ? await handle.requestPermission({ mode: 'readwrite' }) : 'granted'; if (p === 'granted') await openFolder(handle); else toast('Access to the folder was not granted.', true); }
+  catch (e) { toast('Could not open the folder: ' + e.message, true); }
+}
+
+// ------------------------------------------------------------------ dialog
+function dialog(title, body, buttons, width) {
+  const bg = h('div', { class: 'dlgbg' }); const close = () => bg.remove();
+  const dlg = h('div', { class: 'dlg', style: width ? { width: width + 'px' } : null },
+    h('div', { class: 't' }, title, h('button', { class: 'x', title: 'Close', onclick: close }, '×')),
+    h('div', { class: 'b' }, body), h('div', { class: 'f' }, (buttons || []).map(b => h('button', { class: b.cls || '', onclick: () => b.fn(close) }, b.label))));
+  bg.append(dlg); bg.addEventListener('mousedown', (e) => { if (e.target === bg) close(); });
+  document.body.append(bg); const f = dlg.querySelector('textarea, input:not([readonly])'); if (f) f.focus(); return close;
+}
+const field = (label, el) => [h('label', null, label), el];
+function termPicker(init) { // edition-independent: 30 days / 1 year / N years / until a date
+  const iss = h('input', { type: 'date', value: init.iss || today() });
+  const term = h('select', null, [['30d', '30 days'], ['1y', '1 year'], ['ny', 'N years'], ['date', 'Until a date']].map(([v, l]) => h('option', { value: v }, l)));
+  const n = h('input', { type: 'number', min: 2, max: 30, value: init.n || 2, style: { width: '60px' } });
+  const until = h('input', { type: 'date', value: init.exp || addTerm(today(), '1y') });
+  const out = h('b'); const t = init.term || '1y'; term.value = /^\d+y$/.test(t) && t !== '1y' ? 'ny' : t === 'custom' ? 'date' : t; if (term.value === 'ny') n.value = parseInt(t, 10);
+  const get = () => { const exp = term.value === 'date' ? until.value : addTerm(iss.value, term.value, Math.max(2, +n.value || 2)); return { iss: iss.value, exp, term: termFromDates(iss.value, exp) }; };
+  const upd = () => { n.style.display = term.value === 'ny' ? '' : 'none'; until.style.display = term.value === 'date' ? '' : 'none'; const g = get(); out.textContent = g.exp ? 'expires ' + g.exp + ' (' + termLabel(g.term) + ')' : ''; };
+  [iss, term, n, until].forEach(e => e.addEventListener('input', upd)); upd();
+  return { iss, el: h('span', { class: 'row' }, term, n, until, out), get };
+}
+function edSelect(v) { const s = h('select', null, Object.entries(EDITIONS).map(([k, l]) => h('option', { value: k }, l))); s.value = v || '1D'; return s; }
+function mailBar(r) {
+  const via = h('select', null, MAILERS.map(([v, l]) => h('option', { value: v }, l))); via.value = pref('via') || 'gmail';
+  const send = () => { pref('via', via.value); const m = customerMail(r); window.open(mailUrl(via.value, r.email, m.subject, m.body), '_blank'); };
+  return h('span', { class: 'row' }, h('button', { class: 'primary', onclick: send }, 'E-mail to Customer'), via);
+}
+function customerMail(r) {
+  const body = ['Dear ' + (r.name || r.user) + ',', '', 'thank you for choosing Avaris2 CS. ' + (r.rev ? 'Your updated licence:' : 'Your licence:'), '',
+    'Edition: ' + EDITIONS[r.ed], 'Valid: ' + r.iss + ' to ' + r.exp, 'osemtec.com account: ' + r.user, 'Computer: ' + r.mc + (r.host ? ' (' + r.host + ')' : ''), 'Serial: ' + r.ser + (r.rev ? ' rev. ' + r.rev : ''), '',
+    'To activate: open Avaris2 CS > Help > Register, paste the key below into "Activate the licence you received" and click Activate.', '',
+    r.key.match(/.{1,76}/g).join('\n'), '', 'Best regards,', 'OSEMTEC', 'info@osemtec.com'].join('\n');
+  return { subject: 'Your Avaris2 CS licence - ' + EDITIONS[r.ed] + ' - ' + r.ser, body };
+}
+function keyPanel(r) {
+  return h('div', null, h('div', { class: 'sec' }, 'Licence key' + (r.rev ? ' (rev. ' + r.rev + ')' : '')), h('div', { class: 'keybox mono', style: { marginTop: '6px' } }, r.key),
+    h('div', { class: 'row', style: { marginTop: '6px' } }, mailBar(r), h('button', { onclick: () => copy(r.key, 'Licence key') }, 'Copy Key'),
+      h('button', { onclick: () => { const a = h('a', { href: URL.createObjectURL(new Blob([r.key + '\r\n'], { type: 'text/plain' })), download: 'Avaris2CS_' + r.ser + '.avlic' }); a.click(); } }, 'Download .avlic')));
+}
+
+// ------------------------------------------------------------------ new licence
+function newLicence(prefill) {
+  if (!S.seed) { toast(S.keyErr || 'No private key.', true); return; }
+  let R = null; const req = h('textarea', { rows: 6, class: 'mono', spellcheck: false, placeholder: 'Paste the whole request e-mail from the customer (or only the AVREQ-... code)' });
+  const file = h('input', { type: 'file', accept: '.avreq,.txt', style: { display: 'none' }, onchange: async () => { if (file.files[0]) { req.value = await file.files[0].text(); parse(); } } });
+  const info = h('div'); const user = h('input', { type: 'text' }), email = h('input', { type: 'email' }), name = h('input', { type: 'text', placeholder: 'optional, shown in the program' }), company = h('input', { type: 'text', placeholder: 'optional' });
+  const ed = edSelect('1D'); const tp = termPicker({}); const ser = h('input', { type: 'text', value: nextSerial(), style: { width: '160px' } });
+  const notes = h('input', { type: 'text', placeholder: 'order number, payment, remarks (not in the licence)' });
+  const form = h('div', { class: 'form', style: { display: 'none' } }, field('osemtec.com account', user), field('E-mail', email), field('Name', name), field('Company', company),
+    field('Edition', ed), field('Start date', tp.iss), field('Term', tp.el), field('Serial', ser), field('Notes', notes));
+  const parse = () => { R = null; info.replaceChildren(); form.style.display = 'none'; if (!req.value.trim()) return;
+    try { R = parseRequest(req.value); if (!R) { info.append(h('div', { class: 'errbox' }, 'No AVREQ request code found in the text.')); return; } }
+    catch (e) { info.append(h('div', { class: 'errbox' }, e.message)); return; }
+    user.value = R.user || ''; email.value = R.email || ''; name.value = R.name || ''; company.value = R.company || ''; if (R.ed) ed.value = R.ed;
+    info.append(h('div', { class: 'form' }, field('Machine code', h('b', { class: 'mono' }, R.code)), field('Computer', (R.host || '?') + ' (' + (R.os || '?') + ')'), field('Requested', (R.date || '?') + ' with Avaris2 CS ' + (R.app || '?'))));
+    const same = S.ledger.records.filter(x => x.mc === R.code && ['active', 'expiring'].includes(status(x)));
+    if (same.length) info.append(h('div', { class: 'warnbox' }, 'This computer already has a valid licence: ' + same.map(x => x.ser + ' (' + x.user + ', ' + EDITIONS[x.ed] + ', until ' + x.exp + ')').join('; ') + '. To change it, open that licence and edit it instead.'));
+    const acc = S.ledger.records.filter(x => x.user && x.user.toLowerCase() === String(R.user || '').toLowerCase() && x.mc !== R.code && ['active', 'expiring'].includes(status(x)));
+    if (acc.length) info.append(h('div', { class: 'warnbox' }, 'Account "' + R.user + '" already has ' + acc.length + ' valid licence(s) on other computers: ' + acc.map(x => x.ser + ' ' + x.mc + (x.host ? ' (' + x.host + ')' : '')).join(', ') + '.'));
+    info.append(h('div', { class: 'note' }, 'Check the account and the purchase (edition and term) on osemtec.com, then set them below.'));
+    form.style.display = ''; };
+  req.addEventListener('input', parse);
+  const result = h('div');
+  const issue = async (close) => {
+    if (!R) { toast('Paste a licence request first.', true); return; }
+    if (!user.value.trim() || !/^\S+@\S+\.\S+$/.test(email.value.trim())) { toast('Account and a valid e-mail are required.', true); return; }
+    const t = tp.get(); if (!t.exp || t.exp < t.iss) { toast('Check the dates.', true); return; }
+    if (S.ledger.records.some(x => x.ser === ser.value.trim())) { toast('Serial ' + ser.value + ' is already used.', true); return; }
+    const r = { ser: ser.value.trim(), rev: 0, user: user.value.trim(), email: email.value.trim(), name: name.value.trim(), company: company.value.trim(), ed: ed.value, term: t.term, iss: t.iss, exp: t.exp,
+      mc: R.code, hw: R.hw, host: R.host || '', os: R.os || '', app: R.app || '', reqDate: R.date || '', notes: notes.value.trim(), state: '', created: new Date().toISOString(), history: [] };
+    r.key = signLicence(licOf(r)); if (!readKey(r.key).ok) { toast('Internal error: the new key does not verify.', true); return; }
+    r.history.push({ at: new Date().toISOString(), action: 'issued', ed: r.ed, iss: r.iss, exp: r.exp, key: r.key });
+    S.ledger.records.push(r); try { await saveLedger(); await saveKeyFile(r); } catch (e) { toast('Could not save licences.json: ' + e.message, true); return; }
+    close(); render(); toast('Licence ' + r.ser + ' issued and saved.'); editLicence(r, true);
+  };
+  dialog('New Licence', [h('div', { class: 'row' }, h('span', { class: 'note' }, 'Paste the request e-mail, or'), h('button', { onclick: () => file.click() }, 'Open .avreq File...'), file), req, info, form, result],
+    [{ label: 'Cancel', fn: c => c() }, { label: 'Issue Licence', cls: 'primary', fn: issue }]);
+  if (prefill) { req.value = prefill; parse(); }
+}
+
+// ------------------------------------------------------------------ edit / renew a licence
+function editLicence(r, justIssued) {
+  const user = h('input', { type: 'text', value: r.user }), email = h('input', { type: 'email', value: r.email }), name = h('input', { type: 'text', value: r.name || '' }), company = h('input', { type: 'text', value: r.company || '' });
+  const ed = edSelect(r.ed); const exp = h('input', { type: 'date', value: r.exp });
+  const from = () => (r.exp >= today() ? r.exp : today());
+  const quick = (l, f) => h('button', { onclick: () => { exp.value = f(); upd(); } }, l);
+  const notes = h('textarea', { rows: 2, value: r.notes || '', placeholder: 'order number, payment, remarks (not in the licence)' });
+  const st = status(r); const dl = daysLeft(r.exp);
+  const changed = h('div', { class: 'warnbox', style: { display: 'none' } });
+  const signedChanged = () => user.value.trim() !== r.user || email.value.trim() !== r.email || name.value.trim() !== (r.name || '') || company.value.trim() !== (r.company || '') || ed.value !== r.ed || exp.value !== r.exp;
+  const upd = () => { const c = signedChanged(); changed.style.display = c ? '' : 'none';
+    changed.textContent = c ? 'Saving re-issues the licence: a new key (rev. ' + ((r.rev || 0) + 1) + ') is created and has to be sent to the customer. ' + (exp.value < r.exp ? 'Note: a shorter date only takes effect when the customer activates the new key — the old key stays valid until ' + r.exp + ' on that computer.' : 'The old key is replaced in the ledger.') : ''; };
+  [user, email, name, company, ed, exp].forEach(e => e.addEventListener('input', upd));
+  const relIn = h('input', { type: 'text', placeholder: 'REL-...', class: 'mono', style: { width: '170px' } });
+  const hist = h('table', { class: 'hist' }, h('tr', null, ['When', 'Action', 'Edition', 'Valid', 'Note'].map(x => h('th', null, x))),
+    (r.history || []).slice().reverse().map(x => h('tr', null, h('td', null, (x.at || '').slice(0, 16).replace('T', ' ')), h('td', null, x.action), h('td', null, x.ed ? EDITIONS[x.ed] : ''), h('td', null, x.iss ? x.iss + ' → ' + x.exp : ''), h('td', null, x.note || ''))));
+  const save = async (close) => {
+    const c = signedChanged();
+    if (c) { if (!S.seed) { toast(S.keyErr || 'No private key: cannot re-issue.', true); return; }
+      if (!/^\S+@\S+\.\S+$/.test(email.value.trim()) || !user.value.trim()) { toast('Account and a valid e-mail are required.', true); return; }
+      if (!exp.value) { toast('Set the expiry date.', true); return; }
+      const old = { ed: r.ed, exp: r.exp };
+      Object.assign(r, { user: user.value.trim(), email: email.value.trim(), name: name.value.trim(), company: company.value.trim(), ed: ed.value, exp: exp.value, iss: today(), rev: (r.rev || 0) + 1 });
+      r.term = termFromDates(r.iss, r.exp); r.key = signLicence(licOf(r));
+      const what = [old.ed !== r.ed ? EDITIONS[old.ed] + ' → ' + EDITIONS[r.ed] : '', old.exp !== r.exp ? 'expiry ' + old.exp + ' → ' + r.exp : ''].filter(Boolean).join(', ') || 'details changed';
+      r.history.push({ at: new Date().toISOString(), action: 're-issued rev. ' + r.rev, ed: r.ed, iss: r.iss, exp: r.exp, key: r.key, note: what });
+      if (r.state === 'void') r.state = ''; }
+    r.notes = notes.value.trim();
+    try { await saveLedger(); if (c) await saveKeyFile(r); } catch (e) { toast('Could not save licences.json: ' + e.message, true); return; }
+    close(); render(); if (c) { toast('Licence ' + r.ser + ' re-issued (rev. ' + r.rev + '). Send the new key to the customer.'); editLicence(r, true); } else toast('Saved.');
+  };
+  const setState = async (close, state, note) => { r.state = state; r.history.push({ at: new Date().toISOString(), action: state || 'reactivated', note: note || '' }); try { await saveLedger(); } catch (e) { toast(e.message, true); return; } close(); render(); };
+  const checkRel = async () => { const want = await releaseCode(r.ser, r.mc); const got = relIn.value.trim().toUpperCase();
+    if (got !== want) { toast('This release code does not match licence ' + r.ser + ' on ' + r.mc + '.', true); return null; } return got; };
+  const body = [
+    h('div', { class: 'row' }, h('span', { class: 'pill ' + st }, STATUS_LABEL[st]), h('b', null, r.ser + (r.rev ? ' rev. ' + r.rev : '')), h('span', { class: 'note' }, EDITIONS[r.ed] + ' · ' + r.iss + ' → ' + r.exp + (st === 'active' || st === 'expiring' ? ' · ' + dl + ' days left' : ''))),
+    justIssued ? keyPanel(r) : null,
+    h('div', { class: 'sec' }, 'Licence'),
+    h('div', { class: 'form' }, field('Machine code', h('span', { class: 'mono' }, r.mc + (r.host ? '  (' + r.host + (r.os ? ', ' + r.os : '') + ')' : ''))),
+      field('osemtec.com account', user), field('E-mail', email), field('Name', name), field('Company', company), field('Edition', ed),
+      field('Expiry date', h('span', { class: 'row' }, exp, quick('+30 days', () => addTerm(from(), '30d')), quick('+1 year', () => addTerm(from(), '1y')), quick('+2 years', () => addTerm(from(), 'ny', 2)), quick('+3 years', () => addTerm(from(), 'ny', 3)))),
+      field('Notes', notes)),
+    changed,
+    justIssued ? null : h('details', null, h('summary', null, 'Current key'), h('div', { style: { marginTop: '6px' } }, keyPanel(r))),
+    h('details', null, h('summary', null, 'Release (customer moves to another computer)'),
+      h('div', { class: 'row', style: { marginTop: '6px' } }, h('span', { class: 'note' }, 'Release code from the customer:'), relIn,
+        h('button', { onclick: async (ev) => { const c = await checkRel(); if (c) { const bg = ev.target.closest('.dlgbg'); await setState(() => bg.remove(), 'released', c); toast('Licence ' + r.ser + ' marked as released. Issue the new computer from its request.'); } } }, 'Check & Mark Released'))),
+    h('details', null, h('summary', null, 'History (' + (r.history || []).length + ')'), h('div', { style: { marginTop: '6px', overflow: 'auto' } }, hist)),
+    h('div', { class: 'note' }, 'Licences work offline, so a key that was already sent cannot be switched off remotely. Extending is safe (the customer activates the new key). Shortening or voiding is recorded here and takes effect only when the customer activates a new key or the old one expires.')
+  ];
+  dialog('Licence ' + r.ser + ' — ' + r.user, body, [
+    r.state === 'void' || r.state === 'released' ? { label: 'Reactivate', fn: c => setState(c, '', '') } : { label: 'Mark Void', cls: 'danger', fn: c => { if (confirm('Mark licence ' + r.ser + ' as void? (The key itself keeps working offline until it expires.)')) setState(c, 'void', ''); } },
+    { label: 'Close', fn: c => c() }, { label: 'Save', cls: 'primary', fn: save }], 800);
+  upd();
+}
+
+// ------------------------------------------------------------------ import / export
+function exportCsv() {
+  const q = (x) => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"';
+  const cols = ['ser', 'rev', 'status', 'user', 'name', 'company', 'email', 'ed', 'term', 'iss', 'exp', 'daysLeft', 'mc', 'host', 'notes', 'key'];
+  const rows = S.ledger.records.map(r => cols.map(c => c === 'status' ? STATUS_LABEL[status(r)] : c === 'daysLeft' ? daysLeft(r.exp) : c === 'ed' ? EDITIONS[r.ed] : r[c]).map(q).join(','));
+  const a = h('a', { href: URL.createObjectURL(new Blob(['﻿' + cols.join(',') + '\r\n' + rows.join('\r\n') + '\r\n'], { type: 'text/csv' })), download: 'Avaris2CS_licences_' + today() + '.csv' }); a.click();
+}
+async function importKeys(text) { // licence_ledger.csv from Avaris2 CS 2.2.0, or any text with AV2L- keys
+  const keys = String(text).match(/AV2L-[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g) || []; let added = 0, bad = 0, dup = 0;
+  for (const k of keys) { const x = readKey(k); if (!x || !x.ok) { bad++; continue; } const L = x.lic;
+    if (S.ledger.records.some(r => r.ser === L.ser)) { dup++; continue; }
+    S.ledger.records.push({ ser: L.ser, rev: L.rev || 0, user: L.user || '', email: L.email || '', name: L.name || '', company: L.company || '', ed: L.ed, term: L.term, iss: L.iss, exp: L.exp, mc: L.mc, hw: L.hw, host: L.host || '', notes: 'imported', state: '', key: k,
+      created: new Date().toISOString(), history: [{ at: new Date().toISOString(), action: 'imported', ed: L.ed, iss: L.iss, exp: L.exp, key: k }] }); added++; }
+  if (added) await saveLedger(); render(); toast(added + ' licence(s) imported' + (dup ? ', ' + dup + ' already listed' : '') + (bad ? ', ' + bad + ' invalid key(s) skipped' : '') + '.', !added && !!bad);
+}
+
+// ------------------------------------------------------------------ main view
+function renderFolder() {
+  const f = $('#folder'); f.replaceChildren();
+  if (!S.dir) return;
+  f.append(h('span', null, 'Folder: ', h('b', null, S.dir.name)), S.seed ? h('span', { class: 'pill key', title: 'private_key.pem matches the Avaris2 CS public key' }, 'Signing key OK') : h('span', { class: 'pill nokey', title: S.keyErr }, 'No signing key'),
+    h('button', { onclick: chooseFolder }, 'Change Folder...'));
+}
+async function render() {
+  renderFolder(); const M = $('#main'); M.replaceChildren();
+  if (!S.dir) {
+    const last = await idbGet('dir');
+    M.append(h('div', { class: 'welcome' }, h('h2', null, 'Avaris2 CS Licence Manager'),
+      h('p', null, 'Issue, renew and keep track of every Avaris2 CS licence. The licences are stored in a folder of your choice, together with the private signing key:'),
+      h('ol', null, h('li', null, 'Create a folder that only OSEMTEC can reach (for example on the office file server or an encrypted USB drive).'),
+        h('li', null, 'Put ', h('code', null, 'private_key.pem'), ' in it. Keep a second copy of the key in a safe place: without it no further licences can be issued, and it must never be given to anyone.'),
+        h('li', null, 'Click ', h('b', null, 'Open Licence Folder'), ' and choose the folder. The list of licences is saved in ', h('code', null, LEDGER), ' in that folder (a daily copy goes to ', h('code', null, 'backups'), ', each key to ', h('code', null, 'keys'), ').')),
+      window.showDirectoryPicker ? null : h('p', { class: 'errbox' }, 'This browser cannot open folders. Please open this file in Microsoft Edge or Google Chrome.'),
+      h('div', { class: 'row' }, h('button', { class: 'primary', onclick: chooseFolder, disabled: !window.showDirectoryPicker }, 'Open Licence Folder...'), last ? h('button', { onclick: () => reopen(last) }, 'Reopen "' + last.name + '"') : null)));
+    return;
+  }
+  if (S.keyErr) M.append(h('div', { class: 'errbox', style: { marginBottom: '10px' } }, S.keyErr));
+  const recs = S.ledger.records; const cnt = { all: recs.length, active: 0, expiring: 0, expired: 0, inactive: 0 };
+  for (const r of recs) { const s = status(r); if (s === 'void' || s === 'released') cnt.inactive++; else cnt[s]++; }
+  const card = (k, label) => h('div', { class: 'card' + (S.filter === k ? ' on' : ''), onclick: () => { S.filter = k; render(); } }, h('b', null, cnt[k]), h('span', null, label));
+  M.append(h('div', { class: 'cards' }, card('all', 'All licences'), card('active', 'Active'), card('expiring', 'Expiring ≤ 30 days'), card('expired', 'Expired'), card('inactive', 'Void / released')));
+  const search = h('input', { type: 'search', placeholder: 'Search account, name, company, e-mail, serial, machine...', value: S.q, oninput: () => { S.q = search.value; drawTable(); } });
+  const imp = h('input', { type: 'file', accept: '.csv,.txt,.avlic,.json', style: { display: 'none' }, onchange: async () => { if (imp.files[0]) await importKeys(await imp.files[0].text()); imp.value = ''; } });
+  M.append(h('div', { class: 'bar' }, h('button', { class: 'primary', onclick: () => newLicence(), disabled: !S.seed }, '+ New Licence from Request'), search,
+    h('span', { style: { marginLeft: 'auto' } }), h('button', { onclick: exportCsv }, 'Export CSV'), h('button', { onclick: () => imp.click(), title: 'Add licences from licence_ledger.csv (Avaris2 CS 2.2.0) or any text containing AV2L- keys' }, 'Import Keys...'), imp));
+  const wrap = h('div', { class: 'tablewrap' }); M.append(wrap);
+  const COLS = [['ser', 'Serial'], ['user', 'Account'], ['name', 'Licensee'], ['email', 'E-mail'], ['ed', 'Edition'], ['iss', 'Issued'], ['exp', 'Expires'], ['left', 'Days left'], ['status', 'Status'], ['mc', 'Computer'], ['notes', 'Notes']];
+  const val = (r, k) => k === 'left' ? daysLeft(r.exp) : k === 'status' ? status(r) : k === 'name' ? (r.name || '') + ' ' + (r.company || '') : (r[k] || '');
+  function drawTable() {
+    const q = S.q.trim().toLowerCase();
+    let rows = recs.filter(r => { const s = status(r); if (S.filter === 'inactive' ? !(s === 'void' || s === 'released') : S.filter !== 'all' && s !== S.filter) return false;
+      return !q || [r.ser, r.user, r.name, r.company, r.email, r.mc, r.host, r.notes].join(' ').toLowerCase().includes(q); });
+    const { k, desc } = S.sort; rows.sort((a, b) => { const x = val(a, k), y = val(b, k); const c = typeof x === 'number' ? x - y : String(x).localeCompare(String(y)); return desc ? -c : c; });
+    const tb = h('tbody', null, rows.map(r => { const s = status(r), dl = daysLeft(r.exp);
+      return h('tr', { onclick: () => editLicence(r) }, h('td', null, h('b', null, r.ser), r.rev ? h('span', { class: 'sub' }, ' rev. ' + r.rev) : null), h('td', null, r.user),
+        h('td', null, r.name || '', r.company ? h('div', { class: 'sub' }, r.company) : null), h('td', null, r.email), h('td', null, r.ed === '2D' ? '1D-2D' : '1D'),
+        h('td', null, r.iss), h('td', null, r.exp), h('td', { class: 'num' }, s === 'void' || s === 'released' ? '' : dl < 0 ? '—' : dl),
+        h('td', null, h('span', { class: 'pill ' + s }, STATUS_LABEL[s])), h('td', null, h('span', { class: 'mono' }, r.mc), r.host ? h('div', { class: 'sub' }, r.host) : null), h('td', { class: 'notes' }, r.notes || '')); }));
+    const th = h('tr', null, COLS.map(([k, l]) => h('th', { class: S.sort.k === k ? 'sorted' + (S.sort.desc ? ' desc' : '') : '', onclick: () => { S.sort = { k, desc: S.sort.k === k ? !S.sort.desc : false }; drawTable(); } }, l)));
+    wrap.replaceChildren(rows.length ? h('table', null, h('thead', null, th), tb) : h('div', { class: 'empty' }, recs.length ? 'No licences match.' : 'No licences yet. Click "+ New Licence from Request" and paste a request e-mail.'));
+  }
+  drawTable();
+}
+// paste a request anywhere on the page to start a new licence
+document.addEventListener('paste', (e) => { if (!S.dir || !S.seed || document.querySelector('.dlgbg') || /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const t = e.clipboardData.getData('text'); if (/AVREQ-/.test(t)) { e.preventDefault(); newLicence(t); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { const d = document.querySelectorAll('.dlgbg'); if (d.length) d[d.length - 1].remove(); } });
+window.LM = { S, signLicence, readKey, parseRequest, openFolder, render }; // for testing
+(async () => { const last = await idbGet('dir'); if (last && last.queryPermission && await last.queryPermission({ mode: 'readwrite' }) === 'granted') { try { await openFolder(last); return; } catch (e) { } } render(); })();
+</script>
+</body>
+</html>

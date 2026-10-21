@@ -812,7 +812,6 @@
     onKey(e) {
       const tag = (e.target.tagName || '').toLowerCase();
       const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
-      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'l') { e.preventDefault(); AV.licenceIssuer(this); return; }
       if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.save(e.shiftKey); return; }
       if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openDialog(); return; }
       if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); this.newProject(); return; }

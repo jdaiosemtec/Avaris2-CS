@@ -64,7 +64,7 @@ Avaris2CS.exe (Electron)
 | `tools/peicon.py` | 把 PNG 图标写入 Windows exe 的图标资源（Linux 上没有 rcedit 时使用）。 |
 | `tools/iconnorm.py` | Ribbon 图标视觉尺寸统一工具（裁边、按内容面积缩放、居中到画布）。用法：`python3 iconnorm.py 源文件夹 输出文件夹 0.86 96`。 |
 | `tools/make_insights.py` | 旧版本用来生成 Insight Flag 主题 json 的脚本，已被 Flag 面板取代，仅作参考。 |
-| `license-tools/keygen.js` | 命令行版许可证签发：`node keygen.js --request "<申请邮件全文或 AVREQ-…>" [--edition 1D\|2D] [--term 30d\|1y\|3y] [--start YYYY-MM-DD]`。日常签发建议用软件里的 Licence Issuer（Ctrl+Alt+L）。 |
+| `license-tools/keygen.js` | 命令行版许可证签发：`node keygen.js --request "<申请邮件全文或 AVREQ-…>" [--edition 1D\|2D] [--term 30d\|1y\|3y] [--start YYYY-MM-DD]`。日常签发和管理请用 `tools/licence-manager/Avaris2CS_Licence_Manager.html`（见第 9 节）。 |
 | `license-tools/public_key.pem` | 公钥，已嵌入 `main.js` 用于离线验证。 |
 | `license-tools/private_key.pem` | **私钥，务必保密，不能随软件发布**，也不进 git。源码包里如果附带，要单独妥善保管。 |
 | `installer/avaris.nsi` | NSIS 安装脚本：安装目录、开始菜单和桌面快捷方式、可选的 .inp 关联、卸载；安装前会自动卸载旧名称 "Avaris2" 的版本。 |
@@ -137,7 +137,7 @@ Avaris2CS.exe (Electron)
 | `export.js` | 186 | Export Wizard：网络对象连同属性和结果导出为 Shapefile / GDB / CSV。 |
 | `mesh2d.js` | 346 | **2D 地表淹没模块**：在边界多边形内生成方格网（按 DEM 取高程），2D 网格写入 .inp（`AV.mesh2DToINP`），导入 Avaris DS 的 `.ini [2D]` 设置，2D 结果（水深、最大水深、积水时长、退水时间）计算、绘制和图例。 |
 | `history.js` | 485 | 用户登录和角色（Administrator 管理员、Modeler 建模员、Viewer 只读），**修改记录**（谁在什么时候改了哪个对象的哪个变量，旧值和新值），保存在 `<模型>.osemhist.json`。 |
-| `licence.js` | 230 | **许可证**：<br>• 版本分 1D / 1D-2D，期限 30 天、1 年或 N 年，许可证绑定机器码；<br>• 没有有效许可证时（未激活、过期、换了电脑、系统时间被回调）进入只读模式：`AV.licenceGate`，由 `canModify`、`save`、`sim.run` 和方案批量运行调用；<br>• Help ▸ Register 对话框：生成激活申请（发邮件 / 复制 / 保存 .avreq）、导入许可证（粘贴或 .avlic 文件）、释放本机；<br>• **Licence Issuer**（Ctrl+Alt+L，OSEMTEC 内部用，需要私钥文件）：粘贴申请邮件即可签发许可证，自动记入 `licence_ledger.csv`。 |
+| `licence.js` | 230 | **许可证**：<br>• 版本分 1D / 1D-2D，期限 30 天、1 年或 N 年，许可证绑定机器码；<br>• 没有有效许可证时（未激活、过期、换了电脑、系统时间被回调）进入只读模式：`AV.licenceGate`，由 `canModify`、`save`、`sim.run` 和方案批量运行调用；<br>• Help ▸ Register 对话框：生成激活申请（发邮件 / 复制 / 保存 .avreq）、导入许可证（粘贴或 .avlic 文件）、释放本机；<br>• 申请只含 osemtec.com 账号、邮箱和机器码；发送方式：Gmail / Outlook.com / Microsoft 365 网页邮箱（`AV.mailUrl`，浏览器里已登录即可一键发送）、本机邮件程序、复制、保存；如果 `main.js` 里填了 `LIC_FORM_KEY`（Web3Forms），还会出现 *Send Request to OSEMTEC*，直接发到 info@osemtec.com。<br>• 软件里不再有签发功能，签发只在 Licence Manager 里做。 |
 | `clip.js` | 95 | 复制粘贴对象（连同它们用到的曲线、时间序列等），可以跨模型、跨窗口。 |
 
 ### 2.4 `engine/src/`：计算引擎（C）
@@ -312,9 +312,20 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 ## 9. 许可证（第一阶段：邮件申请、人工签发）
 
 **流程**
-1. 用户在 Help ▸ Register 里填写 osemtec.com 账号、姓名、公司、邮箱、版本和期限，点 *Send Request by E-mail*。软件会打开用户自己的邮件程序，内容已填好，发往 info@osemtec.com。
-2. OSEMTEC 在网站后台核对账号和付款，然后在 Avaris2 CS 里按 Ctrl+Alt+L 打开 Licence Issuer：粘贴整封申请邮件，确认版本和期限，签发许可证，再点 *E-mail to Customer*。
+1. 用户在 Help ▸ Register 里只填 osemtec.com 账号和邮箱（机器码自动生成），选择发送方式后点 *Send by E-mail*：
+   - Gmail / Outlook.com / Microsoft 365：浏览器打开用户的网页邮箱，收件人、标题、正文都已填好，用户点"发送"即可（需要浏览器里已登录该邮箱）；
+   - E-mail program：打开本机默认邮件程序（mailto）；
+   - 也可以 *Copy Request* 或 *Save Request File*（.avreq）。
+   - 真正的"一键直发"：在 web3forms.com 用 info@osemtec.com 注册，拿到 access key，填进 `main.js` 的 `LIC_FORM_KEY`，Register 里就会多一个 *Send Request to OSEMTEC* 按钮，由主进程直接 POST，不经过用户的邮箱。
+2. OSEMTEC 在网站后台核对账号和付款（版本、期限由 OSEMTEC 决定），然后在 **Licence Manager** 里签发并发给客户。
 3. 用户把收到的许可证粘贴到 Register 里，点 Activate。之后全程离线验证。
+
+**Licence Manager（`tools/licence-manager/`）**
+- `Avaris2CS_Licence_Manager.html` 是一个独立的网页文件（用 Edge 或 Chrome 打开），由 `make.py` 把 `manager.src.html` 和 TweetNaCl.js（公有领域）合成。改了源文件后运行 `python3 make.py`。
+- 第一次使用：选择一个放有 `private_key.pem` 的文件夹。所有许可证记录在该文件夹的 `licences.json`；每天的副本在 `backups/`，每个发出的 key 在 `keys/`。私钥只在本机浏览器里使用，不会上传。
+- 功能：列出所有许可证（状态：有效 / 30 天内到期 / 已过期 / 作废 / 已释放，可搜索、排序、按状态筛选）；粘贴申请邮件签发新许可证（选版本、期限 30 天 / 1 年 / N 年 / 指定日期、序列号 A2-年份-编号、备注）；打开任一许可证可修改到期日（+30 天 / +1 年 / +2 年 / +3 年或任意日期）、版本、姓名公司邮箱，保存后自动重新签发（rev. 1、2…，历史全部保留），再一键邮件发给客户；核对释放码并标记"已释放"；标记作废；导出 CSV；导入旧的 `licence_ledger.csv`（2.2.0 软件内签发的记录）。
+- 同一台机器已有有效许可证、或同一账号已在别的机器上有许可证时，签发前会提示。
+- **限制**：许可证离线验证，已经发出的 key 无法远程收回。延长有效期没问题（客户激活新 key）；缩短或作废只记录在台账里，客户手里的旧 key 仍可用到原到期日。要做到远程收回需要第二阶段的在线校验。
 
 **许可证格式**
 - 格式为 `AV2L-<base64url JSON>.<base64url Ed25519 签名>`。
@@ -329,10 +340,10 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 只读时可以打开和查看模型与结果，不能编辑、保存或运行。
 
 **换电脑**
-用户点 *Release this Computer*，得到释放码，发给 OSEMTEC。Licence Issuer 里的 *Check a release code* 用来核对释放码。
+用户点 *Release this Computer*，得到释放码，发给 OSEMTEC。在 Licence Manager 里打开该许可证 ▸ Release，输入释放码核对后标记为已释放，再为新电脑签发。
 
 **私钥**
-- `license-tools/private_key.pem` 绝不能随软件发布，也不能进 git。
+- `license-tools/private_key.pem` 绝不能随软件发布，也不能进 git。Licence Manager 文件夹里的私钥同样要妥善保管，并另存一份备份。
 - 公钥写在 `main.js` 的 `LIC_PUB` 里。如果更换密钥对，已发出的许可证会全部失效。
 
 **第二阶段**
