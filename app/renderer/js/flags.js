@@ -52,12 +52,12 @@
       desc: 'Velocity exceeds the allowable limit for the pipe material or an erodible channel.', alg: 'Velocity > {v} Warning', P: { v: [10, 'ft/s', 3] },
       when: { 1: 'velocity > {v}' }, expr: (p) => `iif(abs(rptVel) > ${p.v}, 1, 0)` },
     { id: 'rev', name: 'Reverse flow event', layer: 'link', mode: 'worst', levels: [1, 2], where: "type = 'CONDUIT'",
-      desc: 'Flow runs against the link direction (from the end node to the start node, i.e. negative flow) for a share of the simulation time.',
-      alg: 'Reverse flow ≥ {w} of the simulation time Warning; ≥ {h} High', P: { w: [5, '%', 5], h: [99, '%', 99] },
-      when: { 1: 'reverse flow for ≥ {w} of the simulation time', 2: 'reverse flow for ≥ {h} of the simulation time' },
-      // ▶: share of the whole run reached so far (rises to the final value); Σ: share over the whole run
-      expr: (p, u) => { const R = `rptFlow < -${u.eps}`; const S = `100 * dur(${R}) / totdur(1)`; return `iif(${S} >= ${p.h}, 2, iif(${S} >= ${p.w}, 1, 0))`; },
-      whole: (p, u) => { const R = `rptFlow < -${u.eps}`; const S = `100 * totdur(${R}) / totdur(1)`; return `iif(${S} >= ${p.h}, 2, iif(${S} >= ${p.w}, 1, 0))`; } },
+      desc: 'Flow runs against the link direction (from the end node to the start node, i.e. negative flow) for a share of the time the link carries flow (time steps with zero flow are not counted).',
+      alg: 'Reverse flow ≥ {w} of the time with flow Warning; ≥ {h} High', P: { w: [5, '%', 5], h: [99, '%', 99] },
+      when: { 1: 'reverse flow for ≥ {w} of the time with flow', 2: 'reverse flow for ≥ {h} of the time with flow' },
+      // share = reverse-flow time / time with non-zero flow (|Q| > eps). ▶: share reached so far (rises to the final value); Σ: whole run
+      expr: (p, u) => { const R = `rptFlow < -${u.eps}`, F = `abs(rptFlow) > ${u.eps}`; const S = `iif(totdur(${F}) > 0, 100 * dur(${R}) / totdur(${F}), 0)`; return `iif(${S} >= ${p.h}, 2, iif(${S} >= ${p.w}, 1, 0))`; },
+      whole: (p, u) => { const R = `rptFlow < -${u.eps}`, F = `abs(rptFlow) > ${u.eps}`; const S = `iif(totdur(${F}) > 0, 100 * totdur(${R}) / totdur(${F}), 0)`; return `iif(${S} >= ${p.h}, 2, iif(${S} >= ${p.w}, 1, 0))`; } },
     { id: 'dry', name: 'Dry-weather high depth', layer: 'link', mode: 'play', levels: [1], where: "type = 'CONDUIT'",
       desc: 'Depth ratio above the threshold while there is no rainfall.', alg: 'No rain and d / D > {r} for ≥ {t} Warning', P: { r: [0.5, '', 0.5], t: [30, 'min', 30] },
       when: { 1: 'no rain and d / D > {r} for {t}' }, expr: (p) => `iif(run(sysRain = 0 and rptCapacity > ${p.r}) >= ${p.t}, 1, 0)` },
