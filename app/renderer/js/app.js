@@ -791,6 +791,12 @@
         sec('5. Results', ['The map is colored by max capacity (links) and max depth/full depth (nodes); change it in Thematic Rendering. Use Play to animate.', 'Plot: time series for any objects; Compare overlays a second run (dashed) to check before/after changes.', 'Profile: long section with ground, pipes, current and max HGL; select two nodes first.', 'Report and Nonconvergence Diagnostics read the status report; Results > Export writes CSV by time, variable or statistics, and shapefiles with results.'])),
         buttons: [{ label: 'Close', primary: true }] });
     }
+    async showNotices() {
+      const txt = (window.host.noticesText && await window.host.noticesText()) || 'The notices file was not found.';
+      const pre = h('pre', { class: 'notices' }, txt);
+      AV.modal({ title: 'Third-Party Notices', width: 760, body: h('div', null, h('div', { class: 'note', style: { marginBottom: '8px' } }, 'Avaris2 CS uses the open-source components listed below, each under its own licence.'), pre),
+        buttons: [{ label: 'Copy', onClick: () => { navigator.clipboard.writeText(txt).then(() => AV.toast('Notices copied.')); return false; } }, { label: 'Close', primary: true }] });
+    }
     shortcuts() {
       AV.alert(['Ctrl+N  New project', 'Ctrl+O  Open', 'Ctrl+S  Save', 'Ctrl+Z / Ctrl+Y  Undo / Redo', 'Ctrl+A  Select all', 'Ctrl+F  Find object', 'Del  Delete selection', 'Esc  Cancel / select tool', 'F5  Run simulation', 'Home  Zoom to all',
         'Space + drag / middle mouse  Pan', 'Mouse wheel  Zoom', 'Ctrl+click  Add to selection', 'Shift+click  Choose from overlapping objects (Default Settings)', 'Drag a selected node  Move it (Edit mode ON)', 'Backspace  Remove last vertex while drawing', 'Enter / double-click  Finish polygon'].join('\n'), 'Keyboard Shortcuts');
@@ -799,7 +805,7 @@
       const body = h('div', { style: { whiteSpace: 'pre-wrap', maxWidth: '560px', lineHeight: 1.5 } }, 'Avaris2 CS ' + this.info.version + (AV.LICENSING ? '\nEdition: ' + (this.license && this.license.valid ? AV.EDITIONS[this.license.edition] + ' — licensed to ' + this.license.licensee : 'Avaris2 CS 1D (unregistered)') : '') + '\n© 2026 OSEMTEC. All rights reserved.\n\nEngine: ' + this.engineVersion + '\n'
         + '  - user-set dynamic-wave under-relaxation (UNDER_RELAXATION option)\n  - OpenMP parallel node-depth solution with per-node convergence flags\n'
         + '  - extended "Most Frequent Nonconverging Nodes" list (NONCONV_REPORT_COUNT)\n  - 1D-2D surface flood module\n\nCPU threads available: ' + this.info.cpus);
-      AV.modal({ title: 'About Avaris2 CS', body, buttons: [{ label: 'Third-party notices', onClick: () => { window.host.openNotices && window.host.openNotices(); return false; } }, { label: 'OK', primary: true }] });
+      AV.modal({ title: 'About Avaris2 CS', body, buttons: [{ label: 'Third-party notices', onClick: () => { this.showNotices(); return false; } }, { label: 'OK', primary: true }] });
     }
     onKey(e) {
       const tag = (e.target.tagName || '').toLowerCase();

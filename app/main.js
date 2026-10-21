@@ -218,9 +218,14 @@ ipcMain.handle('app:prepareSample', async (e, name) => {
 });
 ipcMain.handle('app:settings:set', async (e, s) => { saveSettings(s); return true; });
 ipcMain.handle('app:openExternal', async (e, url) => { await shell.openExternal(url); return true; });
-ipcMain.handle('app:openNotices', async () => {
-  const c = [path.join(path.dirname(process.execPath), 'THIRD-PARTY-NOTICES.txt'), path.join(__dirname, '..', 'installer', 'THIRD-PARTY-NOTICES.txt')];
-  for (const f of c) if (fs.existsSync(f)) { await shell.openPath(f); return true; } return false;
+// third-party notices text for Help > About (installed file, or the repository copy plus the GDAL / PROJ licences in development)
+ipcMain.handle('app:noticesText', async () => {
+  const inst = path.join(path.dirname(process.execPath), 'THIRD-PARTY-NOTICES.txt');
+  try { if (fs.existsSync(inst)) return fs.readFileSync(inst, 'utf8'); } catch (e) { }
+  try {
+    const rd = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (e) { return ''; } };
+    return rd(path.join(__dirname, '..', 'installer', 'THIRD-PARTY-NOTICES.txt')) + '\n\nGDAL LICENCE\n============\n\n' + rd(path.join(__dirname, 'gdal', 'win', 'GDAL-LICENSE.txt')) + '\n\nPROJ LICENCE\n============\n\n' + rd(path.join(__dirname, 'gdal', 'win', 'PROJ-LICENSE.txt'));
+  } catch (e) { return ''; }
 });
 ipcMain.handle('app:showItem', async (e, p) => { shell.showItemInFolder(p); return true; });
 ipcMain.on('app:close-confirmed', () => { forceClose = true; if (win) win.close(); });

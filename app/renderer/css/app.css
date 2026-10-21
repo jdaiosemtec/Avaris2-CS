@@ -889,3 +889,5 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .flfields { border: 1px solid var(--border); border-radius: 4px; height: 300px; overflow: auto; font-size: 12px; margin-top: 4px; }
 .flfields div { padding: 1px 8px; cursor: pointer; font-family: var(--mono); } .flfields div:hover { background: var(--accent2); } .flfields .g { font-family: inherit; font-weight: 600; color: var(--muted); background: #fafbfc; cursor: default; }
 .mono { font-family: var(--mono); }
+
+.notices { max-height: 62vh; overflow: auto; margin: 0; padding: 10px 12px; background: #f6f8fa; border: 1px solid var(--border); border-radius: 4px; font: 12px/1.45 Consolas, 'Cascadia Mono', monospace; white-space: pre-wrap; }

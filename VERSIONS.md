@@ -38,3 +38,4 @@ Rules
 - v2.1.1 — Help ▸ About names the engine "Avaris Engine"; Parameter View ▸ Options ▸ Reporting opens the Reporting Options (which objects / tables go into the status report). User guide (HTML) for osemtec.com.
 - v2.1.2 — Basemap tile cache on disk (<userData>/tiles, refreshed after 30 days, used when offline); Basemap ▸ Download for Offline Use… saves the tiles of the model area up to a chosen zoom.
 - v2.1.2 (cont.) — Help ▸ About: neutral engine name ("Avaris hydraulic engine"), copyright line and a Third-party notices button; THIRD-PARTY-NOTICES.txt installed (Electron, Chromium, GDAL, PROJ, LLVM OpenMP, basemap data); licence text updated.
+- v2.1.3 — Help ▸ About ▸ Third-party notices opens an in-app dialog (scrollable, Copy) instead of a text file. User guide: 2D chapter uses the 917C model (full mesh) with auto-themed depth ranges.
