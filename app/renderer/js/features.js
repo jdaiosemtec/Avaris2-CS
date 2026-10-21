@@ -1,4 +1,4 @@
-// OsemCM features: map-synced floating tools, groups, scenarios, summary, converters, editing helpers
+// Avaris2 features: map-synced floating tools, groups, scenarios, summary, converters, editing helpers
 'use strict';
 (function (AV) {
   const h = AV.h;
@@ -62,7 +62,7 @@
       pre.scrollTop = 1e9; return p;
     }
     notAvailable(name, what) {
-      AV.alert(name + ' is not available in this version of OsemCM.\n\nOsemCM currently runs 1D network (SWMM-engine) simulations. ' + what.charAt(0).toUpperCase() + what.slice(1) + ' will be added in a later release; until then use Avaris DS for this step.', name);
+      AV.alert(name + ' is not available in this version of Avaris2.\n\nAvaris2 currently runs 1D network (SWMM-engine) simulations. ' + what.charAt(0).toUpperCase() + what.slice(1) + ' will be added in a later release; until then use Avaris DS for this step.', name);
     }
 
     // ================================================================ picking helper
@@ -362,36 +362,59 @@
     }
     async createGroup() {
       const sel = [...this.app.selection].filter(o => o.kind !== 'GAGE' && o.kind !== 'LABEL');
-      if (!sel.length) { AV.toast('Select the objects to put in the group first.', true); return; }
-      const name = await AV.prompt('Create Group', 'Group name (no spaces)', 'Group' + (this.groups().size + 1)); if (!name) return;
-      const nm = name.trim().replace(/\s+/g, '_');
+      if (!sel.length) { AV.toast('Select the objects on the map first (Select tool, click or box), then click Create Group.', true); return null; }
+      let n = 1; while (this.groups().has('Group' + n)) n++;
+      const name = await AV.prompt('Create Group', 'Group name (' + sel.length + ' selected object' + (sel.length > 1 ? 's' : '') + ')', 'Group' + n); if (!name) return null;
+      const nm = name.trim().replace(/\s+/g, '_'); if (!nm) return null;
+      if (this.groups().has(nm) && !await AV.confirm('Group ' + nm + ' already exists. Add the selected objects to it?', 'Create Group', 'Add', 'Cancel')) return null;
       this.writeGroups('Create group ' + nm, (g) => { if (!g.has(nm)) g.set(nm, new Set()); for (const o of sel) g.get(nm).add(this.keyOf(o)); });
-      AV.toast('Group ' + nm + ' created with ' + sel.length + ' object(s).');
+      AV.toast('Group ' + nm + ': ' + sel.length + ' object(s) added.');
+      return nm;
     }
+    // Manage Groups: group table on the left, actions grouped by purpose on the right
     manageGroups() {
       const app = this.app; let cur = null;
-      const list = h('div', { class: 'list-box', style: { height: 'auto', flex: 1, minHeight: '120px' } });
-      const info = h('div', { class: 'note', style: { padding: '4px 0', color: 'var(--muted)' } });
+      const SV = (d) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('class', 'gico'); s.innerHTML = d; return s; };
+      const IC = { add: '<path d="M8 3v10M3 8h10"/>', ren: '<path d="M3 13l1-3 7-7 2 2-7 7z"/>', del: '<path d="M3 4h10M6 4V2.5h4V4M4.5 4l.7 9.5h5.6l.7-9.5"/>', sel: '<path d="M4 2.5l8 5.5-3.6.8 2 3.7-1.6.8-2-3.7L4 12z"/>', zoom: '<circle cx="7" cy="7" r="4"/><path d="M10 10l3.5 3.5"/>', plus: '<rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M8 5.5v5M5.5 8h5"/>', minus: '<rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M5.5 8h5"/>' };
+      const tbody = h('tbody');
+      const tbl = h('table', { class: 'grptbl' }, h('thead', null, h('tr', null, h('th', null, 'Group'), h('th', { class: 'n' }, 'Nodes'), h('th', { class: 'n' }, 'Links'), h('th', { class: 'n' }, 'Subcatch.'), h('th', { class: 'n' }, 'Total'))), tbody);
+      const info = h('div', { class: 'grpinfo' });
       const objs = (name) => [...(this.groups().get(name) || [])].map(k => this.objFromKey(k)).filter(Boolean);
+      const selCount = () => [...app.selection].filter(o => o.kind !== 'GAGE' && o.kind !== 'LABEL').length;
+      const needGroup = [], needSel = [];
+      const btn = (ic, label, fn, tip) => h('button', { class: 'btn grpbtn', title: tip || label, onclick: fn }, SV(IC[ic]), h('span', null, label));
       const refresh = () => {
-        list.innerHTML = '';
-        for (const [name, set] of this.groups()) list.appendChild(h('div', { class: name === cur ? 'sel' : '', onclick: () => { cur = name; refresh(); }, ondblclick: () => { cur = name; app.selectMany(objs(name)); app.map.zoomToObjects(objs(name)); } }, name + '  (' + set.size + ')'));
-        if (!this.groups().size) list.appendChild(h('div', { style: { color: 'var(--muted)' } }, 'No groups. Select objects and use Group > Create.'));
-        info.textContent = cur ? 'Group ' + cur + ': ' + (this.groups().get(cur) || new Set()).size + ' objects' : 'Double-click a group to select and zoom to it.';
+        const G = this.groups(); if (cur && !G.has(cur)) cur = null;
+        tbody.innerHTML = '';
+        for (const [name, set] of G) {
+          const c = { NODE: 0, LINK: 0, SUBCATCH: 0 }; for (const k of set) { const t = k.slice(0, k.indexOf(':')); c[t] = (c[t] || 0) + 1; }
+          const tr = h('tr', { class: name === cur ? 'sel' : '', onclick: () => { cur = name; refresh(); }, ondblclick: () => { cur = name; app.selectMany(objs(name)); app.map.zoomToObjects(objs(name)); refresh(); } },
+            h('td', null, name), h('td', { class: 'n' }, String(c.NODE || '')), h('td', { class: 'n' }, String(c.LINK || '')), h('td', { class: 'n' }, String(c.SUBCATCH || '')), h('td', { class: 'n' }, h('b', null, String(set.size))));
+          tbody.appendChild(tr);
+        }
+        if (!G.size) tbody.appendChild(h('tr', null, h('td', { colspan: 5, class: 'empty' }, 'No groups yet. Select objects on the map, then click Create Group.')));
+        const ns = selCount();
+        info.innerHTML = ''; info.append(h('span', null, cur ? 'Group ' : 'No group chosen', cur ? h('b', null, cur) : null), h('span', null, 'Map selection: ', h('b', null, String(ns)), ' object' + (ns === 1 ? '' : 's')));
+        needGroup.forEach(b => b.disabled = !cur); needSel.forEach(b => b.disabled = !cur || !ns);
       };
       this.grpRefresh = refresh;
-      const B = (l, fn) => h('button', { class: 'btn small', onclick: () => { if (!cur && l !== 'New from Selection') { AV.toast('Pick a group first.'); return; } fn(); } }, l);
-      const body = h('div', { style: { padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minHeight: 0 } }, list, info,
-        h('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap' } },
-          B('Select', () => app.selectMany(objs(cur))), B('Zoom To', () => app.map.zoomToObjects(objs(cur))),
-          B('Add Selection', () => this.writeGroups('Add to group', (g) => { for (const o of app.selection) if (o.kind !== 'GAGE' && o.kind !== 'LABEL') g.get(cur).add(this.keyOf(o)); })),
-          B('Remove Selection', () => this.writeGroups('Remove from group', (g) => { for (const o of app.selection) g.get(cur).delete(this.keyOf(o)); })),
-          B('Rename', async () => { const n = await AV.prompt('Rename Group', 'New name', cur); if (!n) return; const nm = n.trim().replace(/\s+/g, '_'); this.writeGroups('Rename group', (g) => { const s = g.get(cur); g.delete(cur); g.set(nm, s); }); cur = nm; refresh(); }),
-          B('Delete', async () => { if (await AV.confirm('Delete group ' + cur + '? (objects are not deleted)')) { this.writeGroups('Delete group', (g) => g.delete(cur)); cur = null; refresh(); } }),
-          B('New from Selection', () => this.createGroup())),
-        h('div', { class: 'note', style: { color: 'var(--muted)', fontSize: '11px' } }, 'Groups are saved in the [GROUPS] section of the .inp file, compatible with Avaris DS.'));
-      AV.floatPanel({ id: 'groups', title: 'Manage Groups', w: 420, h: 380, body, onClose: () => { this.grpRefresh = null; } });
+      const bCreate = btn('add', 'Create Group...', async () => { const nm = await this.createGroup(); if (nm) { cur = nm; refresh(); } }, 'Create a group from the objects selected on the map');
+      bCreate.classList.add('primary');
+      const bRen = btn('ren', 'Rename...', async () => { const n = await AV.prompt('Rename Group', 'New name', cur); if (!n) return; const nm = n.trim().replace(/\s+/g, '_'); if (!nm || nm === cur) return; if (this.groups().has(nm)) { AV.toast('Group ' + nm + ' already exists.', true); return; } const old = cur; this.writeGroups('Rename group', (g) => { const s = g.get(old); g.delete(old); g.set(nm, s); }); cur = nm; refresh(); });
+      const bDel = btn('del', 'Delete', async () => { if (await AV.confirm('Delete group ' + cur + '? The objects themselves are not deleted.', 'Manage Groups', 'Delete')) { this.writeGroups('Delete group', (g) => g.delete(cur)); cur = null; refresh(); } });
+      const bSel = btn('sel', 'Select on Map', () => { app.selectMany(objs(cur)); refresh(); }), bZoom = btn('zoom', 'Zoom To', () => app.map.zoomToObjects(objs(cur)));
+      const bAdd = btn('plus', 'Add Selection', () => { this.writeGroups('Add to group', (g) => { for (const o of app.selection) if (o.kind !== 'GAGE' && o.kind !== 'LABEL') g.get(cur).add(this.keyOf(o)); }); refresh(); }, 'Add the objects selected on the map to this group');
+      const bRem = btn('minus', 'Remove Selection', () => { this.writeGroups('Remove from group', (g) => { for (const o of app.selection) g.get(cur).delete(this.keyOf(o)); }); refresh(); }, 'Remove the objects selected on the map from this group');
+      needGroup.push(bRen, bDel, bSel, bZoom); needSel.push(bAdd, bRem);
+      const sec = (title, ...b) => h('div', { class: 'grpsec' }, h('div', { class: 'grpsh' }, title), ...b);
+      const body = h('div', { class: 'grpdlg' },
+        h('div', { class: 'grpleft' }, h('div', { class: 'grptblw' }, tbl), info),
+        h('div', { class: 'grpright' }, sec('Group', bCreate, bRen, bDel), sec('Show', bSel, bZoom), sec('Members', bAdd, bRem)),
+        h('div', { class: 'grpfoot' }, 'Double-click a group to select and zoom to it. Groups are saved in the [GROUPS] section of the .inp file (Avaris DS compatible).'));
+      const p = AV.floatPanel({ id: 'groups', title: 'Manage Groups', w: 560, h: 400, body, onClose: () => { this.grpRefresh = null; clearInterval(tm); } });
+      const tm = setInterval(() => { if (this.grpRefresh) { const ns = selCount(); if (ns !== this._grpLastSel) { this._grpLastSel = ns; refresh(); } } }, 700);
       refresh();
+      return p;
     }
     manageBookmarks() {
       const app = this.app; const bm = app.settings.bookmarks || (app.settings.bookmarks = []);

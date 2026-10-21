@@ -1,6 +1,6 @@
 // Copy the selected objects (with their inflows, RDII, groundwater, LID usage ... and the curves / time series /
 // patterns they use) and paste them into this or another model. The clipboard lives in memory and in
-// localStorage, so it survives opening another model and is shared by OsemCM windows.
+// localStorage, so it survives opening another model and is shared by Avaris2 windows.
 'use strict';
 (function (AV) {
   const KEY = 'osemcm.clipboard.v1';
@@ -14,7 +14,7 @@
   const plain = (o) => { const c = { id: o.id, kind: o.kind, type: o.type, p: clone(o.p), tag: o.tag || '' }; if (o.desc) c.desc = o.desc;
     if (o.kind === 'NODE' || o.kind === 'GAGE') { c.x = o.x; c.y = o.y; } if (o.kind === 'LINK') { c.from = o.from; c.to = o.to; c.verts = clone(o.verts || []); } if (o.kind === 'SUBCATCH') c.poly = clone(o.poly || []); return c; };
 
-  // the clipboard is also written to a file in the user data folder so it reaches other OsemCM windows / processes
+  // the clipboard is also written to a file in the user data folder so it reaches other Avaris2 windows / processes
   const clipFile = async () => { try { const P = await window.host.paths(); const d = P.userData || P.home; return d ? d.replace(/[\\/]+$/, '') + '/osemcm-clipboard.json' : null; } catch (e) { return null; } };
   AV.hasClip = () => { if (AV._clip) return true; try { return !!localStorage.getItem(KEY); } catch (e) { return false; } };
   const getClip = async () => { if (AV._clip) return AV._clip; try { const s = localStorage.getItem(KEY); if (s) return JSON.parse(s); } catch (e) { /* fall through */ }

@@ -10,7 +10,7 @@
   // ------------------------------------------------------------------ field catalogue
   const camel = (s) => s.replace(/\(.*?\)/g, '').replace(/[^A-Za-z0-9]+(.)?/g, (m, c) => c ? c.toUpperCase() : '').replace(/^./, c => c.toLowerCase());
   // field names follow Avaris DS where they exist (rimElev, roughness, inOffset, rptMaxFlow, rptMfFlow ...);
-  // the older OsemCM names stay valid as aliases
+  // the older Avaris2 names stay valid as aliases
   const RENAME = { rough: 'roughness', inOff: 'inOffset', outOff: 'outOffset', elev: 'elev', g1: 'geom1', g2: 'geom2', g3: 'geom3', g4: 'geom4' };
   const NODE_LABEL = { elev: 'Chamber Floor Elev.', maxDepth: 'Chamber Depth', rimElev: 'Rim Elev.', rptFreeboard: 'Min. Freeboard', rptMaxDepth: 'Max. Depth', rptMaxHgl: 'Max. HGL',
     rptMaxLatInflow: 'Max. Lateral Inflow', rptMaxTotInflow: 'Max. Total Inflow', rptMaxFlooding: 'Max. Flood Rate', rptMaxVolume: 'Max. Volume', rptDepthRatio: 'Max. Depth / Chamber Depth' };

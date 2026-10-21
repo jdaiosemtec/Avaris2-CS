@@ -1,8 +1,8 @@
 {
   "name": "osemcm",
-  "productName": "OsemCM",
-  "version": "2.0.9",
-  "description": "OsemCM - urban drainage hydraulic modeling (Avaris DS / EPA SWMM compatible)",
+  "productName": "Avaris2",
+  "version": "2.0.10",
+  "description": "Avaris2 - urban drainage hydraulic modeling with 1D-2D flood simulation (Avaris DS / EPA SWMM compatible)",
   "main": "main.js",
   "author": "OSEMTEC",
   "license": "Proprietary"

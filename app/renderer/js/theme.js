@@ -191,7 +191,7 @@
     }
     // ---------- persistence
     toJSON() { return JSON.stringify({ osemcmTheme: 1, layers: this.layers }, null, 1); }
-    fromJSON(txt) { const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an OsemCM theme file'); for (const k of ['node', 'link', 'sub']) if (j.layers[k]) this.layers[k] = j.layers[k]; this.invalidate(); this.app.map.redraw(); }
+    fromJSON(txt) { const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 theme file'); for (const k of ['node', 'link', 'sub']) if (j.layers[k]) this.layers[k] = j.layers[k]; this.invalidate(); this.app.map.redraw(); }
 
     // ================================================================ Layer Theme Editor dialog
     async dialog(focusLayer) {
@@ -297,8 +297,8 @@
       render();
       const r = await AV.modal({
         title: 'Layer Theme Editor', body, width: 940, enterSubmits: false, buttons: [
-          { label: 'Load...', onClick: async () => { const p = await window.host.openDialog({ filters: [{ name: 'OsemCM theme', extensions: ['json'] }] }); if (p) { try { this.fromJSON(await window.host.readText(p)); render(); } catch (e) { AV.alert(e.message); } } return false; } },
-          { label: 'Save...', onClick: async () => { await AV.downloadText(this.toJSON(), 'theme.json', [{ name: 'OsemCM theme', extensions: ['json'] }]); return false; } },
+          { label: 'Load...', onClick: async () => { const p = await window.host.openDialog({ filters: [{ name: 'Avaris2 theme', extensions: ['json'] }] }); if (p) { try { this.fromJSON(await window.host.readText(p)); render(); } catch (e) { AV.alert(e.message); } } return false; } },
+          { label: 'Save...', onClick: async () => { await AV.downloadText(this.toJSON(), 'theme.json', [{ name: 'Avaris2 theme', extensions: ['json'] }]); return false; } },
           { label: 'Cancel', value: 'cancel' }, { label: 'Apply', onClick: () => { render(); return false; } }, { label: 'OK', primary: true, value: 'ok' }]
       }).done;
       if (r !== 'ok') { this.layers = JSON.parse(snapshot); }

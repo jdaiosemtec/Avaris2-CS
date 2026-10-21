@@ -24,7 +24,7 @@
       this.host.append(h('div', { class: 'ptitle' }, h('span', null, 'Catalog')),
         h('div', { class: 'catbar' }, h('button', { class: 'btn small', title: 'Up one folder', onclick: () => this.up() }, '↑'), h('button', { class: 'btn small', title: 'Refresh', onclick: () => this.go(this.dir) }, '⟳'), fav,
           h('button', { class: 'btn small', title: 'Choose files to add', onclick: () => this.browse() }, 'Add Data…'), h('button', { class: 'btn small', title: 'New drawing layer', onclick: () => this.app.feat.newLayer() }, 'New Layer')),
-        h('div', { class: 'catbar' }, this.pathIn), h('div', { class: 'catbar' }, this.filter, h('label', { title: 'Show only folders and files OsemCM can add' }, this.onlyData, ' GIS data only')),
+        h('div', { class: 'catbar' }, this.pathIn), h('div', { class: 'catbar' }, this.filter, h('label', { title: 'Show only folders and files Avaris2 can add' }, this.onlyData, ' GIS data only')),
         this.list);
       // drop files from Windows Explorer anywhere on the catalog or the map
       const dropT = [this.list, AV.$('#mapWrap')];

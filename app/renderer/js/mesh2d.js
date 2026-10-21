@@ -1,4 +1,4 @@
-// OsemCM V2.0 - 2D surface flood module (Avaris DS compatible approach)
+// Avaris2 V2.0 - 2D surface flood module (Avaris DS compatible approach)
 //
 // The ground surface inside a boundary polygon is covered by a square grid (cell size = boundary attribute "length").
 // Every cell becomes a SWMM junction at the DEM elevation of its centre; neighbouring cells are joined by wide open
@@ -106,7 +106,7 @@
     const rs = parseFloat(f.ROUTING_STEP); const run = AV.f2dRun(m);
     for (const ln of lines) {
       const t = ln.trim();
-      if (t.startsWith('[')) { sec = t.slice(1, t.indexOf(']')).toUpperCase(); out.push(ln); if (add[sec]) { seen.add(sec); out.push(';;OsemCM 2D surface elements'); out.push(...add[sec]); } continue; }
+      if (t.startsWith('[')) { sec = t.slice(1, t.indexOf(']')).toUpperCase(); out.push(ln); if (add[sec]) { seen.add(sec); out.push(';;Avaris2 2D surface elements'); out.push(...add[sec]); } continue; }
       if (sec === 'OPTIONS' && /^ROUTING_STEP\b/i.test(t) && rs > 0) { out.push(pad(['ROUTING_STEP', rs])); continue; }
       if ((sec === 'JUNCTIONS' || sec === 'STORAGE') && t && t[0] !== ';') { const k = AV.tokenize(t); const d = deepen.get(k[0]); if (d !== undefined && k.length >= 3 && !(+k[2] >= d)) { k[2] = String(d); out.push(pad(k)); continue; } }
       out.push(ln);

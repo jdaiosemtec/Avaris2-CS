@@ -88,7 +88,7 @@ window.AV = window.AV || {};
     setTimeout(() => { const f = body.querySelector('input,select,textarea'); if (f && opts.autofocus !== false) f.focus(); }, 30);
     return { el: box, body, close, done };
   };
-  AV.alert = (msg, title) => AV.modal({ title: title || 'OsemCM', body: h('div', { style: { whiteSpace: 'pre-wrap', maxWidth: '560px', lineHeight: 1.5 } }, msg), buttons: [{ label: 'OK', primary: true, value: true }] }).done;
+  AV.alert = (msg, title) => AV.modal({ title: title || 'Avaris2', body: h('div', { style: { whiteSpace: 'pre-wrap', maxWidth: '560px', lineHeight: 1.5 } }, msg), buttons: [{ label: 'OK', primary: true, value: true }] }).done;
   AV.confirm = (msg, title, yes = 'OK', no = 'Cancel') => AV.modal({ title: title || 'Confirm', body: h('div', { style: { whiteSpace: 'pre-wrap', maxWidth: '520px', lineHeight: 1.5 } }, msg), buttons: [{ label: no, value: false }, { label: yes, primary: true, value: true }] }).done.then(v => !!v);
   AV.prompt = (title, label, value) => {
     const inp = h('input', { type: 'text', value: value || '', style: { width: '320px' } });

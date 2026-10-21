@@ -375,7 +375,7 @@ window.AV = window.AV || {};
       }
       // ---- placeholder coordinates for objects without any
       m._fillMissingCoords();
-      // OsemCM extensions (comment lines, ignored by SWMM / Avaris DS)
+      // Avaris2 extensions (comment lines, ignored by SWMM / Avaris DS)
       for (const n of m.nodes.values()) if ((n.type === 'JUNCTION' || n.type === 'DIVIDER') && n.p.chamberArea === undefined) n.p.chamberArea = 0;
       for (const sc of m.subcatchments.values()) if (sc.p.impCoef === undefined) sc.p.impCoef = 1;
       for (const [key, id, v] of ext) {
@@ -580,7 +580,7 @@ window.AV = window.AV || {};
                 for (const r of ts.rows) W(pad(name, 17) + pad(r[0] || '', 11) + pad(r[1], 11) + fmt(r[2]));
                 W(';');
               }
-              for (const [name, cv] of rainConv) { const ts = this.timeseries.get(name); if (!ts || ts.file) continue; W(';OsemCM: ' + name + ' converted to ' + projRU);
+              for (const [name, cv] of rainConv) { const ts = this.timeseries.get(name); if (!ts || ts.file) continue; W(';Avaris2: ' + name + ' converted to ' + projRU);
                 for (const r of ts.rows) W(pad(cv.name, 17) + pad(r[0] || '', 11) + pad(r[1], 11) + fmt(+(+r[2] * cv.f).toPrecision(8))); W(';'); }
               W('');
             }
@@ -621,15 +621,15 @@ window.AV = window.AV || {};
         }
       }
       for (const sec of this.rawOrder) if (!SECTION_ORDER.includes(sec)) rawSec(sec);
-      // OsemCM extensions as comment lines: EPA SWMM and Avaris DS ignore them, the OsemCM engine reads them
+      // Avaris2 extensions as comment lines: EPA SWMM and Avaris DS ignore them, the Avaris2 engine reads them
       const ext = [];
       for (const n of this.nodes.values()) if (+n.p.chamberArea > 0) ext.push(';;@OSEM CHAMBER ' + n.id + ' ' + (+n.p.chamberArea));
       for (const g of this.gages.values()) { const u = String(g.p.tsUnits || '').toUpperCase(); if (g.p.source !== 'FILE' && (u === 'IN' || u === 'MM') && u !== (this.isSI ? 'MM' : 'IN')) ext.push(';;@OSEM RAINUNITS ' + g.id + ' ' + u); }
       for (const sc of this.subcatchments.values()) if (sc.p.impCoef !== undefined && sc.p.impCoef !== '' && +sc.p.impCoef !== 1 && isFinite(+sc.p.impCoef)) ext.push(';;@OSEM IMPCOEF ' + sc.id + ' ' + Math.max(0, Math.min(1, +sc.p.impCoef)));
-      if (ext.length) { W(';;OsemCM extensions (chamber area, impervious runoff coefficient) - ignored by EPA SWMM / Avaris DS'); for (const l of ext) W(l); W(''); }
-      // OsemCM V2.0 2D flood settings (paths relative to the model folder when possible)
+      if (ext.length) { W(';;Avaris2 extensions (chamber area, impervious runoff coefficient) - ignored by EPA SWMM / Avaris DS'); for (const l of ext) W(l); W(''); }
+      // Avaris2 V2.0 2D flood settings (paths relative to the model folder when possible)
       if (this.osem2d && Object.keys(this.osem2d).some(k => this.osem2d[k] !== '' && this.osem2d[k] !== undefined)) {
-        W(';;OsemCM 2D flood module settings - ignored by EPA SWMM / Avaris DS');
+        W(';;Avaris2 2D flood module settings - ignored by EPA SWMM / Avaris DS');
         for (const k of Object.keys(this.osem2d)) { const v = this.osem2d[k]; if (v !== '' && v !== undefined && v !== null) W(';;@OSEM2D ' + k + ' ' + v); }
         W('');
       }

@@ -34,9 +34,7 @@
           { name: 'Selection', items: [
             { id: 'select', label: 'Select', img: 'select', mode: 'select' },
             { id: 'search', label: 'Search', img: 'search', fn: () => T().find() },
-            { small: [
-              { id: 'gc', label: 'Create Group', img: 'grpcreate', fn: () => F().createGroup() },
-              { id: 'gm', label: 'Manage Groups', img: 'grpmanage', fn: () => F().manageGroups() }] }] },
+            { id: 'gm', label: 'Groups', img: 'grpmanage', fn: () => F().manageGroups(), tip: 'Manage Groups: create groups from the map selection, select / zoom to, add or remove members' }] },
           { name: 'Edit', items: [
             { id: 'add', label: 'Add', img: 'add', fn: () => this.toggleAddMode(), active: () => !!this.addMode, tip: 'Add objects: click Add, then click a layer in the Layer View (Junctions, Conduits, Subcatchments ...), then click on the map' },
             { id: 'remove', label: 'Remove', img: 'remove', fn: () => this.deleteSelection(), tip: 'Delete selected objects (Del)' },
@@ -86,10 +84,10 @@
             { id: 'play', label: 'Play', img: 'play', fn: () => S().togglePlaybar(), active: () => !!this.playMode, tip: 'Play mode: animate the results over time (click again to leave play mode)' },
             { id: 'profile', label: 'Profile', img: 'profile', fn: () => F().profileTool() },
             { id: 'plot', label: 'Plot', img: 'plot', fn: () => F().graphTool() },
+            { id: 'comparison', label: 'Comparison', img: 'summary', fn: () => this.toggleComparison(), active: () => this.views && this.views.has('cmp'), tip: 'Open / close the Scenario Comparison window' },
             { small: [
               { id: 'report', label: 'Report', img: 'report', fn: () => S().showReport() },
-              { id: 'conv2', label: 'Convergence', img: 'convergence', fn: () => S().convergenceDiagnostics(), tip: 'Nonconvergence diagnostics' },
-              { id: 'comparison', label: 'Comparison', img: 'summary', fn: () => this.toggleComparison(), active: () => this.views && this.views.has('cmp'), tip: 'Open / close the Scenario Comparison window' }] }] },
+              { id: 'conv2', label: 'Convergence', img: 'convergence', fn: () => S().convergenceDiagnostics(), tip: 'Nonconvergence diagnostics' }] }] },
         ]
       },
       {
@@ -121,7 +119,7 @@
       const icon = it.img ? h('img', { src: IMG(it.img), draggable: 'false' }) : h('span', { class: 'svgi' }, AV.icon(it.svg || 'select'));
       const b = h('button', { class: (small ? 'rsmall' : 'rbig') + (it.hero ? ' hero' : ''), title: typeof it.tip === 'function' ? '' : (it.tip || it.label) }, icon, h('span', { class: 'rl' }, it.label, it.caret ? h('span', { class: 'rcar' }, ' ▾') : null));
       if (it.badge && !small) b.appendChild(h('span', { class: 'rbadge' }, it.badge));
-      if (it.lic) b.appendChild(h('span', { class: 'rlock', title: 'Requires an OsemCM 1D-2D licence' }, '🔒'));
+      if (it.lic) b.appendChild(h('span', { class: 'rlock', title: 'Requires an Avaris2 1D-2D licence' }, '🔒'));
       b.addEventListener('click', (e) => {
         if (it.lic === '2D' && !AV.has2D(this)) { AV.need2D(this, it.label); return; }
         if (it.menu) { const r = b.getBoundingClientRect(); this.contextMenu(r.left, r.bottom + 2, it.menu()); return; }
@@ -147,7 +145,7 @@
       tabs.appendChild(t);
     });
     tabs.appendChild(h('div', { style: { flex: 1 } }));
-    tabs.appendChild(h('div', { class: 'rtitle', id: 'rtitle' }, 'OsemCM'));
+    tabs.appendChild(h('div', { class: 'rtitle', id: 'rtitle' }, 'Avaris2'));
   };
   AV.App.prototype.refreshRibbon = function () {
     if (!this.ribbonButtons) return;

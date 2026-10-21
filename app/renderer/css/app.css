@@ -768,3 +768,26 @@ svg.dsch { width: 100%; height: 250px; display: block; user-select: none; } svg.
 .dsgrid td.bad { background: #ffebee !important; } .dsgrid td.bad input { color: #c62828; font-weight: 600; } .dsgrid tr.ro td.bad { color: #c62828; }
 .dsval { padding: 4px 9px 6px; font-size: 12px; } .dsval.ok { color: #2e7d32; } .dsval.warn { color: #b26a00; } .dsval.err { color: #c62828; }
 .rbig .svgi { display: flex; align-items: flex-start; justify-content: center; height: 38px; } .rbig .svgi svg { margin: 2px 0 0; }
+/* ===== Manage Groups (v2.0.10) ===== */
+.grpdlg { display: grid; grid-template-columns: 1fr 160px; grid-template-rows: 1fr auto; gap: 8px 10px; padding: 10px; flex: 1; min-height: 0; }
+.grpleft { display: flex; flex-direction: column; min-height: 0; gap: 6px; }
+.grptblw { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border2); border-radius: 4px; background: #fff; }
+.grptbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.grptbl th { position: sticky; top: 0; background: var(--panel2); text-align: left; font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.grptbl td { padding: 3px 8px; border-bottom: 1px solid #f0f2f4; cursor: pointer; white-space: nowrap; }
+.grptbl .n { text-align: right; color: #455a64; width: 1%; }
+.grptbl tr:hover td { background: #f1f6fc; } .grptbl tr.sel td { background: #cfe3fb; }
+.grptbl td.empty { color: var(--muted); cursor: default; white-space: normal; padding: 14px 10px; }
+.grpinfo { display: flex; justify-content: space-between; font-size: 12px; color: #455a64; padding: 0 2px; }
+.grpright { display: flex; flex-direction: column; gap: 10px; }
+.grpsec { display: flex; flex-direction: column; gap: 4px; }
+.grpsh { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding-bottom: 2px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.grpbtn { display: flex; align-items: center; gap: 7px; width: 100%; justify-content: flex-start; padding: 4px 9px; font-size: 12.5px; }
+.grpbtn:disabled { opacity: .45; cursor: default; }
+.grpbtn svg.gico { width: 15px; height: 15px; flex: none; stroke: #1f6fb5; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.grpbtn.primary svg.gico { stroke: #fff; }
+.grpfoot { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
+/* normalized icons (64 px canvas, optically equal content) */
+.rbig img { width: 38px; height: 38px; margin-bottom: 2px; } .rbig.hero img { width: 42px; height: 42px; margin-bottom: 0; }
+.rbig .svgi { height: 40px; } .rbig .svgi svg { width: 30px; height: 30px; margin: 4px 0 0; }
+.rsmall img { width: 20px; height: 20px; }
