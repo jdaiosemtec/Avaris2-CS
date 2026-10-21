@@ -115,7 +115,7 @@
       const row = (label, input, key, title) => {
         const tr = tbl.appendChild(h('tr', { class: g1 ? 'sub' : '' }, h('td', { class: 'k', title: (title || label) + (key ? '\n(click to filter the change log by this variable)' : '') }, label), h('td', { class: 'v' }, input)));
         tr.dataset.g0 = g0 || ''; if (g1) tr.dataset.g1 = g1;
-        if (key) { tr.dataset.key = key; if (app.hist && app.hist.filterKey === key) tr.classList.add('logfilter'); tr.addEventListener('mousedown', () => { if (!app.hist) return; tr._was = app.hist.filterKey === key; if (!tr._was) app.hist.setFilter(key); }); tr.querySelector('td.k').addEventListener('click', () => { if (app.hist && tr._was) app.hist.setFilter(key); }); }
+        if (key) { tr.dataset.key = key; if (app.hist && app.hist.filterKey === key) tr.classList.add('logfilter'); tr.querySelector('td.k').addEventListener('click', () => { if (app.hist) app.hist.setFilter(key); }); }
         return tr; };
       // rows of AV.propLayout, opening / closing sub-groups as the 'sg' label changes
       const layout = (rows, objs) => { let sg = null;
@@ -128,6 +128,9 @@
     showProps() {
       const el = AV.$('#props'); const sc = el.parentElement ? el.parentElement.scrollTop : 0; el.innerHTML = '';
       const sel = [...this.app.selection];
+      // the change-log variable filter belongs to the object it was set on: drop it when another object is selected
+      const selKey = sel.map(o => o.kind + ':' + o.id).join('|');
+      if (selKey !== this._selKey) { this._selKey = selKey; const H = this.app.hist; if (H && H.filterKey) { H.filterKey = null; H.renderPanel && H.renderPanel(); } }
       AV.$('#propSub').textContent = sel.length > 1 ? sel.length + ' selected' : '';
       if (!sel.length) { el.appendChild(h('div', { class: 'empty' }, 'Select an object on the map', h('br'), 'or in an attribute table to view and edit its properties.')); this.modelSummary(el); return; }
       if (sel.length > 1) return this.multiProps(el, sel);
@@ -240,7 +243,7 @@
       el.appendChild(h('div', { class: 'phead' }, h('div', { class: 'pt' }, sel.length + ' objects selected'), keys.length > 1 ? h('div', { class: 'ps' }, 'Choose which type to edit:') : null, gsel));
       const objs = groups.get(this.multiKey) || [];
       const tbl = h('table', { class: 'pgrid' });
-      const addRow = (label, input, key) => { const tr = tbl.appendChild(h('tr', null, h('td', { class: 'k', title: label }, label), h('td', { class: 'v' }, input))); if (key) { tr.dataset.key = key; if (app.hist && app.hist.filterKey === key) tr.classList.add('logfilter'); tr.addEventListener('mousedown', () => { if (app.hist && app.hist.filterKey !== key) app.hist.setFilter(key); }); } return tr; };
+      const addRow = (label, input, key) => { const tr = tbl.appendChild(h('tr', null, h('td', { class: 'k', title: label }, label), h('td', { class: 'v' }, input))); if (key) { tr.dataset.key = key; if (app.hist && app.hist.filterKey === key) tr.classList.add('logfilter'); tr.querySelector('td.k').addEventListener('click', () => { if (app.hist) app.hist.setFilter(key); }); } return tr; };
       const ro = (t) => h('div', { class: 'ro mixed' }, t);
       addRow('Name', ro(objs.length > 1 ? '*Multiple Values' : objs[0].id));
       const tags = objs.map(o => o.tag || ''); const tagSame = tags.every(t => t === tags[0]);
