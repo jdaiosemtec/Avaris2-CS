@@ -452,7 +452,7 @@
       this.app.panels.refreshLayers(); this.app.map.redraw();
     }
     async exportLayer(L) {
-      const p = await window.host.saveDialog({ title: 'Export layer as shapefile', defaultPath: L.name + '.shp', filters: [{ name: 'Shapefile', extensions: ['shp'] }] }); if (!p) return;
+      const p = await window.host.saveDialog({ title: 'Export layer as shapefile', defaultPath: String(L.name).replace(/\.\w+$/, '') + '.shp', filters: [{ name: 'Shapefile', extensions: ['shp'] }] }); if (!p) return;
       const b = p.replace(/\.shp$/i, ''); const feats = L.features.map(f => ({ coords: f.coords, props: f.props }));
       const keys = Object.keys(feats.reduce((a, f) => Object.assign(a, f.props), {})); const fields = AV.SHP.fieldsFor(feats.map(f => f.props), keys.length ? keys : ['ID']);
       const w = AV.SHP.write(L.kind, feats, fields);

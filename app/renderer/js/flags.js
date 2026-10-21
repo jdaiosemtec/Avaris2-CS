@@ -51,11 +51,13 @@
     { id: 'highv', name: 'High velocity / scour risk', layer: 'link', mode: 'worst', levels: [1], where: "type = 'CONDUIT'",
       desc: 'Velocity exceeds the allowable limit for the pipe material or an erodible channel.', alg: 'Velocity > {v} Warning', P: { v: [10, 'ft/s', 3] },
       when: { 1: 'velocity > {v}' }, expr: (p) => `iif(abs(rptVel) > ${p.v}, 1, 0)` },
-    { id: 'rev', name: 'Reverse flow event', layer: 'link', mode: 'play', levels: [1, 2], where: "type = 'CONDUIT'",
-      desc: 'Flow runs against the link direction (as drawn) for one or more time steps.',
-      alg: 'Any reverse flow Warning; High if > {a} continuous or > {b} within {win}', P: { a: [5, 'min', 5], b: [10, 'min', 10], win: [60, 'min', 60] },
-      when: { 1: 'flow < 0', 2: 'reverse > {a} without a break, or > {b} within {win}' },
-      expr: (p, u) => { const R = `rptFlow < -${u.eps}`; return `iif(${R}, iif(run(${R}) > ${p.a} or win(${R}, ${p.win}) > ${p.b}, 2, 1), 0)`; } },
+    { id: 'rev', name: 'Reverse flow event', layer: 'link', mode: 'worst', levels: [1, 2], where: "type = 'CONDUIT'",
+      desc: 'Flow runs against the link direction (from the end node to the start node, i.e. negative flow) for a share of the simulation time.',
+      alg: 'Reverse flow ≥ {w} of the simulation time Warning; ≥ {h} High', P: { w: [5, '%', 5], h: [99, '%', 99] },
+      when: { 1: 'reverse flow for ≥ {w} of the simulation time', 2: 'reverse flow for ≥ {h} of the simulation time' },
+      // ▶: share of the whole run reached so far (rises to the final value); Σ: share over the whole run
+      expr: (p, u) => { const R = `rptFlow < -${u.eps}`; const S = `100 * dur(${R}) / totdur(1)`; return `iif(${S} >= ${p.h}, 2, iif(${S} >= ${p.w}, 1, 0))`; },
+      whole: (p, u) => { const R = `rptFlow < -${u.eps}`; const S = `100 * totdur(${R}) / totdur(1)`; return `iif(${S} >= ${p.h}, 2, iif(${S} >= ${p.w}, 1, 0))`; } },
     { id: 'dry', name: 'Dry-weather high depth', layer: 'link', mode: 'play', levels: [1], where: "type = 'CONDUIT'",
       desc: 'Depth ratio above the threshold while there is no rainfall.', alg: 'No rain and d / D > {r} for ≥ {t} Warning', P: { r: [0.5, '', 0.5], t: [30, 'min', 30] },
       when: { 1: 'no rain and d / D > {r} for {t}' }, expr: (p) => `iif(run(sysRain = 0 and rptCapacity > ${p.r}) >= ${p.t}, 1, 0)` },
@@ -91,9 +93,9 @@
     color(f, l) { const c = this.S.col[f.id]; if (c && c[l] !== undefined) return c[l]; return l === 0 ? LV[0][1] : LV[l][1]; }
     params(f) { const o = {}; for (const k in f.P) o[k] = this.val(f, k); return o; }
     text(f, s) { return String(s || '').replace(/\{(\w+)\}/g, (m, k) => f.P[k] ? this.val(f, k) + (this.unit(f, k) ? (this.unit(f, k) === '%' ? '%' : ' ' + this.unit(f, k)) : '') : m); }
-    expr(f) {
+    expr(f, whole) {
       const p = this.params(f); const sys = this.sys(); const u = { tol: sys === 'SI' ? 0.003 : 0.01, eps: sys === 'SI' ? 0.0001 : 0.001 };
-      if (!f.custom) return f.expr(p, u);
+      if (!f.custom) return whole && f.whole ? f.whole(p, u) : f.expr(p, u);
       const sub = (c) => String(c || '').replace(/\$(\w+)/g, (m, k) => p[k] !== undefined ? String(p[k]) : m);
       let e = '0'; for (const l of [1, 2, 3]) if (f.cond && f.cond[l]) e = `iif(${sub(f.cond[l])}, ${l}, ${e})`;
       return e;
@@ -103,10 +105,10 @@
     sub(layer) {
       const id = this.S.active[layer]; if (!id) return null; const f = this.def(id); if (!f) return null;
       const key = id + '|' + this.ver + '|' + this.sys() + '|' + this.mode(f); const c = this._subs[layer]; if (c && c.key === key) return c.t;
-      const ex = this.expr(f); const worst = this.mode(f) === 'worst';
+      const worst = this.mode(f) === 'worst'; const ex = worst && f.whole ? this.expr(f, true) : this.expr(f);
       const sz = { node: [null, 6, 8, 10], link: [null, 2.5, 3.5, 5], sub: [null, 1, 1, 1] }[layer];
       const ranges = [0].concat(f.levels).map(l => { const col = this.color(f, l); return { v: String(l), label: LV[l][0], color: col, size: l === 0 ? null : sz[l], show: true }; });
-      const t = { name: '⚑ ' + f.name, field: 'x:' + (worst ? 'peak(' + ex + ')' : ex), kind: 'individual', abs: false, nulls: false, enabled: true, legend: true, useColor: true, useSize: layer !== 'sub',
+      const t = { name: '⚑ ' + f.name, field: 'x:' + (worst && !f.whole ? 'peak(' + ex + ')' : ex), kind: 'individual', abs: false, nulls: false, enabled: true, legend: true, useColor: true, useSize: layer !== 'sub',
         method: 'linear', ranges, nullRow: { color: null, size: null, show: true }, where: f.where || '', flag: f.id, desc: f.desc };
       this._subs[layer] = { key, t }; return t;
     }

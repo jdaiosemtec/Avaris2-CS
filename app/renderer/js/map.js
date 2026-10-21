@@ -592,6 +592,12 @@
       }
       ctx.globalAlpha = op * fo; ctx.fillStyle = L.fill || 'rgba(144,164,174,.15)'; ctx.fill(polys, 'evenodd'); ctx.globalAlpha = op;
       ctx.stroke(polys); ctx.stroke(lines); ctx.fillStyle = L.stroke || '#607d8b'; ctx.fill(pts);
+      // features selected in the attribute table
+      if (L.sel && L.sel.size) {
+        const hp = new Path2D(), hl = new Path2D();
+        for (const f of L.sel) { if (f.type === 'point') { for (const p of f.coords) { const [x, y] = this.toScreen(p[0], p[1]); hp.moveTo(x + pr + 2, y); hp.arc(x, y, pr + 2, 0, 6.2832); } } else for (const part of f.coords) part.forEach((p, i) => { const [x, y] = this.toScreen(p[0], p[1]); i ? hl.lineTo(x, y) : hl.moveTo(x, y); if (f.type === 'polygon' && i === part.length - 1) hl.closePath(); }); }
+        ctx.globalAlpha = 1; ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = Math.max(3, (L.width || 1) + 2); ctx.lineJoin = 'round'; ctx.stroke(hl); ctx.fillStyle = '#00e5ff'; ctx.fill(hp); ctx.strokeStyle = '#006064'; ctx.lineWidth = 1; ctx.stroke(hp);
+      }
       ctx.restore();
     }
     drawTemp() {

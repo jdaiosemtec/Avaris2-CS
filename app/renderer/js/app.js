@@ -525,6 +525,7 @@
       const cnt = (t) => t === 'SUBCATCH' ? m.subcatchments.size : AV.NODE_TYPES.includes(t) ? [...m.nodes.values()].filter(n => n.type === t).length : [...m.links.values()].filter(l => l.type === t).length;
       const items = Object.keys(N).map(t => ({ label: N[t] + '  (' + cnt(t) + ')', fn: () => AV.openTable(this, t) }));
       if (this.mesh2d && AV.has2D(this)) items.push('-', { label: '2D Meshes  (' + this.mesh2d.cells.length + ')', fn: () => AV.meshTable(this) });
+      const ext = this.map.extLayers.filter(L => !L.raster && L.features); if (ext.length) items.push('-', ...ext.map(L => ({ label: L.name + '  (' + L.features.length + ')', fn: () => AV.openTable(this, AV.extTableId(L)) })));
       this.contextMenu(r.left, r.bottom + 2, items);
     }
     invertSelection() {

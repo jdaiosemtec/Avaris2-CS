@@ -202,8 +202,8 @@
       if (open.ext) map.extLayers.forEach((L, i) => {
         row(1, [sp(), chk(L.visible, v => L.visible = v), symBtn(null, L), h('span', { class: 'lname', title: L.path }, L.name), h('span', { class: 'lcnt' }, L.raster ? (L.w + '×' + L.h) : String(L.features.length))], {
           dbl: () => map.zoomToBox({ x1: L.bbox[0], y1: L.bbox[1], x2: L.bbox[2], y2: L.bbox[3] }),
-          menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox({ x1: L.bbox[0], y1: L.bbox[1], x2: L.bbox[2], y2: L.bbox[3] }) }, ZS(null), { label: 'Symbology...', fn: () => app.symPane.open({ ext: L }) },
-            L.editable ? { label: 'Draw Features', fn: () => app.feat.startDraw(L) } : null, L.editable ? { label: 'Export as Shapefile...', fn: () => app.feat.exportLayer(L) } : null,
+          menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox({ x1: L.bbox[0], y1: L.bbox[1], x2: L.bbox[2], y2: L.bbox[3] }) }, ZS(null), !L.raster ? { label: 'Attribute Table', fn: () => AV.openTable(app, AV.extTableId(L)) } : null, { label: 'Symbology...', fn: () => app.symPane.open({ ext: L }) },
+            L.editable ? { label: 'Draw Features', fn: () => app.feat.startDraw(L) } : null, !L.raster ? { label: 'Export as Shapefile...', fn: () => app.feat.exportLayer(L) } : null,
             !L.raster && L.features.length ? { label: 'Import into Network...', fn: () => app.tools.importNetwork(L.path) } : null,
             '-', { label: 'Move Up', fn: () => { if (i > 0) { map.extLayers.splice(i, 1); map.extLayers.splice(i - 1, 0, L); this.refreshLayers(); map.redraw(); } } },
             { label: 'Move Down', fn: () => { if (i < map.extLayers.length - 1) { map.extLayers.splice(i, 1); map.extLayers.splice(i + 1, 0, L); this.refreshLayers(); map.redraw(); } } },

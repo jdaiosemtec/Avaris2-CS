@@ -18,8 +18,24 @@
     if (app.meshResults && app.playMode) cols.push({ k: '_depth', l: 'Depth (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'depth')), num: true, ro: true, res: true }, { k: '_wse', l: 'Water Surface (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'wse')), num: true, ro: true, res: true });
     return { kind: 'MESH', cols, objs };
   }
+  // imported (external) vector layers: one row per feature, columns = the layer's attribute fields
+  AV.extTableId = (L) => L._tid || (L._tid = 'EXT' + (AV._extSeq = (AV._extSeq || 0) + 1));
+  AV.extLayerOf = (app, type) => app.map.extLayers.find(L => L._tid === type) || null;
+  function extRows(app, L) {
+    const objs = L ? L.features : [];
+    if (L) objs.forEach((f, i) => { f._fid = i + 1; if (!f.props) f.props = {}; });
+    const names = L ? (L.fields && L.fields.length ? L.fields.slice() : [...new Set(objs.flatMap(f => Object.keys(f.props)))]) : [];
+    const cols = [{ k: '_fid', l: 'FID', get: (f) => f._fid, num: true, ro: true }];
+    for (const n of names) {
+      let num = 0, any = 0; for (let i = 0; i < objs.length && any < 500; i++) { const v = objs[i].props[n]; if (v === null || v === undefined || v === '') continue; any++; if (typeof v === 'number' || (isFinite(+v) && String(v).trim() !== '')) num++; }
+      cols.push({ k: n, l: n, get: (f) => { const v = f.props[n]; return v === undefined || v === null ? '' : v; }, num: any > 0 && num === any, ext: true });
+    }
+    cols.push({ k: '_geom', l: 'Geometry', get: (f) => f.type, ro: true });
+    return { kind: 'EXT', cols, objs, layer: L };
+  }
   AV.tableRows = function (app, type) {
     if (type === 'MESH') return meshRows(app);
+    if (/^EXT/.test(type)) return extRows(app, AV.extLayerOf(app, type));
     const m = app.model; const kind = AV.NODE_TYPES.includes(type) ? 'NODE' : AV.LINK_TYPES.includes(type) ? 'LINK' : type;
     const coll = kind === 'NODE' ? m.nodes : kind === 'LINK' ? m.links : kind === 'SUBCATCH' ? m.subcatchments : m.gages;
     const objs = (kind === 'NODE' || kind === 'LINK') ? [...coll.values()].filter(o => o.type === type) : [...coll.values()];
@@ -44,15 +60,15 @@
     constructor(app, type) {
       this.app = app; this.type = type; this.sortCol = null; this.sortDir = 1; this.filter = ''; this.selOnly = false;
       this.el = h('div', { class: 'grid-wrap' });
-      this.typeSel = h('select', { onchange: () => { this.type = this.typeSel.value; this.sortCol = null; this.refresh(); } }, ALL_TYPES.concat(app.mesh2d ? ['MESH'] : []).map(t => h('option', { value: t }, t === 'MESH' ? '2D Meshes' : AV.TYPE_LABEL[t])));
-      this.typeSel.value = type;
+      this.typeSel = h('select', { onchange: () => { this.type = this.typeSel.value; this.sortCol = null; this.refresh(); } });
+      this.fillTypes(); this.typeSel.value = type;
       this.filterInp = h('input', { type: 'text', placeholder: 'Filter ID...', style: { width: '130px' }, oninput: AV.debounce(() => { this.filter = this.filterInp.value.toLowerCase(); this.refresh(); }, 200) });
       this.count = h('span', { style: { color: 'var(--muted)' } });
       const B = (label, fn, title) => h('button', { class: 'btn small', onclick: fn, title }, label);
       this.selOnlyChk = h('input', { type: 'checkbox', onchange: (e) => { this.selOnly = e.target.checked; this.refresh(); } });
       this.el.appendChild(h('div', { class: 'grid-tools' }, this.typeSel, this.filterInp,
         B('Select by Attribute...', () => this.selectByAttr()), B('Select All', () => this.selMany(this.rows.objs, false)), B('Invert', () => { const s = new Set(this.rows.objs.filter(o => !this.isSel(o))); this.selMany([...s]); }),
-        B('Clear', () => this.mesh() ? AV.meshClearSel(this.app) : this.app.clearSelection()), h('label', null, this.selOnlyChk, ' Selected only'),
+        B('Clear', () => this.ext() ? this.selMany([], false) : this.mesh() ? AV.meshClearSel(this.app) : this.app.clearSelection()), h('label', null, this.selOnlyChk, ' Selected only'),
         B('Zoom to Selected', () => this.zoomSel()),
         B('Copy', () => this.copy(), 'Copy selected rows (or all) as tab-separated text for Excel'), B('Paste', () => this.paste(), 'Paste tab-separated rows from Excel; first column = ID, header row = column names'),
         B('Export CSV', () => this.exportCSV()), this.count));
@@ -63,15 +79,31 @@
       new ResizeObserver(() => this.renderRows()).observe(this.scroll);
       this.refresh();
     }
-    // ---- selection helpers (network objects, or 2D cells for the 2D Meshes table)
+    // layer list: network types, 2D meshes and the imported vector layers
+    fillTypes() {
+      const app = this.app; const ext = app.map.extLayers.filter(L => !L.raster && L.features);
+      const opts = ALL_TYPES.map(t => [t, AV.TYPE_LABEL[t]]).concat(app.mesh2d ? [['MESH', '2D Meshes']] : []).concat(ext.map(L => [AV.extTableId(L), 'Layer: ' + L.name]));
+      const key = opts.map(o => o.join('=')).join('|'); if (key === this._optKey) return; this._optKey = key;
+      const cur = this.typeSel.value; this.typeSel.innerHTML = ''; for (const [v, l] of opts) this.typeSel.appendChild(h('option', { value: v }, l)); if (cur) this.typeSel.value = cur;
+    }
+    // ---- selection helpers (network objects, 2D cells for the 2D Meshes table, features of an imported layer)
     mesh() { return this.type === 'MESH'; }
-    isSel(o) { return this.mesh() ? !!(this.app.meshSelSet && this.app.meshSelSet.has(o)) : this.app.selection.has(o); }
-    selMany(objs, add) { if (this.mesh()) AV.meshSelect(this.app, objs, add); else this.app.selectMany(objs, add); if (this.mesh()) this.refreshSel(); }
-    sel1(o, add) { if (this.mesh()) { if (add && this.isSel(o)) { this.app.meshSelSet.delete(o); AV.meshSelect(this.app, [], true); } else AV.meshSelect(this.app, [o], add); this.refreshSel(); } else this.app.select(o, add); }
+    ext() { return /^EXT/.test(this.type); }
+    extSet() { const L = this.rows && this.rows.layer; if (!L) return new Set(); return L.sel || (L.sel = new Set()); }
+    isSel(o) { return this.ext() ? this.extSet().has(o) : this.mesh() ? !!(this.app.meshSelSet && this.app.meshSelSet.has(o)) : this.app.selection.has(o); }
+    selMany(objs, add) { if (this.ext()) { const S = this.extSet(); if (!add) S.clear(); for (const o of objs) S.add(o); this.app.map.redraw(); this.refreshSel(); return; } if (this.mesh()) AV.meshSelect(this.app, objs, add); else this.app.selectMany(objs, add); if (this.mesh()) this.refreshSel(); }
+    sel1(o, add) { if (this.ext()) { const S = this.extSet(); if (!add) S.clear(); if (add && S.has(o)) S.delete(o); else S.add(o); this.app.map.redraw(); this.refreshSel(); return; } if (this.mesh()) { if (add && this.isSel(o)) { this.app.meshSelSet.delete(o); AV.meshSelect(this.app, [], true); } else AV.meshSelect(this.app, [o], add); this.refreshSel(); } else this.app.select(o, add); }
     refreshSel() { if (this.selOnly) this.refresh(); else { this.updateSel(); this.count.textContent = this.view.length + ' of ' + this.rows.objs.length + ' rows, ' + this.rows.objs.filter(o => this.isSel(o)).length + ' selected'; } }
-    zoomSel() { this.app.activateView('map'); if (this.mesh()) { const S = [...(this.app.meshSelSet || [])]; if (!S.length) { AV.toast('No 2D cells are selected.', true); return; } let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const c of S) { x1 = Math.min(x1, c.x - c.s); y1 = Math.min(y1, c.y - c.s); x2 = Math.max(x2, c.x + c.s); y2 = Math.max(y2, c.y + c.s); } this.app.map.zoomToBox({ x1, y1, x2, y2 }); } else this.app.map.zoomToObjects([...this.app.selection]); }
+    zoomSel() { this.app.activateView('map');
+      if (this.ext()) { const S = [...this.extSet()]; if (!S.length) { AV.toast('No features are selected.', true); return; } let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+        for (const f of S) { const pts = f.type === 'point' ? f.coords : f.coords.flat(); for (const p of pts) { x1 = Math.min(x1, p[0]); y1 = Math.min(y1, p[1]); x2 = Math.max(x2, p[0]); y2 = Math.max(y2, p[1]); } }
+        const pad = Math.max(x2 - x1, y2 - y1, 1) * 0.1; this.app.map.zoomToBox({ x1: x1 - pad, y1: y1 - pad, x2: x2 + pad, y2: y2 + pad }); return; }
+      if (this.mesh()) { const S = [...(this.app.meshSelSet || [])]; if (!S.length) { AV.toast('No 2D cells are selected.', true); return; } let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const c of S) { x1 = Math.min(x1, c.x - c.s); y1 = Math.min(y1, c.y - c.s); x2 = Math.max(x2, c.x + c.s); y2 = Math.max(y2, c.y + c.s); } this.app.map.zoomToBox({ x1, y1, x2, y2 }); } else this.app.map.zoomToObjects([...this.app.selection]); }
     // set a property of objects (network: setProps with undo; 2D cells: elevation / roughness with undo, mesh file saved)
     setPropsAny(objs, key, vals) {
+      if (this.ext()) { const app = this.app; const old = objs.map(f => f.props[key]); const nw = vals.slice(); const L = this.rows.layer;
+        const upd = () => { if (L && L.fields && !L.fields.includes(key)) L.fields.push(key); if (L) L.dirty = true; this.refresh(); };
+        app.exec({ label: 'Edit ' + (L ? L.name : 'layer') + ' (' + key + ')', do: () => { objs.forEach((f, i) => { f.props[key] = nw[i]; }); upd(); }, undo: () => { objs.forEach((f, i) => { f.props[key] = old[i]; }); upd(); } }); return; }
       if (!this.mesh()) { this.app.setProps(objs, key, vals); return; }
       const app = this.app; const old = objs.map(c => c[key]); const nw = vals.map(v => +v);
       const save = () => { const mp = AV.meshPath(app); if (mp && app.mesh2d) window.host.writeText(mp, JSON.stringify(app.mesh2d)).catch(() => {}); app._meshRange = null; app.map.redraw(); this.refresh(); };
@@ -83,9 +115,13 @@
       const hasMeshOpt = [...this.typeSel.options].some(o => o.value === 'MESH');
       if (app.mesh2d && !hasMeshOpt) this.typeSel.appendChild(h('option', { value: 'MESH' }, '2D Meshes'));
       if (!app.mesh2d && hasMeshOpt) { [...this.typeSel.options].find(o => o.value === 'MESH').remove(); if (this.type === 'MESH') { this.type = 'JUNCTION'; this.typeSel.value = 'JUNCTION'; } }
+      this._optKey = null; this.fillTypes();
+      if (this.ext() && !AV.extLayerOf(app, this.type)) this.type = 'JUNCTION';   // the layer was removed
+      this.typeSel.value = this.type;
+      this.filterInp.placeholder = this.ext() ? 'Filter (any field)...' : 'Filter ID...';
       this.rows = AV.tableRows(app, this.type);
       let objs = this.rows.objs;
-      if (this.filter) objs = objs.filter(o => o.id.toLowerCase().includes(this.filter));
+      if (this.filter) objs = this.ext() ? objs.filter(o => this.rows.cols.some(c => String(c.get(o)).toLowerCase().includes(this.filter))) : objs.filter(o => o.id.toLowerCase().includes(this.filter));
       if (this.selOnly) objs = objs.filter(o => this.isSel(o));
       if (this.sortCol) { const c = this.rows.cols.find(x => x.k === this.sortCol); if (c) { const d = this.sortDir; objs = objs.slice().sort((a, b) => { let x = c.get(a), y = c.get(b); if (c.num) { x = parseFloat(x); y = parseFloat(y); x = isFinite(x) ? x : -Infinity; y = isFinite(y) ? y : -Infinity; return (x - y) * d; } return String(x).localeCompare(String(y), undefined, { numeric: true }) * d; }); } }
       this.view = objs;
@@ -138,6 +174,7 @@
     }
     setValue(o, c, val) {
       const app = this.app, m = app.model;
+      if (c.ext) { let v = val; if (c.num && val.trim() !== '') { v = parseFloat(val); if (!isFinite(v)) { AV.toast(c.l + ' must be numeric.', true); return false; } } this.setPropsAny([o], c.k, [v]); return true; }
       if (c.mesh) { const v = parseFloat(val); if (!isFinite(v) || (c.k === 'n' && !(v > 0))) { AV.toast(c.l + ' must be a ' + (c.k === 'n' ? 'positive ' : '') + 'number.', true); return false; } this.setPropsAny([o], c.k, [v]); return true; }
       if (c.id) { val = val.trim(); if (!val || /\s/.test(val) || m.idExists(val)) { AV.toast('Invalid or duplicate ID.', true); return false; } const old = o.id; app.exec({ label: 'Rename', do: () => m.renameObject(o, val), undo: () => m.renameObject(o, old) }); return true; }
       if (c.ends) { if (!m.nodes.has(val)) { AV.toast('Node ' + val + ' not found.', true); return false; } const old = o[c.k]; app.exec({ label: 'Reconnect', do: () => o[c.k] = val, undo: () => o[c.k] = old }); return true; }
@@ -154,7 +191,7 @@
       const items = [{ label: 'Sort Ascending', fn: () => { this.sortCol = c.k; this.sortDir = 1; this.refresh(); } }, { label: 'Sort Descending', fn: () => { this.sortCol = c.k; this.sortDir = -1; this.refresh(); } }, '-',
       { label: 'Statistics', fn: () => this.stats(c) }];
       if (!c.ro && !c.res && !c.id && !c.ends) items.push({ label: 'Field Calculator...', fn: () => this.calculator(c) });
-      if (c.num || c.res) items.push({ label: 'Color Map by This Field', fn: () => this.themeBy(c) });
+      if ((c.num || c.res) && !this.ext()) items.push({ label: 'Color Map by This Field', fn: () => this.themeBy(c) });
       this.app.contextMenu(e.clientX, e.clientY, items);
     }
     themeBy(c) {
@@ -194,6 +231,7 @@
     }
     async selectByAttr() {
       const t = this.type;
+      if (this.ext()) return this.extSelectByAttr();
       if (t === 'MESH') { // numeric condition on the cell columns, e.g.  elev < 60 and maxdepth > 0.3
         const cols = this.rows.cols.filter(x => x.num); const keys = cols.map(x => x.k.replace(/^_/, ''));
         const r = await AV.formDialog('Select by Attribute - 2D Meshes', [{ k: 'expr', l: 'Where', t: 'text', w: 340 }, { k: 'mode', l: 'Selection', t: 'choice', o: [['new', 'New selection'], ['add', 'Add to selection'], ['sub', 'Select from current selection']], d: 'new' },
@@ -208,6 +246,21 @@
       if (!kind) { AV.toast('Select by Attribute is available for nodes, links and subcatchments.', true); return; }
       await AV.selectByAttribute(this.app, { kind, kindFixed: true, objs: this.rows.objs, zoom: false });
     }
+    // imported layer: condition on its fields, e.g.  DIAMETER >= 24 and MATERIAL = 'RCP'
+    async extSelectByAttr() {
+      const cols = this.rows.cols.filter(c => c.ext); const ids = cols.map(c => c.k.replace(/\W/g, '_').replace(/^(\d)/, '_$1'));
+      const r = await AV.formDialog('Select by Attribute - ' + this.rows.layer.name, [{ k: 'expr', l: 'Where', t: 'text', w: 340 }, { k: 'mode', l: 'Selection', t: 'choice', o: [['new', 'New selection'], ['add', 'Add to selection'], ['sub', 'Select from current selection']], d: 'new' },
+        { t: 'note', l: 'Fields: ' + ids.join(', ') + '. Operators: < <= > >= = != and or not ( ) + - * /; text in quotes. Example: ' + (ids[0] || 'FIELD') + " > 10" }], { expr: this._extWhere || '' });
+      if (!r || !r.expr.trim()) return; this._extWhere = r.expr;
+      const strs = []; let src = r.expr.replace(/'([^']*)'|"([^"]*)"/g, (m, a, b) => { strs.push(a !== undefined ? a : b); return ' __s' + (strs.length - 1) + ' '; });
+      src = src.replace(/\band\b/gi, '&&').replace(/\bor\b/gi, '||').replace(/\bnot\b/gi, '!').replace(/([^<>!=])=([^=])/g, '$1==$2').replace(/<>/g, '!=');
+      const words = src.split(/[^A-Za-z_0-9]+/).filter(w => w && !/^\d/.test(w));
+      if (!/^[\w\s+\-*/().<>=!&|]+$/.test(src) || words.some(w => !ids.includes(w) && !/^__s\d+$/.test(w))) { AV.alert('Invalid condition. Use the field names listed, numbers, quoted text and comparison operators only.'); return; }
+      let fn; try { fn = Function(...ids, ...strs.map((_, i) => '__s' + i), 'return (' + src + ');'); } catch (e) { AV.alert('Invalid condition: ' + e.message); return; }
+      const pool = r.mode === 'sub' ? this.rows.objs.filter(o => this.isSel(o)) : this.rows.objs;
+      const hit = pool.filter(o => { try { return !!fn(...cols.map(c => { const v = c.get(o); return c.num && v !== '' ? +v : v; }), ...strs); } catch (e) { return false; } });
+      this.selMany(hit, r.mode === 'add'); AV.toast(hit.length + ' feature(s) selected.');
+    }
     copy() {
       const objs = this.view.some(o => this.isSel(o)) ? this.view.filter(o => this.isSel(o)) : this.view;
       const cols = this.rows.cols;
@@ -215,6 +268,7 @@
       navigator.clipboard.writeText(text).then(() => AV.toast(objs.length + ' row(s) copied.'));
     }
     async paste() {
+      if (this.ext()) { AV.toast('Paste is available for network layers; edit imported layer values by double-clicking a cell or with the Field Calculator.', true); return; }
       let text = ''; try { text = await navigator.clipboard.readText(); } catch (e) { AV.alert('Clipboard not accessible.'); return; }
       const lines = text.split(/\r?\n/).filter(l => l.trim()); if (lines.length < 2) { AV.alert('Paste needs a header row (column keys or labels) and at least one data row, with the object ID in the first column.'); return; }
       const hdr = lines[0].split('\t').map(s => s.trim()); const cols = hdr.map(k => this.rows.cols.find(c => c.k === k || c.l === k));
@@ -234,13 +288,13 @@
     }
     exportCSV() {
       const cols = this.rows.cols; const lines = [cols.map(c => AV.csvCell(c.l)).join(',')].concat(this.view.map(o => cols.map(c => AV.csvCell(c.get(o))).join(',')));
-      AV.downloadText(lines.join('\n'), (this.type === 'MESH' ? '2d_meshes' : this.type.toLowerCase()) + '.csv');
+      AV.downloadText(lines.join('\n'), (this.type === 'MESH' ? '2d_meshes' : this.ext() ? String(this.rows.layer ? this.rows.layer.name : 'layer').replace(/\.\w+$/, '').replace(/\W+/g, '_') : this.type.toLowerCase()) + '.csv');
     }
   }
 
   AV.openTable = function (app, type, selOnly) {
     const v = app.views.get('table');
-    if (v && v.table) { v.table.type = type; v.table.typeSel.value = type; v.table.sortCol = null; if (selOnly) { v.table.selOnly = true; v.table.selOnlyChk.checked = true; } v.table.refresh(); app.activateView('table'); return; }
+    if (v && v.table) { v.table.type = type; v.table.fillTypes(); v.table.typeSel.value = type; v.table.sortCol = null; if (selOnly) { v.table.selOnly = true; v.table.selOnlyChk.checked = true; } v.table.refresh(); app.activateView('table'); return; }
     const t = new TableView(app, type);
     if (selOnly) { t.selOnly = true; t.selOnlyChk.checked = true; t.refresh(); }
     const view = app.addView('table', 'Attribute Table', t.el, { onShow: () => t.refresh() });
