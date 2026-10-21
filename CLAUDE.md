@@ -15,4 +15,4 @@ Read `DEVELOPER_GUIDE.md` (Chinese, complete file-by-file guide) before changing
 - Units follow Flow Units (CFS/GPM/MGD = US ft, CMS/LPS/MLD = SI m).
 - New renderer file → add a `<script>` in `index.html` in dependency order.
 - User preferences: ArcGIS Pro–style ribbon/UI; show an HTML prototype for confirmation before larger UI changes;
-  keep dialogs tidy. Licensing is on (phase 1, `licence.js`); licences are issued with `tools/licence-manager` (OSEMTEC only), never inside the app.
+  keep dialogs tidy. Do NOT update the user guide (HTML manual) unless the user asks. Licensing is on (phase 1, `licence.js`); licences are issued with `tools/licence-manager` (OSEMTEC only), never inside the app.
