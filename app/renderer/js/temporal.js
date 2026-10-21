@@ -24,7 +24,8 @@
     const st = T.stores.get(keyOf(R, node));
     if (!st) { T.request(node); return null; }
     const live = T.curP !== null && st.live; if (!st.done && !live) return null;
-    const p = live ? T.curP : R.period; const lastP = live ? T.curP : st.n - 1; const step = st.stepMin;
+    // inside a pass over the results (T.curP set) a finished store is read at the pass's time step too
+    const p = T.curP !== null ? T.curP : R.period; const lastP = live ? T.curP : st.n - 1; const step = st.stepMin;
     const s = st.data.get(o.id);
     if (node.fn === 'peak') return s ? s.max : null;
     const iv = s || []; const nW = Math.max(1, Math.round((node.W || 60) / step));
@@ -62,7 +63,12 @@
     const app = AV.app; const R = app && app.results; if (!R || !T.queue.length) return;
     // forget stores of other results / older model versions
     for (const k of [...T.stores.keys()]) if (!k.startsWith(R.handle + '|' + app.model.version + '|')) T.stores.delete(k);
-    const nodes = T.queue.splice(0).sort((a, b) => a.depth - b.depth);
+    // a function that uses a whole-run function (totdur, maxrun, …, peak) of an unfinished pass waits for the next pass
+    const WH = new Set(['totdur', 'maxrun', 'maxwin', 'first', 'peak']);
+    const pending = (nd) => (nd.children || []).some(c => { const s = T.stores.get(keyOf(R, c)); return (WH.has(c.fn) && !(s && s.done)) || pending(c); });
+    const all = T.queue.splice(0).sort((a, b) => a.depth - b.depth);
+    const nodes = all.filter(nd => !pending(nd)); T.queue.push(...all.filter(nd => pending(nd)));
+    if (!nodes.length) { T.queue.length = 0; return; }
     const n = R.meta.nPeriods, stepMin = R.meta.reportStep / 60; const m = app.model;
     const objsOf = (k) => [...(k === 'node' ? m.nodes.values() : k === 'link' ? m.links.values() : m.subcatchments.values())];
     const jobs = nodes.map(node => { const k = keyOf(R, node); const st = { done: false, live: true, n, stepMin, data: new Map() }; T.stores.set(k, st); T.running.set(k, st); return { node, st, objs: objsOf(node.kind) }; });

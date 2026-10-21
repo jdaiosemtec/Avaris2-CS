@@ -117,7 +117,7 @@ Avaris2CS.exe (Electron)
 | `lidsketch.js` | 33 | LID 类型示意剖面图。 |
 | `sym.js` | 348 | Layer View 图层树（网络图层、外部图层、底图，右键菜单），右侧停靠栏标签（Properties / Catalog / Symbology），符号化面板（每类对象的颜色、大小、线宽、标签）。 |
 | `theme.js` | 347 | **Theme（专题着色）**，参考 InfoWorks ICM Layer Theme Editor：每个图层有一个有序的子主题列表，可以是连续分级或按值，设置颜色和大小，可用 Where 条件，图例；动态主题只在播放时显示。`subsOf(layer)`：Flag 打开时返回 Flag 项。 |
-| `flags.js` | 260 | **Flag 面板**：12 个内置报警规则加用户自定义规则；每个图层可选一条；算法说明里的参数可直接编辑；单位跟随 Flow Units；▶ / Σ 两种模式；颜色设置；新建向导和条件编辑器；导入导出；设置保存在 `<model>.flags.json`。`AV.flagsForReport` 供报告 Insights 页使用。 |
+| `flags.js` | 260 | **Flag 面板**：12 个内置报警规则加用户自定义规则；每个图层可选一条；算法说明里的参数可直接编辑；单位跟随 Flow Units；▶ / Σ 两种模式；颜色设置；新建向导和条件编辑器；导入导出；设置保存在 `<model>.flags.json`。<br>• 内置规则也用条件文本（`cond`，每级一条，`$参数`，`$eps`/`$tol` 由程序提供）定义，在面板里点 *Edit…* 可改名称、说明、算法文字、条件、Where 和参数默认值（US/SI）；修改存在程序设置 `prefs.flagEdits`（对所有模型生效），*Reset* 恢复原定义；*Paste Conditions…* 粘贴 "High: … / Warning: … / Where: …" 文本；Export 会带上这些修改，Import 时写回。<br>• Σ 模式统一为 `peak(等级表达式)`；`temporal.js` 会把用到 totdur 等整场函数的表达式推迟到下一遍计算。`AV.flagsForReport` 供报告 Insights 页使用。 |
 | `expr.js` | 366 | **表达式语言**：Select by Attribute、Theme、Flag 共用。可以用字段、计算值、模拟结果（`rpt…` 当前时间步、`max…` 最大值），上下游前缀 `us_` / `ds_`，`iif`、`abs`、`like`，以及时间函数。`AV.compileExpr(src, AV.exprFields(app, layer))` 返回 `{fn, used, temporals}`。 |
 | `temporal.js` | 137 | 时间函数（单位：分钟）：`dur / run / win`（到当前时间步为止），`totdur / maxrun / maxwin / first / peak`（全程）。对结果所有时间步只扫一遍，按对象保存区间，播放时可以直接取值。另含 `crownElev`、`maxVolume` 等计算字段。 |
 | `units.js` | 88 | Flow Units 切换（状态栏），可选择同时换算全模型的数值（US ↔ SI），切换后通知 Flag 换算参数。 |
