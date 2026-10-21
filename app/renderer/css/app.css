@@ -702,3 +702,69 @@ table.edtbl th { background: #f3f5f7; font-weight: 600; }
 .scrow { display: grid; grid-template-columns: 150px 1fr 70px; gap: 8px; align-items: center; }
 .scname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .scst { font-size: 11.5px; color: var(--muted); text-align: right; }
+
+/* ===== v2.0.9 ribbon (ArcGIS Pro style): white card panel, 34 px large icons with two-line labels, 3-row small stacks ===== */
+#ribbon { background: #f5f6f7; border-bottom: 1px solid #dfe3e8; }
+.rtabs { background: #f5f6f7; height: 34px; }
+.rtab { padding: 6px 13px 6px; font-size: 13.5px; color: #2b2b2b; border-bottom: 2px solid transparent; background: none; }
+.rtab:hover { color: #0b62b8; }
+.rtab.active { color: #111; font-weight: 600; border-bottom-color: #1a73c8; background: none; }
+.rpanel { height: 100px; margin: 2px 8px 6px; background: #fff; border: 1px solid #e1e4e8; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.rpage { align-items: stretch; padding-top: 3px; }
+.rgroup { padding: 0 6px; border-right: 0; position: relative; }
+.rgroup + .rgroup::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: #e3e6ea; }
+.ritems { gap: 2px; align-items: flex-start; }
+.rgname { font-size: 11.5px; color: #555; padding: 1px 0 4px; position: relative; }
+.rlaunch { position: absolute; right: -4px; bottom: 4px; width: 12px; height: 12px; cursor: pointer; border-right: 1.3px solid #888; border-bottom: 1.3px solid #888; border-radius: 1px; }
+.rlaunch::after { content: ''; position: absolute; right: 1px; bottom: 1px; width: 7px; height: 1.3px; background: #888; transform: rotate(45deg); transform-origin: right; }
+.rlaunch:hover { border-color: #1a73c8; } .rlaunch:hover::after { background: #1a73c8; }
+.rbig { min-width: 50px; max-width: 80px; height: 72px; padding: 4px 5px 2px; gap: 0; font-size: 12px; line-height: 1.18; justify-content: flex-start; text-align: center; color: #1d1d1d; border-radius: 4px; }
+.rbig img { width: 34px; height: 34px; margin-bottom: 4px; }
+.rbig .svgi svg { width: 30px; height: 30px; margin: 2px 0 6px; }
+.rbig .rl { white-space: normal; }
+.rbig.hero img { width: 40px; height: 40px; margin-bottom: 2px; }
+.rbig .rcar { font-size: 9px; color: #555; }
+.rbadge { position: absolute; top: 0; right: -2px; font-size: 8.5px; line-height: 12px; background: #fff3e0; color: #b26a00; border: 1px solid #ffcc80; border-radius: 3px; padding: 0 3px; }
+.rstack { gap: 1px; padding-top: 1px; }
+.rsmall { height: 22px; gap: 7px; padding: 0 8px 0 4px; font-size: 12.5px; color: #1d1d1d; }
+.rsmall img { width: 18px; height: 18px; }
+.rsmall .svgi svg { width: 16px; height: 16px; }
+.rbig:hover, .rsmall:hover { background: #e6f0fb; border-color: #c7dcf3; }
+.rbig.active, .rsmall.active { background: #d6e6f7; border-color: #a9c8ea; }
+/* ===== Design Storm dialog (v2.0.9) ===== */
+.dsdlg { width: 1010px; max-width: calc(100vw - 80px); }
+.dsseg { display: flex; border: 1px solid var(--border2); border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
+.dsseg button { flex: 1; border: 0; border-right: 1px solid var(--border2); background: #fff; padding: 6px 6px 5px; font: inherit; cursor: pointer; line-height: 1.25; }
+.dsseg button:last-child { border-right: 0; }
+.dsseg button small { display: block; color: var(--muted); font-size: 11px; }
+.dsseg button.on { background: var(--accent2); box-shadow: inset 0 -3px 0 var(--accent); font-weight: 600; }
+.dsseg button.on small { color: #0d47a1; font-weight: 400; }
+.dscols { display: grid; grid-template-columns: 280px 1fr; gap: 14px; }
+.dsdlg fieldset { border: 1px solid var(--border); border-radius: 5px; margin: 0 0 8px; padding: 4px 10px 7px; }
+.dsdlg legend { font-weight: 600; color: #0d47a1; padding: 0 4px; font-size: 12.5px; }
+.dsfr { display: grid; grid-template-columns: 1fr 118px; align-items: center; gap: 6px; margin: 4px 0; }
+.dsfr label { color: #37474f; } .dsfr .u { color: var(--muted); font-size: 11px; }
+.dsfr input, .dsfr select { width: 100%; } .dsfr input[readonly] { background: var(--panel2); color: #455a64; }
+.dshint { color: var(--muted); font-size: 11.5px; line-height: 1.45; margin-top: 4px; }
+.dschart { border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px 2px; }
+svg.dsch { width: 100%; height: 250px; display: block; user-select: none; } svg.dsch.draw { cursor: crosshair; }
+.dschips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.dschip { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 9px; font-size: 12px; }
+.dspat { margin-top: 8px; border: 1px solid var(--border); border-radius: 5px; }
+.dspt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 5px 8px; background: var(--panel2); border-bottom: 1px solid var(--border); }
+.dsradio { display: inline-flex; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden; }
+.dsradio button { border: 0; background: #fff; font: inherit; font-size: 12px; padding: 2px 9px; cursor: pointer; border-right: 1px solid var(--border2); }
+.dsradio button:last-child { border-right: 0; } .dsradio button.on { background: var(--accent); color: #fff; }
+.dspaste { display: none; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.dspaste textarea { width: 100%; height: 70px; font-family: var(--mono); font-size: 12px; }
+.dsgrid { overflow-x: auto; padding: 6px 8px 4px; }
+.dsgrid table { border-collapse: collapse; font-size: 12px; }
+.dsgrid th { background: var(--panel2); font-weight: 600; text-align: left; padding: 2px 8px; border: 1px solid var(--border); white-space: nowrap; position: sticky; left: 0; z-index: 1; }
+.dsgrid td { border: 1px solid var(--border); padding: 0; min-width: 48px; text-align: right; white-space: nowrap; }
+.dsgrid tr.ro td { color: #78909c; padding: 2px 5px; background: #fafbfc; }
+.dsgrid tr.edit td { background: #fff; }
+.dsgrid td input { width: 54px; border: 0; font: inherit; text-align: right; padding: 2px 4px; background: transparent; }
+.dsgrid td input:focus { outline: 2px solid var(--accent); background: #fff; }
+.dsgrid td.bad { background: #ffebee !important; } .dsgrid td.bad input { color: #c62828; font-weight: 600; } .dsgrid tr.ro td.bad { color: #c62828; }
+.dsval { padding: 4px 9px 6px; font-size: 12px; } .dsval.ok { color: #2e7d32; } .dsval.warn { color: #b26a00; } .dsval.err { color: #c62828; }
+.rbig .svgi { display: flex; align-items: flex-start; justify-content: center; height: 38px; } .rbig .svgi svg { margin: 2px 0 0; }

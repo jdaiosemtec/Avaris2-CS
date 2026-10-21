@@ -14,5 +14,5 @@ cp $P/app/samples/* $ST/resources/samples/
 mkdir -p $ST/resources/gdal && cp -r $P/app/gdal/win/* $ST/resources/gdal/
 cp $P/installer/LICENSE.txt $ST/LICENSE-OsemCM.txt
 cd $P/installer
-NSISDIR=$S/dl/nsis $S/dl/nsis/linux/makensis -V2 -DSTAGE=$ST -DICON=$P/build/icon.ico -DOUTFILE=$P/dist/OsemCMV2.0-Setup-2.0.8.exe avaris.nsi
+NSISDIR=$S/dl/nsis $S/dl/nsis/linux/makensis -V2 -DSTAGE=$ST -DICON=$P/build/icon.ico -DOUTFILE=$P/dist/OsemCMV2.0-Setup-2.0.9.exe avaris.nsi
 ls -la $P/dist/*.exe

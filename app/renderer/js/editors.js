@@ -139,73 +139,170 @@
     } else if (p.method === 'uniform') cum = (t) => p.depth * t / D;
     else if (p.method === 'triangular') { const r = Math.min(1, Math.max(0, p.r)); const tp = r * D; const ip = 2 * p.depth / D; cum = (t) => t <= tp ? (tp ? 0.5 * ip * t * t / tp : 0) : p.depth - (D - tp ? 0.5 * ip * (D - t) * (D - t) / (D - tp) : 0); }
     else if (p.method === 'scs2') cum = (t) => p.depth * interp(SCS2, t / 60 * 24 / (D / 60));
+    else if (p.method === 'custom' && p.pattern) { const c = [0]; p.pattern.forEach(v => c.push(c[c.length - 1] + Math.max(0, v))); const s = c[c.length - 1] || 1; const tab = c.map((v, i) => [i / p.pattern.length, v / s]); cum = (t) => p.depth * interp(tab, t / D); }
     else if (p.method === 'custom') { const tab = p.table; const T = tab[tab.length - 1][0]; cum = (t) => p.depth * interp(tab, t / D * T) / tab[tab.length - 1][1]; }
     const out = []; for (let i = 0; i < n; i++) out.push((cum((i + 1) * dt) - cum(i * dt)) / (dt / 60));
     return out;
   };
 
+  // Design Storm dialog (v2.0.9): method buttons, parameters on the left, live hyetograph on the right,
+  // custom pattern edited as % per interval or cumulative %, drawn on the chart, pasted from Excel or taken from presets;
+  // invalid patterns (decreasing cumulative / negative values) are marked and cannot be added.
+  const STORM_METHODS = [['chicago', 'Chicago', 'IDF a/(t+b)^c'], ['scs2', 'SCS Type II', '24-hr, scaled'], ['triangular', 'Triangular', 'peak position'], ['uniform', 'Uniform', 'constant'], ['custom', 'Custom Pattern', 'your own distribution']];
+  const fmtN = (v, d = 1) => String(Math.round(v * 10 ** d) / 10 ** d);
+  const cumOf = (p) => { const c = [0]; p.forEach(v => c.push(c[c.length - 1] + v)); return c; };
+  const sumOf = (p) => p.reduce((s, v) => s + v, 0);
+  const chiCum = (P, D) => { const r = Math.min(0.99, Math.max(0.01, P.r)), tp = r * D; const Fb = (x) => x <= 0 ? 0 : x * P.a / Math.pow(x / r + P.b, P.c) / 60, Fa = (x) => x <= 0 ? 0 : x * P.a / Math.pow(x / (1 - r) + P.b, P.c) / 60; return (t) => t <= tp ? Fb(tp) - Fb(tp - t) : Fb(tp) + Fa(t - tp); };
+  AV.stormPreset = function (k, n) {
+    let w = [];
+    if (k === 'scs') for (let i = 0; i < n; i++) w.push(interp(SCS2, (i + 1) / n * 24) - interp(SCS2, i / n * 24));
+    else if (k === 'chi') { const cum = chiCum({ a: 60, b: 10, c: 0.8, r: 0.4 }, 120); for (let i = 0; i < n; i++) w.push(cum((i + 1) / n * 120) - cum(i / n * 120)); }
+    else { const f = { uni: () => 1, front: (x) => Math.exp(-((x - .2) ** 2) / .03), center: (x) => Math.exp(-((x - .5) ** 2) / .025), rear: (x) => Math.exp(-((x - .78) ** 2) / .03) }[k] || (() => 1); for (let i = 0; i < n; i++) w.push(f((i + .5) / n)); }
+    const s = sumOf(w) || 1; const out = w.map(v => +(v / s * 100).toFixed(1)); out[out.length - 1] = +(out[out.length - 1] + 100 - sumOf(out)).toFixed(1); return out;
+  };
+  // validity of a custom pattern: { level: ok | warn | err, bad: Set(interval index), msg }
+  AV.stormPatternCheck = function (pat, mode) {
+    const bad = new Set(); pat.forEach((v, i) => { if (!(v >= 0)) bad.add(i); });
+    if (bad.size) { const i = [...bad][0]; const c = cumOf(pat); return { level: 'err', bad, msg: mode === 'cum' ? 'Cumulative % must not decrease (interval ' + (i + 1) + ': ' + fmtN(c[i]) + ' → ' + fmtN(c[i + 1]) + ').' : 'Interval ' + (i + 1) + ' is negative: rainfall cannot be negative.' }; }
+    const s = sumOf(pat); if (!(s > 0)) return { level: 'err', bad, msg: 'The pattern is empty.' };
+    if (Math.abs(s - 100) > 0.05) return { level: 'warn', bad, msg: 'Total is ' + fmtN(s) + ' %: the pattern is scaled to 100 % of the total depth. Click "Normalize to 100%" to fix the numbers.' };
+    return { level: 'ok', bad, msg: '✓ Valid pattern: ' + pat.length + ' intervals, total 100 %.' };
+  };
+
   AV.hyetographDialog = async function (app) {
-    const si = app.model.isSI;
+    const m = app.model; const si = m.isSI; const U = si ? 'mm' : 'in';
+    const st = app._storm || (app._storm = { method: 'custom', mode: 'inc', depth: si ? 75 : 3, dur: 120, step: 5, a: si ? 1500 : 60, b: 10, c: 0.8, r: 40, pat: AV.stormPreset('center', 12), name: 'DesignStorm' });
+    let pat = st.pat.slice(); let mode = st.mode, method = st.method;
+    const num = (v, step) => h('input', { type: 'number', step: step || 'any', value: v });
+    const toIso = (d) => { const a = String(d || '').split('/'); return a.length === 3 ? a[2].padStart(4, '0') + '-' + a[0].padStart(2, '0') + '-' + a[1].padStart(2, '0') : '2026-01-01'; };
     const f = {
-      method: h('select', null, [['chicago', 'Chicago (Keifer-Chu, IDF a/(t+b)^c)'], ['scs2', 'SCS 24-hr Type II (scaled to duration)'], ['triangular', 'Triangular'], ['uniform', 'Uniform'], ['custom', 'Custom cumulative distribution']].map(([v, l]) => h('option', { value: v }, l))),
-      a: h('input', { type: 'number', step: 'any', value: si ? 1500 : 60 }), b: h('input', { type: 'number', step: 'any', value: 10 }), c: h('input', { type: 'number', step: 'any', value: 0.8 }),
-      r: h('input', { type: 'number', step: 'any', value: 0.4 }), depth: h('input', { type: 'number', step: 'any', value: si ? 75 : 3 }),
-      dur: h('input', { type: 'number', step: 'any', value: 120 }), step: h('input', { type: 'number', step: 'any', value: 5 }),
-      name: h('input', { type: 'text', value: 'DesignStorm' }), gage: h('input', { type: 'checkbox', checked: true }),
-      // storm start = model Start Analysis date / time by default; the end follows from the duration
-      sdate: h('input', { type: 'text', value: app.model.options.START_DATE || '01/01/2026', placeholder: 'MM/DD/YYYY' }), stime: h('input', { type: 'text', value: String(app.model.options.START_TIME || '00:00:00').slice(0, 5), placeholder: 'HH:MM' }),
-      edate: h('input', { type: 'text', disabled: true }),
-      table: h('textarea', { rows: 4, style: { fontFamily: 'var(--mono)' } }, '0 0\n0.5 0.2\n1 1'),
+      depth: num(st.depth), dur: num(st.dur), step: h('select', null, [1, 2, 5, 10, 15, 30, 60].map(v => h('option', { value: v, selected: v === st.step }, String(v)))),
+      a: num(st.a), b: num(st.b), c: num(st.c), r: h('input', { type: 'range', min: 5, max: 95, value: st.r }),
+      sd: h('input', { type: 'date', value: toIso(m.options.START_DATE) }), stime: h('input', { type: 'time', value: String(m.options.START_TIME || '00:00').slice(0, 5).padStart(5, '0') }), en: h('input', { type: 'text', readOnly: true }),
+      name: h('input', { type: 'text', value: st.name }),
+      gage: h('select', null, [...m.gages.keys()].map(g => h('option', { value: g }, g)).concat([m.gages.size ? null : h('option', { value: '+' }, '(new rain gage)'), h('option', { value: '' }, '(none)')].filter(Boolean))),
+      preset: h('select', null, [['', '(choose…)'], ['uni', 'Uniform'], ['front', 'Front-loaded peak'], ['center', 'Center peak'], ['rear', 'Rear-loaded peak'], ['scs', 'SCS Type II shape'], ['chi', 'Chicago shape (peak 40%)']].map(([v, l]) => h('option', { value: v }, l))),
+      np: h('input', { type: 'number', min: 2, max: 96, value: pat.length, style: { width: '56px' } }),
     };
-    const units = si ? 'mm' : 'in';
-    const rows = {};
-    const R = (key, label, el) => { const lab = h('label', null, label); rows[key] = [lab, el]; return [lab, el]; };
-    const form = h('div', { class: 'form' }, R('method', 'Method', f.method), R('a', 'IDF a (' + units + '/hr, t in min)', f.a), R('b', 'IDF b (min)', f.b), R('c', 'IDF c', f.c),
-      R('r', 'Peak position ratio r (0-1)', f.r), R('depth', 'Total depth (' + units + ')', f.depth), R('table', 'Cumulative table (t, fraction)', f.table), R('dur', 'Duration (min)', f.dur), R('step', 'Time step (min)', f.step),
-      R('sdate', 'Start date (MM/DD/YYYY)', f.sdate), R('stime', 'Start time (HH:MM)', f.stime), R('edate', 'End date / time', f.edate),
-      R('gage', 'Assign to a rain gage', f.gage));
-    const chartHost = h('div', { style: { height: '260px', display: 'flex', marginTop: '10px', border: '1px solid var(--border)' } });
-    const info = h('div', { style: { color: 'var(--muted)', marginTop: '6px' } });
-    const body = h('div', { style: { width: '640px' } }, form, chartHost, info);
-    const chart = new AV.Chart(chartHost, {});
-    const params = () => ({ method: f.method.value, a: +f.a.value, b: +f.b.value, c: +f.c.value, r: +f.r.value, depth: +f.depth.value, dur: +f.dur.value, step: Math.max(0.5, +f.step.value), table: f.table.value.trim().split('\n').map(l => l.trim().split(/[\s,;]+/).map(Number)).filter(p => p.length >= 2 && p.every(isFinite)) });
-    const t0 = () => AV.parseSwmmDate(f.sdate.value, f.stime.value);
-    const updEnd = () => { const d0 = t0(); f.edate.value = d0 === null ? 'invalid start date' : AV.fmtDateTime(d0 + Math.max(1, Math.round((+f.dur.value || 0) / Math.max(0.5, +f.step.value || 5))) * Math.max(0.5, +f.step.value || 5) / 1440).slice(0, 16); };
-    const update = () => {
-      updEnd();
-      const p = params(); const show = { a: p.method === 'chicago', b: p.method === 'chicago', c: p.method === 'chicago', r: ['chicago', 'triangular'].includes(p.method), depth: p.method !== 'chicago', table: p.method === 'custom' };
-      for (const k in show) rows[k].forEach(e => e.style.display = show[k] ? '' : 'none');
-      if (p.method === 'custom' && p.table.length < 2) return;
-      const I = AV.designStorm(p); const x = Float64Array.from(I.map((_, i) => (i + 0.5) * p.step / 60));
-      chart.setSeries([{ name: 'Intensity (' + units + '/hr)', x, y: Float32Array.from(I), bars: true, color: '#7e57c2' }], { invert: app.prefs.invertRain, xLabel: 'Hours', yLabel: 'Intensity (' + units + '/hr)', title: 'Hyetograph' });
-      const tot = I.reduce((s, v) => s + v * p.step / 60, 0); info.textContent = 'Total depth ' + AV.fmt(tot, 3) + ' ' + units + ', peak intensity ' + AV.fmt(Math.max(...I), 3) + ' ' + units + '/hr, ' + I.length + ' steps';
-    };
-    for (const k in f) f[k].addEventListener('input', update); f.method.addEventListener('change', update);
-    setTimeout(() => { chart.resize(); update(); }, 50);
-    const r = await AV.modal({ title: 'Hyetograph - Design Storm', body, buttons: [{ label: 'Cancel', value: null }, { label: 'Copy to Clipboard', onClick: () => { const p = params(); const I = AV.designStorm(p); navigator.clipboard.writeText(I.map((v, i) => AV.secToHms(i * p.step * 60).slice(0, 5) + '\t' + v.toFixed(4)).join('\n')); AV.toast('Copied'); return false; } }, { label: 'Add to Project', primary: true, onClick: async () => {
-      // the user names the new time series when adding it
-      let nm = f.name.value;
-      for (;;) {
-        nm = await AV.prompt('Add to Project', 'Time series name', nm); if (nm === null) return false;
-        nm = nm.trim().replace(/\s+/g, '_'); if (!nm) { AV.toast('Enter a name.', true); continue; }
-        if (app.model.timeseries.has(nm) && !await AV.confirm('A time series named "' + nm + '" already exists. Replace it?', 'Add to Project', 'Replace', 'Cancel')) continue;
-        break;
+    const fr = (label, el, unit) => h('div', { class: 'dsfr' }, h('label', null, label, unit ? h('span', { class: 'u' }, ' (' + unit + ')') : null), el);
+    const fsDepth = fr('Total depth', f.depth, U);
+    const fsIdf = h('fieldset', null, h('legend', null, 'IDF curve  i = a / (t + b)^c'), fr('a', f.a, U + '/hr, t in min'), fr('b', f.b, 'min'), fr('c', f.c));
+    const rlab = h('div', { class: 'dshint' });
+    const fsPeak = h('fieldset', null, h('legend', null, 'Peak position'), fr('Peak at', f.r, '% of duration'), rlab);
+    const left = h('div', null,
+      h('fieldset', null, h('legend', null, 'Storm'), fsDepth, fr('Duration', f.dur, 'min'), fr('Time step', f.step, 'min')), fsIdf, fsPeak,
+      h('fieldset', null, h('legend', null, 'Timing'), fr('Start date', f.sd), fr('Start time', f.stime), fr('End', f.en), h('div', { class: 'dshint' }, "Defaults to the model's Start Analysis date / time.")),
+      h('fieldset', null, h('legend', null, 'Output'), fr('Time series name', f.name), fr('Assign to rain gage', f.gage)));
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'dsch');
+    const chips = h('div', { class: 'dschips' });
+    const modeBtns = [['inc', '% per interval'], ['cum', 'Cumulative %']].map(([k, l]) => h('button', { 'data-m': k, onclick: () => { mode = k; grid(); modeBtns.forEach(b => b.classList.toggle('on', b.dataset.m === mode)); } }, l));
+    modeBtns.forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+    const pasteT = h('textarea', { placeholder: '5\t10\n10\t25\n15\t40 ...' });
+    const pasteBox = h('div', { class: 'dspaste' }, h('div', { class: 'dshint' }, 'Paste one column (values) or two columns (time in min, value) from Excel. Values are read in the input mode chosen above.'), pasteT,
+      h('div', { style: { textAlign: 'right', marginTop: '4px' } }, h('button', { class: 'btn small', onclick: () => { pasteBox.style.display = 'none'; } }, 'Cancel'), ' ', h('button', { class: 'btn small primary', onclick: () => applyPaste() }, 'Apply')));
+    const gt = h('table'); const val = h('div', { class: 'dsval' });
+    const patBox = h('div', { class: 'dspat' },
+      h('div', { class: 'dspt' }, h('b', null, 'Pattern'), h('label', null, 'Preset ', f.preset), h('label', null, 'Intervals ', f.np), h('span', null, 'Enter as'), h('span', { class: 'dsradio' }, modeBtns), h('span', { style: { flex: 1 } }),
+        h('button', { class: 'btn small', onclick: () => { pasteBox.style.display = 'block'; pasteT.focus(); } }, 'Paste from Excel…'), h('button', { class: 'btn small', onclick: () => normalize() }, 'Normalize to 100%')),
+      pasteBox, h('div', { class: 'dsgrid' }, gt), val);
+    const seg = h('div', { class: 'dsseg' }, STORM_METHODS.map(([k, n, s]) => h('button', { 'data-k': k, onclick: () => { method = k; upd(); } }, n, h('small', null, s))));
+    const body = h('div', { class: 'dsdlg' }, seg, h('div', { class: 'dscols' }, left, h('div', { style: { minWidth: 0 } }, h('div', { class: 'dschart' }, svg), chips, patBox)));
+    const params = () => ({ method, depth: +f.depth.value || 0, dur: Math.max(1, +f.dur.value || 60), step: +f.step.value || 5, a: +f.a.value, b: +f.b.value, c: +f.c.value, r: (+f.r.value || 40) / 100, pattern: method === 'custom' ? pat.slice() : null });
+    const check = () => method === 'custom' ? AV.stormPatternCheck(pat, mode) : { level: 'ok', bad: new Set() };
+    const t0 = () => { const [y, mo, d] = (f.sd.value || '').split('-'); return y ? AV.parseSwmmDate(mo + '/' + d + '/' + y, f.stime.value || '00:00') : null; };
+    const timing = () => { const P = params(); const d0 = t0(); f.en.value = d0 === null ? 'invalid start date' : AV.fmtDateTime(d0 + Math.max(1, Math.round(P.dur / P.step)) * P.step / 1440).slice(0, 16); };
+    let geo = null;
+    const el = (tg, a, txt) => { const e = document.createElementNS(NS, tg); for (const k in a) e.setAttribute(k, a[k]); if (txt !== undefined) e.textContent = txt; return e; };
+    const chart = () => {
+      svg.innerHTML = ''; const W = svg.clientWidth || 640, H = 250; svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      const L = 52, R = 50, T = 26, B = 34, pw = W - L - R, ph = H - T - B; const v = check(); const P = params();
+      const I = v.level === 'err' ? [] : AV.designStorm(P); const n = Math.max(1, Math.round(P.dur / P.step)), D = n * P.step; const max = Math.max(0.1, ...I) * 1.15;
+      svg.appendChild(el('text', { x: W / 2, y: 15, 'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 600, fill: '#263238' }, 'Hyetograph'));
+      for (let k = 0; k <= 4; k++) { const y = T + ph - ph * k / 4; svg.appendChild(el('line', { x1: L, x2: L + pw, y1: y, y2: y, stroke: '#eceff1' })); svg.appendChild(el('text', { x: L - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 10.5, fill: '#607d8b' }, fmtN(max * k / 4, max < 2 ? 2 : 1))); svg.appendChild(el('text', { x: L + pw + 6, y: y + 4, 'font-size': 10.5, fill: '#90a4ae' }, (25 * k) + '%')); }
+      const hrs = D / 60; const tick = hrs <= 2 ? .25 : hrs <= 6 ? 1 : hrs <= 24 ? 3 : 6;
+      for (let t = 0; t <= hrs + 1e-9; t += tick) { const x = L + pw * t / hrs; svg.appendChild(el('line', { x1: x, x2: x, y1: T + ph, y2: T + ph + 4, stroke: '#90a4ae' })); svg.appendChild(el('text', { x, y: T + ph + 16, 'text-anchor': 'middle', 'font-size': 10.5, fill: '#607d8b' }, fmtN(t, 2))); }
+      svg.appendChild(el('text', { x: L + pw / 2, y: H - 3, 'text-anchor': 'middle', 'font-size': 11, fill: '#455a64' }, 'Hours'));
+      svg.appendChild(el('text', { x: 13, y: T + ph / 2, 'text-anchor': 'middle', 'font-size': 11, fill: '#455a64', transform: 'rotate(-90 13 ' + (T + ph / 2) + ')' }, 'Intensity (' + U + '/hr)'));
+      svg.appendChild(el('text', { x: W - 8, y: T + ph / 2, 'text-anchor': 'middle', 'font-size': 11, fill: '#90a4ae', transform: 'rotate(90 ' + (W - 8) + ' ' + (T + ph / 2) + ')' }, 'Cumulative'));
+      const bw = pw / n;
+      if (v.level === 'err') svg.appendChild(el('text', { x: L + pw / 2, y: T + ph / 2, 'text-anchor': 'middle', 'font-size': 13, fill: '#c62828' }, 'Fix the pattern (see the red cells) to see the hyetograph'));
+      else {
+        I.forEach((q, i) => { const hg = ph * q / max; svg.appendChild(el('rect', { x: L + i * bw + bw * .08, y: T + ph - hg, width: Math.max(1, bw * .84), height: hg, fill: '#7e57c2', rx: 1 })); });
+        const tot = I.reduce((s, q) => s + q * P.step / 60, 0) || 1; let c = 0, d = 'M' + L + ' ' + (T + ph);
+        I.forEach((q, i) => { c += q * P.step / 60; d += ' L' + (L + (i + 1) * bw) + ' ' + (T + ph - ph * c / tot); }); svg.appendChild(el('path', { d, fill: 'none', stroke: '#26a69a', 'stroke-width': 2 }));
       }
-      if (t0() === null) { AV.toast('Enter the start date as MM/DD/YYYY and the time as HH:MM.', true); return false; }
-      f.name.value = nm; return params(); } }] }).done;
-    if (!r) return;
-    const I = AV.designStorm(r); const m = app.model; let name = f.name.value.trim().replace(/\s+/g, '_') || 'DesignStorm';
-    // dated rows from the storm start (the date is written on the first row and when it changes)
+      svg.appendChild(el('rect', { x: L, y: T, width: pw, height: ph, fill: 'none', stroke: '#b0bec5' }));
+      svg.classList.toggle('draw', method === 'custom');
+      if (method === 'custom') { for (let k = 1; k < pat.length; k++) { const x = L + pw * k / pat.length; svg.appendChild(el('line', { x1: x, x2: x, y1: T, y2: T + ph, stroke: '#d1c4e9', 'stroke-dasharray': '3 3' })); } svg.appendChild(el('text', { x: L + 6, y: T + 13, 'font-size': 11, fill: '#5e35b1' }, '✎ Drag on the chart to draw the pattern')); }
+      svg.appendChild(el('rect', { x: L + pw - 210, y: 6, width: 10, height: 10, fill: '#7e57c2' })); svg.appendChild(el('text', { x: L + pw - 196, y: 15, 'font-size': 10.5, fill: '#455a64' }, 'Intensity'));
+      svg.appendChild(el('line', { x1: L + pw - 140, x2: L + pw - 124, y1: 11, y2: 11, stroke: '#26a69a', 'stroke-width': 2 })); svg.appendChild(el('text', { x: L + pw - 120, y: 15, 'font-size': 10.5, fill: '#455a64' }, 'Cumulative depth'));
+      geo = { L, T, pw, ph, max, P, D };
+      chips.innerHTML = '';
+      if (v.level !== 'err') { const tot = I.reduce((s, q) => s + q * P.step / 60, 0), pk = Math.max(...I), ip = I.indexOf(pk);
+        [['Total depth', fmtN(tot, 3) + ' ' + U], ['Peak intensity', fmtN(pk, 3) + ' ' + U + '/hr'], ['Peak at', fmtN(ip * P.step, 0) + '–' + fmtN((ip + 1) * P.step, 0) + ' min'], ['Steps', n + ' × ' + P.step + ' min']].forEach(([a, b]) => chips.appendChild(h('span', { class: 'dschip' }, a + ' ', h('b', null, b)))); }
+      if (addBtn) { addBtn.disabled = v.level === 'err'; addBtn.style.opacity = v.level === 'err' ? .45 : 1; }
+    };
+    let drawing = false;
+    const drawAt = (ev) => {
+      if (!geo || method !== 'custom') return; const r = svg.getBoundingClientRect(); const sx = svg.viewBox.baseVal.width / r.width;
+      const x = (ev.clientX - r.left) * sx, y = (ev.clientY - r.top) * sx; const k = Math.floor((x - geo.L) / geo.pw * pat.length); if (k < 0 || k >= pat.length) return;
+      const inten = Math.max(0, (geo.T + geo.ph - y) / geo.ph * geo.max); const dtH = geo.D / pat.length / 60; const tot = sumOf(pat.map(v => Math.max(0, v)));
+      pat[k] = geo.P.depth > 0 ? +(inten * dtH / geo.P.depth * (tot > 0 ? tot : 100)).toFixed(1) : 0; grid(); chart();
+    };
+    svg.addEventListener('mousedown', (e) => { if (method === 'custom') { drawing = true; drawAt(e); e.preventDefault(); } });
+    const mv = (e) => { if (drawing) drawAt(e); }, mu = () => { drawing = false; };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', mu);
+    let busy = false;
+    const grid = () => { if (busy) return; busy = true; try { gridInner(); } finally { busy = false; } };
+    const gridInner = () => {
+      const P = params(); const n = pat.length; const dt = P.dur / n; const c = cumOf(pat); const v = check(); const tot = sumOf(pat.map(x => Math.max(0, x))) || 1;
+      const cell = (i, txt, edit) => { const td = h('td', { class: v.bad.has(i) ? 'bad' : '' }); if (edit) { const inp = h('input', { value: txt }); inp.addEventListener('change', () => { if (busy) return; const x = parseFloat(inp.value); if (!isFinite(x)) { grid(); return; } if (mode === 'inc') pat[i] = x; else { const cc = cumOf(pat); cc[i + 1] = x; pat = pat.map((_, k) => +(cc[k + 1] - cc[k]).toFixed(3)); } grid(); chart(); });
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); inp.dispatchEvent(new Event('change')); setTimeout(() => { const nx = gt.querySelectorAll('input')[i + (e.shiftKey ? -1 : 1)]; if (nx) { nx.focus(); nx.select(); } }, 0); } }); td.appendChild(inp); } else td.textContent = txt; return td; };
+      const rowInc = h('tr', { class: mode === 'inc' ? 'edit' : 'ro' }, h('th', null, '% per interval'), pat.map((p, i) => cell(i, fmtN(p, 2), mode === 'inc')), h('td', null, h('b', null, fmtN(sumOf(pat), 2))));
+      const rowCum = h('tr', { class: mode === 'cum' ? 'edit' : 'ro' }, h('th', null, 'Cumulative %'), pat.map((_, i) => cell(i, fmtN(c[i + 1], 2), mode === 'cum')), h('td'));
+      gt.innerHTML = '';
+      gt.appendChild(h('tr', { class: 'ro' }, h('th', null, 'Time (min)'), pat.map((_, i) => h('td', null, fmtN(dt * i, 1) + '–' + fmtN(dt * (i + 1), 1))), h('td', null, h('b', null, 'Total'))));
+      gt.appendChild(mode === 'inc' ? rowInc : rowCum); gt.appendChild(mode === 'inc' ? rowCum : rowInc);
+      gt.appendChild(h('tr', { class: 'ro' }, h('th', null, 'Depth (' + U + ')'), pat.map(p => h('td', null, fmtN(Math.max(0, p) / tot * P.depth, 3))), h('td', null, h('b', null, fmtN(P.depth, 3)))));
+      val.className = 'dsval ' + v.level; val.textContent = v.msg || '';
+    };
+    const normalize = () => { const s = sumOf(pat.map(v => Math.max(0, v))); if (s > 0) { pat = pat.map(v => +(Math.max(0, v) / s * 100).toFixed(2)); pat[pat.length - 1] = +(pat[pat.length - 1] + 100 - sumOf(pat)).toFixed(2); } grid(); chart(); };
+    const applyPaste = () => { const rows = pasteT.value.trim().split(/\r?\n/).map(l => l.trim().split(/[\t,; ]+/).map(Number)).filter(r => r.length && r.every(isFinite)); if (!rows.length) { AV.toast('No numbers found.', true); return; }
+      const vals = rows.map(r => r[r.length - 1]); pat = mode === 'inc' ? vals : vals.map((v, i) => +(v - (i ? vals[i - 1] : 0)).toFixed(3)); f.np.value = pat.length; pasteBox.style.display = 'none'; grid(); chart(); };
+    f.preset.addEventListener('change', () => { if (!f.preset.value) return; pat = AV.stormPreset(f.preset.value, Math.min(96, Math.max(2, +f.np.value || 12))); f.preset.value = ''; grid(); chart(); });
+    f.np.addEventListener('change', () => { const n = Math.min(96, Math.max(2, +f.np.value || 12)); f.np.value = n; const c = cumOf(pat.map(v => Math.max(0, v))), s = c[c.length - 1] || 100; const tab = c.map((v, i) => [i / pat.length, v / s * 100]); const out = []; for (let i = 0; i < n; i++) out.push(+(interp(tab, (i + 1) / n) - interp(tab, i / n)).toFixed(2)); pat = out; grid(); chart(); });
+    const upd = () => {
+      AV.$$('button', seg).forEach(b => b.classList.toggle('on', b.dataset.k === method));
+      fsDepth.style.display = method !== 'chicago' ? '' : 'none'; fsIdf.style.display = method === 'chicago' ? '' : 'none'; fsPeak.style.display = ['chicago', 'triangular'].includes(method) ? '' : 'none';
+      patBox.style.display = method === 'custom' ? '' : 'none';
+      rlab.textContent = 'Peak at ' + f.r.value + ' % of the duration (' + fmtN(+f.r.value / 100 * params().dur, 0) + ' min)';
+      timing(); if (method === 'custom') grid(); chart();
+    };
+    for (const k of ['depth', 'dur', 'step', 'a', 'b', 'c', 'r', 'sd', 'stime']) f[k].addEventListener('input', upd);
+    let addBtn = null;
+    setTimeout(() => { addBtn = AV.$$('button', body.closest('.modal') || document).find(b => b.textContent === 'Add to Project') || null; upd(); }, 40);
+    const ro = new ResizeObserver(() => chart()); ro.observe(svg);
+    const res = await AV.modal({ title: 'Design Storm (Hyetograph)', body, enterSubmits: false, buttons: [{ label: 'Cancel', value: null },
+      { label: 'Copy to Clipboard', onClick: () => { if (check().level === 'err') { AV.toast('Fix the pattern first.', true); return false; } const P = params(); const I = AV.designStorm(P); navigator.clipboard.writeText(I.map((v, i) => AV.secToHms(i * P.step * 60).slice(0, 5) + '\t' + v.toFixed(4)).join('\n')); AV.toast('Copied'); return false; } },
+      { label: 'Add to Project', primary: true, onClick: async () => {
+        if (check().level === 'err') { AV.toast(check().msg, true); return false; }
+        if (t0() === null) { AV.toast('Enter a valid start date and time.', true); return false; }
+        let nm = f.name.value.trim().replace(/\s+/g, '_');
+        if (!nm) { AV.toast('Enter a time series name.', true); return false; }
+        if (m.timeseries.has(nm) && !await AV.confirm('A time series named "' + nm + '" already exists. Replace it?', 'Add to Project', 'Replace', 'Cancel')) return false;
+        f.name.value = nm; return params(); } }] }).done;
+    ro.disconnect(); window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', mu);
+    Object.assign(st, { method, mode, pat: pat.slice(), depth: +f.depth.value, dur: +f.dur.value, step: +f.step.value, a: +f.a.value, b: +f.b.value, c: +f.c.value, r: +f.r.value, name: f.name.value });
+    if (!res) return;
+    const I = AV.designStorm(res); const name = f.name.value;
     const d0 = t0(); let lastD = '';
-    const row = (k, v) => { const s = AV.fmtDateTime(d0 + k * r.step / 1440); const ds = s.slice(0, 10).replace(/^0(\d)\/0?(\d+)/, '$1/$2').replace(/^(\d+)\/0(\d)/, '$1/$2'); const tm = s.slice(11, 16).replace(/^0(\d)/, '$1'); const out = [ds !== lastD ? ds : '', tm, v]; lastD = ds; return out; };
+    const row = (k, v) => { const s = AV.fmtDateTime(d0 + k * res.step / 1440); const ds = s.slice(0, 10).replace(/^0(\d)\/0?(\d+)/, '$1/$2').replace(/^(\d+)\/0(\d)/, '$1/$2'); const tm = s.slice(11, 16).replace(/^0(\d)/, '$1'); const out = [ds !== lastD ? ds : '', tm, v]; lastD = ds; return out; };
     const ts = { file: null, rows: I.map((v, i) => row(i, +v.toFixed(4))).concat([row(I.length, 0)]) };
     const old = m.timeseries.get(name);
-    const doGage = f.gage.checked; let gage = null, gageOld = null;
-    if (doGage) {
-      gage = [...m.gages.values()][0];
-      if (gage) gageOld = Object.assign({}, gage.p);
-    }
-    const interval = AV.secToHms(r.step * 60).replace(/^0(\d)/, '$1').slice(0, -3);
+    const gsel = f.gage.value; const doGage = gsel !== '';
+    const gage = doGage && gsel !== '+' ? m.gages.get(gsel) : null; const gageOld = gage ? Object.assign({}, gage.p) : null;
+    const interval = AV.secToHms(res.step * 60).replace(/^0(\d)/, '$1').slice(0, -3);
     let newGage = null;
     if (doGage && !gage) { const b = m.bounds(false) || { x1: 0, y2: 0 }; newGage = { id: m.nextId('RG'), kind: 'GAGE', p: AV.defaults('GAGE'), x: b.x1, y: b.y2, tag: '' }; }
     app.exec({
@@ -213,6 +310,6 @@
       do: () => { m.timeseries.set(name, ts); if (doGage) { const g = gage || newGage; if (newGage) m.gages.set(newGage.id, newGage); Object.assign(g.p, { format: 'INTENSITY', interval, source: 'TIMESERIES', series: name }); if (newGage) for (const s of m.subcatchments.values()) if (!s.p.gage) s.p.gage = newGage.id; } },
       undo: () => { if (old) m.timeseries.set(name, old); else m.timeseries.delete(name); if (gage && gageOld) gage.p = Object.assign({}, gageOld); if (newGage) m.gages.delete(newGage.id); },
     });
-    AV.toast('Time series ' + name + ' added (' + f.sdate.value + ' ' + f.stime.value + ' – ' + f.edate.value + ')' + (doGage ? ' and assigned to rain gage ' + (gage || newGage).id : '') + '. Check the simulation end time covers the storm.', false, 6000);
+    AV.toast('Time series ' + name + ' added (' + f.en.value.replace(/^/, AV.fmtDateTime(d0).slice(0, 16) + ' – ') + ')' + (doGage ? ' and assigned to rain gage ' + (gage || newGage).id : '') + '. Check the simulation end time covers the storm.', false, 6000);
   };
 })(window.AV);
