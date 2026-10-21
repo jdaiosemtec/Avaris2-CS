@@ -1,0 +1,159 @@
+
+<section class="topic" id="play" data-ch="Results and analysis" data-title="Play results">
+<h1>Play results</h1>
+<p><span class="ui">Simulation ▸ Results ▸ Play</span> opens the playback bar below the map. The map then shows the results at the current time step, using the themes marked ▶ (time-varying).</p>
+<figure><img src="images/playbar.png" alt="Playback bar"></figure>
+<ul>
+<li><b>▶ / ❚❚</b> plays or pauses; <b>◀ / ▶</b> step back or forward by one reporting step. Drag the slider to jump to any time.</li>
+<li>Choose the <b>speed</b>: Slow, Normal, Fast or Very fast.</li>
+<li><span class="ui">Theme…</span> opens the <a href="#theme">Layer Theme Editor</a>.</li>
+<li><span class="ui">Peak ▾</span> jumps to the time of a system peak: rainfall, runoff, total lateral inflow, flooding, system outflow or storage volume. With an object selected, it can also jump to that object's own peaks.</li>
+<li><span class="ui">✕ Quit</span> closes play mode. The results stay loaded, and the map returns to the themes for whole-run values.</li>
+</ul>
+<figure><video poster="images/clip_play_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_play.webm" type="video/webm"><source src="media/clip_play.mp4" type="video/mp4"></video><figcaption>Video: playback of a 2-year storm.</figcaption></figure>
+<p>The <b>legend</b> in the lower right of the map lists the active themes. Hover over any object to read its current value. The Properties pane of a selected object shows its <i>Statistic Results</i> from the status report and a small results card.</p>
+</section>
+
+<section class="topic" id="theme" data-ch="Results and analysis" data-title="Themes">
+<h1>Themes</h1>
+<p>Themes colour and size nodes, links and subcatchments by any attribute, computed value, simulation result or expression. Open the <b>Layer Theme Editor</b> with <span class="ui">Operation ▸ Display ▸ Theme</span>, from the playback bar, or by right-clicking a layer.</p>
+<figure><img src="images/theme_editor.png" alt="Layer Theme Editor"><figcaption>The Layer Theme Editor, modelled on the InfoWorks ICM theme editor.</figcaption></figure>
+<h2>How themes combine</h2>
+<ul>
+<li>Each layer (Nodes, Links, Subcatchments) has an ordered <b>list of themes</b> above a <b>Base Theme</b>, which gives each object type its own colour.</li>
+<li>Themes are applied from the top down: the first enabled theme that sets the colour, or the size or width, of an object wins.</li>
+<li>Themes marked <b>▶</b> use results at the current time step and are shown only in play mode. The others are shown outside play mode.</li>
+<li>A <b>Where</b> condition limits a theme to some objects, for example <code>type = 'CONDUIT' and diam &gt;= 1</code>.</li>
+</ul>
+<h2>Theme settings</h2>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Options</th></tr>
+<tr><td>Variable</td><td>Any model field (diameter, invert, roughness…), computed value (slope, rim elevation, full flow…), result (max depth, max capacity, flooding, current depth…), or <i>Custom expression…</i> written in the <a href="#expressions">expression language</a>.</td></tr>
+<tr><td>Range type</td><td><i>Continuous (ranges)</i> for numbers; <i>Individual (values)</i> for categories such as type, shape or tag.</td></tr>
+<tr><td>AutoScale</td><td>Linear, Quantile (equal count), Logarithmic or Exponential. <span class="ui">Auto-Theme</span> fills the ranges from the data.</td></tr>
+<tr><td>Colour ramp</td><td>A choice of ramps. Each range can also be edited one by one: value, colour, width or size, visible.</td></tr>
+<tr><td>Options</td><td>Line colour, line width (or symbol size), absolute values, theme nulls, invert ramp, show in key, enabled.</td></tr>
+</table></div>
+<p>The <b>Labels</b> tab shows chosen variables as map labels, with the number of decimal places. <span class="ui">Save…</span> and <span class="ui">Load…</span> exchange themes between models; Load asks whether to add the loaded themes on top or replace the current ones.</p>
+<div class="callout tip"><b class="t">Tip:</b><p>Right-click a numeric column of an attribute table and choose <span class="ui">Color Map by This Field</span> to create a theme in one step.</p></div>
+</section>
+
+<section class="topic" id="flags" data-ch="Results and analysis" data-title="Flags">
+<h1>Flags</h1>
+<p class="lead">Flags are ready-made warning rules that colour the problem objects of a simulation, for example nodes that flood, pipes over capacity or sewers that silt up. Each rule has up to three levels: <b>Warning</b>, <b>High</b> and <b>Critical</b>. You can adjust the thresholds directly in the rule text, and edit the rules themselves.</p>
+<figure><video poster="images/clip_flag_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_flag.webm" type="video/webm"><source src="media/clip_flag.mp4" type="video/mp4"></video><figcaption>Video: showing the flooding flag on nodes and the capacity flag on conduits, then raising a threshold.</figcaption></figure>
+<h2>The Flag panel</h2>
+<p>Open the panel with <span class="ui">Operation ▸ Flag ▸ Flag</span>.</p>
+<figure class="narrow"><img src="images/flag_panel.png" alt="Flag panel"></figure>
+<ul>
+<li>Flags are grouped by layer: <b>Nodes</b>, <b>Links</b> and <b>Subcatchments</b>. Choose <b>one flag per layer</b> with its radio button, so up to three flags can be shown at the same time. Choose <b>None</b> to show no flag on that layer.</li>
+<li>While any flag is shown, all ordinary <b>themes are suspended</b>. Close the panel, or set every layer to None, and the themes come back.</li>
+<li>The numbers in the rule text are <b>edit boxes</b>. Type a new threshold and press <kbd>Enter</kbd>; the map updates at once. Changed values are highlighted. To return to the default value, type it again.</li>
+<li><b>Units follow the model</b>: feet and ft/s for CFS, GPM and MGD; metres and m/s for CMS, LPS and MLD. When you change the flow units, the thresholds are converted.</li>
+<li><b>▶ / Σ</b> chooses how the flag is shown:
+  <ul><li><b>▶</b> shows the level at the current time step, during playback;</li>
+  <li><b>Σ</b> shows the worst level reached during the whole run, outside playback.</li></ul></li>
+<li>Click the <b>colour strip</b> of a flag to change the colour of each level.</li>
+</ul>
+<figure><img src="images/flags_map.png" alt="Flags on the map"><figcaption>Nodes flagged for flooding (orange = High, red = Critical) and conduits flagged for capacity exceedance.</figcaption></figure>
+<h2>Colours</h2>
+<p>The colour dialog shows a short description of the flag and, for each level, its colour and the condition that sets it. To change the conditions, use <span class="ui">Edit…</span>. Tick <span class="ui">No fill</span> for <i>Normal</i> to keep the usual symbol for objects that are not flagged.</p>
+<figure class="narrow"><img src="images/flag_colours.png" alt="Flag colours dialog"></figure>
+<h2>Create your own flag</h2>
+<ol class="steps">
+<li>Click <span class="ui">+ New flag</span>.</li>
+<li>Enter a name, the layer, the display mode, a short description and the rule text. Write each number the user may change as <code>{name}</code>, without its unit.</li>
+<li>Click <span class="ui">Next: conditions…</span>.</li>
+<li>Write the condition of each level in the <a href="#expressions">expression language</a>. Refer to parameters as <code>$name</code>, and click a field or function on the right to insert it. Levels are checked from Critical down, and the first true condition sets the level.</li>
+<li>Enter the default value and unit of each parameter, and optionally a <b>Where</b> condition, then click <span class="ui">Add flag</span>.</li>
+</ol>
+<figure class="narrow"><img src="images/flag_new1.png" alt="New Flag, step 1"></figure>
+<figure><img src="images/flag_new2.png" alt="Flag conditions, step 2"><figcaption>Step 2: the condition of each level, with time functions such as <code>run(…)</code> and the parameters <code>$depth</code> and <code>$minutes</code>.</figcaption></figure>
+<p>Your own flags can be edited or deleted with the links under them. <span class="ui">Export…</span> and <span class="ui">Import…</span> share flags between models and colleagues. All flag settings are saved with the model in <code>Model.flags.json</code>.</p>
+<h2>Edit a built-in flag</h2>
+<p>Every built-in flag can be changed, not only its thresholds. Click <span class="ui">Edit…</span> under the flag to change its name, description, rule text, the condition of each level, the <b>Where</b> condition and the default values of its parameters (US and SI).</p>
+<figure><img src="images/flag_edit.png" alt="Edit Flag dialog"></figure>
+<ul>
+<li>Conditions use the <a href="#expressions">expression language</a>. <code>$name</code> is a parameter of the rule text; <code>$eps</code> (smallest flow counted as flow) and <code>$tol</code> (level tolerance) are set by Avaris2 CS for the model units.</li>
+<li><span class="ui">Copy Conditions</span> copies the conditions as text, one line per level. <span class="ui">Paste Conditions…</span> takes such text, for example a rule sent to you by OSEMTEC or a colleague:
+<pre><code>High: totdur(abs(rptFlow) &gt; $eps) &gt;= $n and 100 * dur(rptFlow &lt; -$eps) / totdur(abs(rptFlow) &gt; $eps) &gt;= $h
+Warning: totdur(abs(rptFlow) &gt; $eps) &gt;= $n and 100 * dur(rptFlow &lt; -$eps) / totdur(abs(rptFlow) &gt; $eps) &gt;= $w
+Where: type = 'CONDUIT'</code></pre></li>
+<li>If a condition has an error, the dialog shows the level and the problem, and nothing is changed.</li>
+<li>An edited flag is marked <i>edited</i> in the panel. Changes to built-in flags apply to all models on this computer. Click <span class="ui">Reset</span> to restore the original flag.</li>
+<li><span class="ui">Export…</span> includes your edits of built-in flags, and <span class="ui">Import…</span> applies them on another computer.</li>
+</ul>
+<h2>Built-in flags</h2>
+<p>Default thresholds are shown as <i>US / SI</i> values.</p>
+<div class="tablewrap"><table>
+<tr><th>Flag</th><th>Layer</th><th>Rule</th><th>Default thresholds</th></tr>
+<tr><td>Flooding at node / rim exceedance</td><td>Nodes (not outfalls)</td><td>HGL &gt; rim: High; Critical if more than <i>above</i> over the rim, or flooded longer than <i>dur</i> in total</td><td>above 0.5 ft / 0.15 m; dur 15 min</td></tr>
+<tr><td>Surcharge duration</td><td>Nodes (not outfalls)</td><td>HGL above the crown of the highest connected pipe for more than <i>w</i> in total: Warning; more than <i>h</i>: High</td><td>10 min; 60 min</td></tr>
+<tr><td>Freeboard compression</td><td>Junctions</td><td>Rim − HGL below <i>w</i>: Warning; below <i>h</i>: High (not flooding)</td><td>2 ft / 0.6 m; 1 ft / 0.3 m</td></tr>
+<tr><td>Storage nearing capacity</td><td>Storage units</td><td>Volume over <i>w</i> of full: Warning; over <i>h</i>: High; overflowing: Critical</td><td>80 %; 95 %</td></tr>
+<tr><td>Conduit capacity exceedance</td><td>Conduits</td><td>Q / Qfull over <i>w</i>: Warning; over <i>h</i>: High</td><td>90 %; 100 %</td></tr>
+<tr><td>Depth exceedance (d / D)</td><td>Conduits</td><td>Depth / diameter over <i>w</i>: Warning</td><td>0.9</td></tr>
+<tr><td>Low velocity / sedimentation risk</td><td>Conduits</td><td>No rain, flowing, velocity below <i>v</i>: Warning; continuously for <i>t</i>: High</td><td>2 ft/s / 0.6 m/s; 60 min</td></tr>
+<tr><td>High velocity / scour risk</td><td>Conduits</td><td>Velocity over <i>v</i>: Warning</td><td>10 ft/s / 3 m/s</td></tr>
+<tr><td>Reverse flow event</td><td>Conduits</td><td>Only conduits that carry flow for at least <i>n</i>: flow against the link direction (end node to start node) for at least <i>w</i> of the time with flow: Warning; at least <i>h</i>: High. Time steps without flow are not counted.</td><td>60 min; 5 %; 99 %</td></tr>
+<tr><td>Dry-weather high depth</td><td>Conduits</td><td>No rain and d / D over <i>r</i> for at least <i>t</i>: Warning</td><td>0.5; 30 min</td></tr>
+<tr><td>Tailwater sensitivity</td><td>Links into outfalls</td><td>Outfall level within <i>d</i> of the pipe crown: Warning; above the crown: High</td><td>1 ft / 0.3 m</td></tr>
+<tr><td>Slow-draining subcatchment</td><td>Subcatchments</td><td>Runoff continues more than <i>t</i> after the rain stops: Warning</td><td>120 min</td></tr>
+</table></div>
+<div class="callout"><b class="t">Accuracy</b><p>Durations are counted in reporting steps. With a 15-minute reporting step, a condition that is true at one step counts as 15 minutes. Use a shorter reporting step for more precise durations.</p></div>
+</section>
+
+<section class="topic" id="report" data-ch="Results and analysis" data-title="Report viewer">
+<h1>Report viewer</h1>
+<p><span class="ui">Simulation ▸ Results ▸ Report</span> opens the engine status report (<code>.rpt</code>) as a document with navigation, instead of plain text.</p>
+<figure><img src="images/report_overview.png" alt="Report overview"></figure>
+<div class="tablewrap"><table>
+<tr><th>Page</th><th>Contents</th></tr>
+<tr><td>Overview</td><td>KPI cards: runoff and flow-routing continuity errors, flooded nodes and flooding loss, surcharged nodes and conduits, steps not converging, total precipitation. Also a flow-routing water balance bar, the distribution of routing time steps, the main options, and the top-10 lists.</td></tr>
+<tr><td>Continuity</td><td>The runoff, groundwater and flow-routing continuity tables.</td></tr>
+<tr><td>Warnings</td><td>Engine warnings and errors.</td></tr>
+<tr><td>Insights</td><td>For every flag that uses durations (<code>dur</code>, <code>run</code>, <code>win</code>): the number of flagged objects, the worst level of each object, the time of the worst level and the total time, using the thresholds currently set in the Flag panel. Each table has <span class="ui">Export CSV</span>.</td></tr>
+<tr><td>Convergence</td><td>The most frequently non-converging nodes and the time step summary.</td></tr>
+<tr><td>Result tables</td><td>Subcatchment Runoff, Node Depth, Node Inflow, Node Surcharge, Node Flooding, Outfall Loading, Link Flow, Flow Classification, Conduit Surcharge. You can sort by any column, filter, export to CSV, and click an ID to locate the object.</td></tr>
+<tr><td>Full text</td><td>The complete report as text.</td></tr>
+</table></div>
+<figure><img src="images/report_insights.png" alt="Report Insights page"><figcaption>The Insights page: how many objects each flag marks, with the worst level and duration of each object.</figcaption></figure>
+</section>
+
+<section class="topic" id="profile" data-ch="Results and analysis" data-title="Profile (long section)">
+<h1>Profile (long section)</h1>
+<p>Select two nodes, or a chain of links, and click <span class="ui">Simulation ▸ Results ▸ Profile</span>. The profile follows the flow path between them and shows:</p>
+<ul>
+<li>the ground, manhole shafts and pipes;</li>
+<li>the water level at the current time (HGL);</li>
+<li>the maximum HGL.</li>
+</ul>
+<p>A table of node and link values sits above the graph.</p>
+<figure><img src="images/profile.png" alt="Profile view"></figure>
+<ul>
+<li><span class="ui">Play</span> animates the water level along the profile, in step with the map.</li>
+<li><span class="ui">Options</span> chooses what is drawn (node labels, max HGL, EGL) and which rows the information table shows.</li>
+<li><span class="ui">Export CSV</span> saves the table, and <span class="ui">Select on Map</span> selects the profile objects.</li>
+</ul>
+</section>
+
+<section class="topic" id="plot" data-ch="Results and analysis" data-title="Time series plots">
+<h1>Time series plots</h1>
+<p>Select one or more objects and click <span class="ui">Simulation ▸ Results ▸ Plot</span>. Choose the object type, the variable and the time axis (elapsed hours or date and time). You can tick <i>Overlay comparison run</i> to draw a second run as dashed lines.</p>
+<figure class="narrow"><img src="images/plot_dialog.png" alt="Time Series Plot dialog"></figure>
+<figure><img src="images/plot.png" alt="Time series plot"><figcaption>Depth at a junction. The vertical line marks the current time of the playback.</figcaption></figure>
+<p>Hover over the graph to read values. Drag to zoom in, and double-click to reset the zoom. <span class="ui">Export CSV</span> and <span class="ui">Save PNG</span> export the graph. The rainfall of a rain gage is drawn as an inverted bar chart; you can change this in Default Settings.</p>
+</section>
+
+<section class="topic" id="comparison" data-ch="Results and analysis" data-title="Scenario comparison">
+<h1>Scenario comparison</h1>
+<p><span class="ui">Simulation ▸ Results ▸ Comparison</span> compares two runs: two scenarios, or two runs of the same model. Load the second run from the <a href="#database">Database</a> (<i>Add to Comparison</i>), or use <span class="ui">Run Selected &amp; Compare</span> in the Scenarios panel.</p>
+<figure><img src="images/comparison.png" alt="Scenario Comparison"><figcaption>Comparing the base model with a scenario in which all pipes are 30 % larger.</figcaption></figure>
+<ul>
+<li><b>Base</b> and <b>Compare</b> choose the two runs; <b>⇄</b> swaps them.</li>
+<li><b>KPI cards</b> compare the system totals: flood volume, flooded and surcharged nodes, surcharged conduits, outfall volume, surface runoff and continuity error.</li>
+<li>The <b>difference table</b> compares one variable (max HGL, max depth, freeboard, flood volume, hours flooded, max flow, capacity…) object by object, within a tolerance. Each object is marked <i>Worse</i>, <i>Better</i>, <i>New</i> (for example, newly flooding), <i>Resolved</i> or <i>No change</i>. Tick <i>Changed only</i> to hide the unchanged objects.</li>
+<li>The <b>scatter plot</b> draws base against compare. Points above the 1:1 line are higher in the compare run. Click a point to select the object.</li>
+<li><span class="ui">Difference on Map</span> colours the map by the change, and <span class="ui">Graph Selected</span> plots both runs for the selected objects.</li>
+</ul>
+</section>

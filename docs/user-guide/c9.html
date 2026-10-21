@@ -1,0 +1,164 @@
+
+<section class="topic" id="expressions" data-ch="Reference" data-title="Expression language">
+<h1>Expression language</h1>
+<p>Select by Attribute, theme <i>Where</i> conditions, custom theme variables and flag conditions all use the same expression language. Each expression is evaluated once for every object of a layer.</p>
+<h2>Operators</h2>
+<div class="tablewrap"><table>
+<tr><th>Kind</th><th>Operators</th></tr>
+<tr><td>Arithmetic</td><td><code>+ - * / % ^</code> and parentheses</td></tr>
+<tr><td>Comparison</td><td><code>= == != &lt;&gt; &gt; &gt;= &lt; &lt;=</code>, and <code>like</code> with <code>%</code> as wildcard (<code>name like 'J_5%'</code>)</td></tr>
+<tr><td>Logical</td><td><code>and or not</code> (also <code>&amp;&amp; || !</code>)</td></tr>
+<tr><td>Values</td><td>numbers, <code>'text'</code>, <code>true</code>, <code>false</code>, <code>null</code></td></tr>
+</table></div>
+<h2>Functions</h2>
+<div class="tablewrap"><table>
+<tr><th>Group</th><th>Functions</th></tr>
+<tr><td>Math</td><td><code>abs sqrt min max round floor ceil log log10 exp pow</code></td></tr>
+<tr><td>Text</td><td><code>len upper lower contains startswith endswith num str</code></td></tr>
+<tr><td>Logic</td><td><code>iif(condition, a, b)</code>, <code>isnull(x)</code></td></tr>
+</table></div>
+<h2>Time functions</h2>
+<p>Time functions read every reporting step of the loaded results. All durations are in <b>minutes</b>, and <code>c</code> is a condition.</p>
+<div class="tablewrap"><table>
+<tr><th>Function</th><th>Returns</th><th>Changes with the time step?</th></tr>
+<tr><td><code>dur(c)</code></td><td>Total time <code>c</code> was true from the start up to the current time step</td><td>Yes</td></tr>
+<tr><td><code>run(c)</code></td><td>How long <code>c</code> has been true without a break at the current time step (0 when false now)</td><td>Yes</td></tr>
+<tr><td><code>win(c, W)</code></td><td>Time <code>c</code> was true within the last <code>W</code> minutes</td><td>Yes</td></tr>
+<tr><td><code>totdur(c)</code></td><td>Total time <code>c</code> was true in the whole simulation</td><td>No</td></tr>
+<tr><td><code>maxrun(c)</code></td><td>Longest uninterrupted period <code>c</code> was true</td><td>No</td></tr>
+<tr><td><code>maxwin(c, W)</code></td><td>Most time <code>c</code> was true within any <code>W</code>-minute window</td><td>No</td></tr>
+<tr><td><code>first(c)</code></td><td>Elapsed time when <code>c</code> was first true (null if never)</td><td>No</td></tr>
+<tr><td><code>peak(x)</code></td><td>Highest value of <code>x</code> over the simulation (x may itself use the functions above)</td><td>No</td></tr>
+</table></div>
+<p>Expressions that change with the time step are shown during playback (▶). Whole-run expressions are shown outside playback. The first use of a time function reads the results once in the background; later uses are instant.</p>
+<h2>Fields</h2>
+<p>The field list in each dialog shows every field with a description. The main groups are:</p>
+<div class="tablewrap"><table>
+<tr><th>Group</th><th>Examples</th></tr>
+<tr><td>General</td><td><code>name tag descrip type x y</code>; links also have <code>usNode dsNode</code></td></tr>
+<tr><td>Properties</td><td>Nodes: <code>elev maxDepth surDepth aPonded</code>; links: <code>length roughness inOffset outOffset shape geom1 barrels</code>; subcatchments: <code>area imperv width slope outlet gage</code></td></tr>
+<tr><td>Computed</td><td>Nodes: <code>rimElev crownElev maxVolume nLinks</code>; links: <code>slope diam usInvert dsInvert fullFlow mapLength</code>; subcatchments: <code>polyArea</code></td></tr>
+<tr><td>Results, current time step</td><td>Nodes: <code>rptDepth rptHgl rptVolume rptLatInflow rptTotInflow rptFlooding</code>; links: <code>rptFlow rptDepth rptVel rptCapacity</code>; subcatchments: <code>rptRainfall rptRunoff rptInfiltration</code>; system: <code>sysRain</code></td></tr>
+<tr><td>Results, whole run</td><td>Nodes: <code>rptMaxDepth rptMaxHgl rptFreeboard rptHrsSurcharged rptHrsFlooded rptFloodVol</code>; links: <code>rptMaxFlow rptMaxVel rptMaxCapacity rptMfFlow rptMfDepth rptSurchargeHrs</code></td></tr>
+<tr><td>Neighbours</td><td>Links: the upstream and downstream node fields with <code>us_</code> and <code>ds_</code>, for example <code>us_rptDepth</code> or <code>ds_type</code>. Subcatchments: the outlet node fields with <code>out_</code>.</td></tr>
+</table></div>
+<h2>Examples</h2>
+<pre><code>// conduits that ran more than 90 % full
+rptMaxCapacity &gt; 0.9
+
+// nodes that flooded for more than 30 minutes in total
+totdur(rptFlooding &gt; 0) &gt; 30
+
+// level 2 when surcharged for 60 min without a break, else 1 when surcharged now, else 0
+iif(run(rptHgl &gt; crownElev) &gt;= 60, 2, iif(rptHgl &gt; crownElev, 1, 0))
+
+// pipes whose downstream node is an outfall
+ds_type = 'OUTFALL'</code></pre>
+</section>
+
+<section class="topic" id="shortcuts" data-ch="Reference" data-title="Keyboard shortcuts">
+<h1>Keyboard shortcuts</h1>
+<div class="tablewrap"><table>
+<tr><th>Keys</th><th>Action</th></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> / <kbd>Ctrl</kbd>+<kbd>O</kbd> / <kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>New / Open / Save</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save As</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Undo / Redo</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Copy / paste objects</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all</td></tr>
+<tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Find an object</td></tr>
+<tr><td><kbd>Del</kbd></td><td>Delete the selection</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Cancel the current tool, clear the selection</td></tr>
+<tr><td><kbd>F5</kbd></td><td>Run simulation</td></tr>
+<tr><td><kbd>Home</kbd></td><td>Zoom to the whole model</td></tr>
+<tr><td><kbd>T</kbd></td><td>Hide or show theme colouring</td></tr>
+<tr><td>Mouse wheel</td><td>Zoom</td></tr>
+<tr><td><kbd>Space</kbd>+drag, or middle mouse button</td><td>Pan</td></tr>
+<tr><td><kbd>Ctrl</kbd>+click</td><td>Add to or remove from the selection</td></tr>
+<tr><td><kbd>Shift</kbd>+click</td><td>Choose between overlapping objects</td></tr>
+<tr><td><kbd>Backspace</kbd></td><td>Remove the last vertex while drawing</td></tr>
+<tr><td><kbd>Enter</kbd> or double-click</td><td>Finish a polygon or line</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="engine" data-ch="Reference" data-title="The Avaris engine">
+<h1>The Avaris engine</h1>
+<p>Avaris2 CS runs simulations with the Avaris hydraulic engine: a dynamic-wave, kinematic-wave and steady-flow solver for urban drainage networks, with rainfall-runoff, infiltration, groundwater, snowmelt, RDII, LID and water quality. Compared with standard solvers for the <code>.inp</code> format, it adds:</p>
+<ul>
+<li><b>User-set under-relaxation</b> of the dynamic-wave iterations (<code>UNDER_RELAXATION</code>, 0.1–1.0; the standard value is 0.5).</li>
+<li><b>Parallel node-depth solution</b> with OpenMP, with per-node convergence flags. The results do not depend on the number of threads.</li>
+<li><b>Extended non-convergence report</b>: up to 500 nodes in "Most Frequent Nonconverging Nodes" (<code>NONCONV_REPORT_COUNT</code>). Outfalls are excluded from the statistics.</li>
+<li>An optional <b>compact report</b> that leaves out the time series tables.</li>
+<li>Sections the engine does not use, such as <code>[GROUPS]</code> written by Avaris DS, are skipped instead of causing an error.</li>
+<li><b>Manhole chamber area</b> and an <b>impervious runoff coefficient</b> per subcatchment, read from the <code>;;@OSEM</code> comment lines.</li>
+<li>The 2D surface mesh for 1D-2D runs.</li>
+</ul>
+<figure class="narrow"><img src="images/about.png" alt="About Avaris2 CS"><figcaption><span class="ui">Help ▸ About</span> shows the program and engine versions and the number of CPU threads.</figcaption></figure>
+<p>A model saved by Avaris2 CS can also be run by EPA SWMM 5.2. The Avaris-specific settings are then ignored.</p>
+</section>
+
+<section class="topic" id="troubleshooting" data-ch="Reference" data-title="Troubleshooting and FAQ">
+<h1>Troubleshooting and FAQ</h1>
+<h3>Windows shows "Windows protected your PC" when I install</h3>
+<p>Click <span class="ui">More info ▸ Run anyway</span>. See <a href="#install">Install Avaris2 CS</a>.</p>
+<h3>The basemap is empty or in the wrong place</h3>
+<p>The basemap needs an internet connection and a correct coordinate system. Open the coordinate system dialog and check where the model centre lands. A wrong <code>.prj</code> file next to the model is the most common cause. See <a href="#crs">Coordinate systems and basemaps</a>.</p>
+<h3>A large model is slow to zoom and pan</h3>
+<ul>
+<li>Turn on <span class="ui">Default Settings ▸ Simplify the map when zoomed out</span>.</li>
+<li>Hide the layers you do not need, such as subcatchments or labels.</li>
+<li><span class="ui">Help ▸ Diagnostics</span> shows the time each step takes. Copy the table and send it to support.</li>
+</ul>
+<h3>The simulation has a high continuity error or many non-converging steps</h3>
+<ul>
+<li>Use <a href="#run">Convergence diagnostics</a> to find the problem nodes.</li>
+<li>Convert orifices to equivalent conduits.</li>
+<li>Lower the under-relaxation factor, and check very short conduits.</li>
+</ul>
+<h3>Flags show nothing</h3>
+<ul>
+<li>Load results first.</li>
+<li>A flag set to <b>▶</b> is shown only during playback, and a flag set to <b>Σ</b> only outside playback.</li>
+<li>Flags that use durations need a moment to read the results the first time; the status bar shows the progress.</li>
+</ul>
+<h3>My themes disappeared</h3>
+<ul>
+<li>Themes are suspended while a flag is shown: close the Flag panel.</li>
+<li>The eye button (<kbd>T</kbd>) may also be hiding the colouring.</li>
+</ul>
+<h3>Avaris2 CS opens read-only</h3>
+<p>The message in the read-only notice tells you why: no licence, an expired licence, a licence for another computer, or a computer clock set earlier than the last use. See <a href="#licensing">Licensing and registration</a>.</p>
+<h3>Where are my settings stored?</h3>
+<p>In <code>%APPDATA%\OsemCM</code>: user accounts, recent files, layer styles, themes and preferences. Model-specific settings are stored next to the model.</p>
+</section>
+
+<section class="topic" id="legal" data-ch="Reference" data-title="Legal notices">
+<h1>Legal notices</h1>
+<p>Avaris2 CS © 2026 OSEMTEC. All rights reserved.</p>
+<p>Avaris2 CS includes open-source components that remain under their own licences. The full notices are in <code>THIRD-PARTY-NOTICES.txt</code> in the installation folder, and are shown in the program with <span class="ui">Help ▸ About ▸ Third-party notices</span>, where they can also be copied.</p>
+<figure><img src="images/notices.png" alt="Third-Party Notices dialog"></figure>
+<div class="tablewrap"><table>
+<tr><th>Component</th><th>Use</th><th>Licence</th></tr>
+<tr><td>Electron, Chromium, Node.js</td><td>Application framework</td><td>MIT, BSD-style and others (<code>LICENSE</code>, <code>LICENSES.chromium.html</code>)</td></tr>
+<tr><td>GDAL / OGR</td><td>Esri File Geodatabase read and write</td><td>MIT / X11</td></tr>
+<tr><td>PROJ</td><td>Coordinate transformation data used by GDAL</td><td>MIT / X11</td></tr>
+<tr><td>LLVM OpenMP runtime</td><td>Multi-threading of the hydraulic engine</td><td>Apache 2.0 with LLVM Exceptions</td></tr>
+<tr><td>Public-domain code of the U.S. Environmental Protection Agency</td><td>Parts of the hydraulic engine</td><td>Public domain</td></tr>
+</table></div>
+<h2>Basemap data</h2>
+<p>Basemaps are loaded from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> (© OpenStreetMap contributors, ODbL) and <a href="https://opentopomap.org/about">OpenTopoMap</a> (© OpenTopoMap, CC-BY-SA; elevation SRTM). The attribution is shown in the lower-right corner of the map and must not be removed from exported or published maps. Please download tiles for offline use only for your project area: the tile servers are run by volunteers.</p>
+</section>
+
+<section class="topic" id="versions" data-ch="Reference" data-title="Version history">
+<h1>Version history</h1>
+<div class="tablewrap"><table>
+<tr><th>Version</th><th>Highlights</th></tr>
+<tr><td>2.2</td><td>Licences per computer (1D / 1D-2D; 30 days, 1 year or several years): request with your osemtec.com account by e-mail (Gmail, Outlook.com, Microsoft 365 or e-mail program), offline activation; read-only mode without a licence. Reverse flow flag based on the time with flow. Built-in flags can be edited (conditions, parameters) and reset.</td></tr>
+<tr><td>2.1</td><td>Renamed Avaris2 CS. Basemap tile cache and <i>Download for Offline Use</i>. Third-party notices in Help ▸ About. Attribute tables for imported GIS layers. Reverse-flow flag based on the share of the simulation time. The Flag panel keeps its scroll position. The change-log filter is cleared when another object is selected.</td></tr>
+<tr><td>2.0.14</td><td>Flag panel: 12 built-in rules plus custom flags, editable thresholds, units that follow the model, ▶ / Σ display, colours with <i>No fill</i>.</td></tr>
+<tr><td>2.0.13</td><td>Level-of-detail map drawing for very large models.</td></tr>
+<tr><td>2.0.12</td><td>High-resolution icons. WKT2 and Hotine Oblique Mercator coordinate systems, with a check of where the model centre lands. Diagnostics.</td></tr>
+<tr><td>2.0.11</td><td>Time functions in expressions. Report viewer with an Insights page. Eye button and Locator.</td></tr>
+<tr><td>2.0</td><td>Ribbon interface, Layer Theme Editor, 2D flood module, scenario comparison, users and change history, Avaris engine settings.</td></tr>
+</table></div>
+<p class="updated">This guide describes Avaris2 CS 2.2. © 2026 OSEMTEC.</p>
+</section>

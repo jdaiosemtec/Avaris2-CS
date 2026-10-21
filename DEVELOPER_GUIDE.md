@@ -1,6 +1,6 @@
 # Avaris2 CS 开发指导手册（源码说明）
 
-版本：2.1.0（2026-10-21） · 公司：OSEMTEC
+版本：2.2.3（2026-10-21） · 公司：OSEMTEC
 
 这份手册面向接手 Avaris2 CS 源码的开发人员。内容包括：
 - 软件的整体结构，以及每个文件是做什么的；
@@ -59,6 +59,8 @@ Avaris2CS.exe (Electron)
 | `.gitignore` | 排除 `dist/`、`node_modules/`、`app/gdal/`（体积大，单独附带）、`license-tools/private_key.pem`。 |
 | `build/icon.png`, `build/icon.ico` | 程序和安装包图标（A² 标志），ico 内含多种尺寸。 |
 | `docs/FEATURES-1D-2D.md` | 1D 和 2D 功能划分清单，供以后开启许可证分版本时查找对应代码。 |
+| `docs/KNOWLEDGE_HANDOFF.md` | 经验与知识交接：合作方式、可复用模块、踩过的坑，以及给供水管网模型项目的建议。 |
+| `docs/user-guide/` | 用户手册源文件（c1–c9.html、图片、视频），`python3 build.py` 生成网页版到 `build/`。 |
 | `tests/launch_dev.sh` | 在 Linux 无界面环境下从源码启动程序，并打开 CDP 调试端口 9333。 |
 | `tests/e2e_smoke.py` | Playwright 冒烟测试：打开样例模型、属性表、Flag 面板，有 JS 报错即失败。 |
 | `tools/peicon.py` | 把 PNG 图标写入 Windows exe 的图标资源（Linux 上没有 rcedit 时使用）。 |

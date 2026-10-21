@@ -1,0 +1,62 @@
+
+<section class="topic" id="tools-connectivity" data-ch="Tools" data-title="Connectivity: trace and path">
+<h1>Connectivity: trace and path</h1>
+<ul>
+<li><b>Upstream Trace</b> and <b>Downstream Trace</b> (<span class="ui">Tools ▸ Connectivity</span>) select and highlight every node and link upstream or downstream of the selected node or link. The status bar sums the trace: number of objects, conduit length and contributing subcatchment area.</li>
+<li><b>Path</b> opens a small panel: click the start node and the end node on the map, and the path between them is highlighted and selected. Untick <i>Directed</i> to allow paths against the flow direction.</li>
+<li><b>Clear Trace</b> removes the highlight.</li>
+</ul>
+<figure><video poster="images/clip_trace_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_trace.webm" type="video/webm"><source src="media/clip_trace.mp4" type="video/mp4"></video><figcaption>Video: upstream trace from an outfall.</figcaption></figure>
+<div class="callout tip"><b class="t">Tip:</b><p>After a trace, open <span class="ui">Groups ▸ Create Group…</span> to save the traced catchment, or open the attribute table with <span class="ui">Selected only</span> ticked to review it.</p></div>
+</section>
+
+<section class="topic" id="tools-geometry" data-ch="Tools" data-title="Network geometry tools">
+<h1>Network geometry tools</h1>
+<h2>Batch Assign Outlet</h2>
+<p>Assigns the outlet node of many subcatchments at once. Each subcatchment drains to the node with the lowest invert inside its polygon, or to the nearest node if there is none inside. You can apply it to all or only the selected subcatchments, and limit it to subcatchments without a valid outlet.</p>
+<figure class="narrow"><img src="images/batch_assign_outlet.png" alt="Batch Assign Outlet"></figure>
+<h2>Recalculate Subcatchment Area / Conduit Length</h2>
+<p>These tools recompute the areas from the polygons and the lengths from the drawn lines, in map units. Set <span class="ui">Map Units</span> in the status bar first. For conduits you can set a minimum length.</p>
+<h2>Derive Elevations (design inverts)</h2>
+<p>Designs invert elevations for a tree-shaped (dendritic) network from the rim levels:</p>
+<ul>
+<li>Ground level at each node is the current invert plus its maximum depth.</li>
+<li>The deepest conduit at each node keeps the minimum cover over the pipe crown.</li>
+<li>Inverts are worked downstream from the most upstream nodes so that every conduit keeps at least the minimum slope.</li>
+<li>Where needed, drop structures (inlet offsets) are used.</li>
+</ul>
+<p>Max. depths and conduit offsets are updated to match. A network that contains a loop is rejected.</p>
+<figure><img src="images/derive_elev.png" alt="Derive Elevation dialog"></figure>
+<h2>Orifice to Conduit</h2>
+<p>In dynamic-wave models, orifices are a frequent cause of non-convergence. This tool replaces them with short equivalent conduits that behave like orifices:</p>
+<ul>
+<li>the same cross section and inlet invert;</li>
+<li>a length of 10 ft (3.048 m);</li>
+<li>entry loss 0.5, exit loss 1.0, Manning's n 0.013.</li>
+</ul>
+<p>Orifices used by control rules can be skipped, and the new conduits are tagged so you can find them.</p>
+<figure><img src="images/orifice_conduit.png" alt="Convert Orifices to Equivalent Conduits"></figure>
+<h2>Measure</h2>
+<p>Click points on the map to measure a distance in map units. Double-click to finish.</p>
+</section>
+
+<section class="topic" id="validate" data-ch="Tools" data-title="Validate the model">
+<h1>Validate the model</h1>
+<p><span class="ui">Tools ▸ Utilities ▸ Validate Model</span> checks the model and lists the problems in a Validation view.</p>
+<ul>
+<li><b>Errors</b>:
+  <ul><li>links whose inlet or outlet node does not exist;</li>
+  <li>conduits with zero length or zero depth;</li>
+  <li>a pump curve, rain gage, time series or subcatchment outlet that is not defined;</li>
+  <li>a conduit that starts and ends at the same node.</li></ul></li>
+<li><b>Warnings</b>:
+  <ul><li>nodes not connected to any link;</li>
+  <li>adverse (negative) conduit slopes.</li></ul></li>
+<li><b>Notes</b>:
+  <ul><li>junctions with zero depth;</li>
+  <li>a conduit crown above the rim of its upstream node;</li>
+  <li>very short conduits that can limit the time step;</li>
+  <li>orifices in dynamic-wave models.</li></ul></li>
+</ul>
+<p>Click a row to select the object and zoom to it, and click <span class="ui">Re-check</span> after fixing problems. The quick checks also run automatically before each simulation.</p>
+</section>

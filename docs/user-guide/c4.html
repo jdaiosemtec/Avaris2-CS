@@ -1,0 +1,120 @@
+
+<section class="topic" id="select" data-ch="Editing the network" data-title="Select, search and groups">
+<h1>Select, search and groups</h1>
+<h2>Select on the map</h2>
+<p>With the <span class="ui">Select</span> tool active, which is the default:</p>
+<ul>
+<li>Click an object to select it.</li>
+<li>Drag a box to select everything inside it.</li>
+<li><kbd>Ctrl</kbd>+click adds or removes an object.</li>
+<li><kbd>Shift</kbd>+click lets you choose between overlapping objects.</li>
+</ul>
+<p>The status bar shows how many objects are selected, with their total area and length.</p>
+<h2>Search</h2>
+<p><span class="ui">Operation ▸ Selection ▸ Search</span> (<kbd>Ctrl</kbd>+<kbd>F</kbd>) finds objects by ID, part of an ID or tag, optionally for one object type. Click a result to zoom to it, or click <span class="ui">Select All Results</span> to select every match.</p>
+<figure class="small"><img src="images/search.png" alt="Search panel"></figure>
+<h2>Groups</h2>
+<p>Groups are named sets of objects, for example <i>Phase 1 upgrades</i> or <i>Pump station catchment A</i>. They are stored in the <code>[GROUPS]</code> section of the <code>.inp</code> file, in the same format Avaris DS uses.</p>
+<figure class="narrow"><img src="images/groups.png" alt="Manage Groups panel"></figure>
+<ol class="steps">
+<li>Select objects on the map and open <span class="ui">Operation ▸ Selection ▸ Groups</span>.</li>
+<li>Click <span class="ui">Create Group…</span> and enter a name.</li>
+<li>Later, double-click a group to select it and zoom to it. Use <span class="ui">Add Selection</span> and <span class="ui">Remove Selection</span> to change its members, or <span class="ui">Rename…</span> and <span class="ui">Delete</span> to change the group itself.</li>
+</ol>
+<h2>Bookmarks</h2>
+<p><span class="ui">Create Bookmark</span> saves the current map view under a name. <span class="ui">Manage Bookmarks</span> lists them with <span class="ui">Go To</span>, <span class="ui">Rename</span> and <span class="ui">Delete</span>.</p>
+</section>
+
+<section class="topic" id="add-objects" data-ch="Editing the network" data-title="Add and remove objects">
+<h1>Add and remove objects</h1>
+<ol class="steps">
+<li>Click <span class="ui">Operation ▸ Edit ▸ Add</span>.</li>
+<li>Click the layer to add to in the Layer View: Junctions, Outfalls, Storages, Dividers, Conduits, Pumps, Orifices, Weirs, Outlets, Subcatchments, Rain Gages or Map Labels.</li>
+<li>Click on the map:
+  <ul>
+  <li><b>Nodes and rain gages</b>: one click per object.</li>
+  <li><b>Links</b>: click the upstream node, optionally click to place bends, then click the downstream node.</li>
+  <li><b>Subcatchments</b>: click the corners of the outline and double-click (or press <kbd>Enter</kbd>) to finish. <kbd>Backspace</kbd> removes the last corner.</li>
+  </ul></li>
+<li>Press <kbd>Esc</kbd> to stop adding.</li>
+</ol>
+<p>New objects get the next free ID and the default values set in <span class="ui">Simulation ▸ Options ▸ Object Defaults</span>. Conduit length is taken from the map when <i>Auto length from map</i> is ticked.</p>
+<p>To delete objects, select them and click <span class="ui">Remove</span> or press <kbd>Del</kbd>. Links connected to a deleted node are deleted too.</p>
+<h2>Copy and paste</h2>
+<p><kbd>Ctrl</kbd>+<kbd>C</kbd> copies the selected objects together with everything they use: inflows, RDII, groundwater, LID usage, curves, time series and patterns. <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes them into the same model or into another model, even in another Avaris2 CS window. IDs that already exist are renamed with a suffix (_1, _2 …).</p>
+</section>
+
+<section class="topic" id="edit-geometry" data-ch="Editing the network" data-title="Edit geometry, split and merge">
+<h1>Edit geometry, split and merge</h1>
+<h2>Edit Geometry</h2>
+<p>Turn on <span class="ui">Operation ▸ Edit ▸ Edit Geometry</span>; the status bar then shows <i>Edit: ON</i>. In this mode you can:</p>
+<ul>
+<li>drag selected nodes;</li>
+<li>drag link vertices;</li>
+<li>double-click a link to add a vertex.</li>
+</ul>
+<p>Turn the mode off to avoid moving objects by accident.</p>
+<h2>Split</h2>
+<p>Use <span class="ui">Split</span> to:</p>
+<ul>
+<li>insert a new junction into a conduit at the point you click. The two new conduits keep the original properties, and the length is shared in proportion to the split point.</li>
+<li>cut a selected subcatchment in two along a line you draw. Area and width are shared out by area.</li>
+</ul>
+<h2>Merge</h2>
+<ul>
+<li><b>Subcatchments</b>: select adjacent subcatchments, click <span class="ui">Merge</span> and choose the one to keep. Areas, widths and curb lengths are summed. Percent impervious, slope, roughness and storage are area-weighted.</li>
+<li><b>Conduits</b>: select the junction where two conduits meet and click <span class="ui">Merge</span> to join them into one conduit.</li>
+</ul>
+<h2>Assign Outlet</h2>
+<p>Click <span class="ui">Assign Outlet</span>, click a subcatchment (<kbd>Ctrl</kbd>+click for several), then click the node it drains to. For many subcatchments at once, use <a href="#tools-geometry">Batch Assign Outlet</a>.</p>
+<h2>Convert Type and Reverse</h2>
+<p><span class="ui">Convert Type</span> changes selected objects into another type, for example a junction into a storage unit or a conduit into a weir, For nodes, the invert elevation and depth are kept and the other properties get default values. For links, the cross section and offsets are kept where the new type uses them. <span class="ui">Reverse</span> swaps the start and end nodes of the selected links, together with their offsets.</p>
+</section>
+
+<section class="topic" id="edit-properties" data-ch="Editing the network" data-title="Edit properties">
+<h1>Edit properties</h1>
+<p>Edit values in the <a href="#properties">Properties pane</a> or in an <a href="#attribute-table">attribute table</a>.</p>
+<h2>Several objects at once</h2>
+<ul>
+<li>Select the objects. In the Properties pane, choose the object type, then type a value: it is applied to every selected object of that type.</li>
+<li>Click <span class="ui">Batch Edit…</span> to apply a value or an expression, such as <code>x*1.1</code> to raise every value by 10 %.</li>
+<li>In an attribute table, right-click a column header and choose <span class="ui">Field Calculator…</span> to calculate a field from other fields, for example <code>elev + maxDepth</code>.</li>
+</ul>
+<h2>Cross sections</h2>
+<p>For a conduit, click the pencil button next to <i>Shape</i> to open the Cross Section Editor. Pick the shape from the picture gallery, then enter its dimensions. The editor offers all the standard shapes, plus irregular (transect), custom (shape curve) and street sections.</p>
+<figure><img src="images/xsect_editor.png" alt="Cross Section Editor"></figure>
+<h2>Inflows and other per-object data</h2>
+<p>The pencil buttons in the Properties pane open the editors for:</p>
+<ul>
+<li>Direct Inflows (time series and baseline with patterns);</li>
+<li>Dry Weather Flows (average value with monthly, daily and hourly patterns);</li>
+<li>RDII (unit hydrograph and sewershed area);</li>
+<li>Groundwater;</li>
+<li>LID Usage of a subcatchment.</li>
+</ul>
+<h2>Undo and redo</h2>
+<p>Every change, including bulk changes, can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and redone with <kbd>Ctrl</kbd>+<kbd>Y</kbd>, or with the arrows in the quick-access toolbar.</p>
+</section>
+
+<section class="topic" id="history" data-ch="Editing the network" data-title="Change log and history">
+<h1>Change log and history</h1>
+<p>Avaris2 CS records every change to a model: who made it, when, which object and variable, the old value and the new value. The record is kept in <code>Model.osemhist.json</code> next to the model.</p>
+<h2>Log of the selected object</h2>
+<p>The <b>Log</b> below the Properties pane lists the changes of the selected object. Changes that are not saved yet are shown in italics. Click a property name in the Properties pane to show only the changes of that variable.</p>
+<figure class="small"><img src="images/change_log.png" alt="Log of a junction"></figure>
+<h2>Model Change History</h2>
+<p><span class="ui">Project ▸ User ▸ Change History</span>, or <span class="ui">Operation ▸ Change Log ▸ History</span>, lists every change in the model. You can:</p>
+<ul>
+<li>filter it by user, object type, object, variable or value;</li>
+<li>show only the changes of the selected objects;</li>
+<li>export the list as CSV.</li>
+</ul>
+<p>Click a row to select that object on the map.</p>
+<figure><img src="images/change_history.png" alt="Model Change History"></figure>
+<p>In <span class="ui">Project ▸ Settings ▸ Default</span> you can choose:</p>
+<ul>
+<li>whether a comment is requested each time you save;</li>
+<li>how often edits are recorded: every second, every minute, every 10 minutes, or only the last value when the model is saved.</li>
+</ul>
+<figure class="narrow"><img src="images/default_settings.png" alt="Default Settings"></figure>
+</section>

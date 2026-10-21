@@ -1,6 +1,6 @@
 # Avaris2 CS — notes for Claude
 
-Read `DEVELOPER_GUIDE.md` (Chinese, complete file-by-file guide) before changing code. Short version:
+Read `DEVELOPER_GUIDE.md` (Chinese, complete file-by-file guide) and `docs/KNOWLEDGE_HANDOFF.md` before changing code. Short version:
 
 - Electron 33.2.1 desktop app for Windows. `app/main.js` (main process, IPC `window.host.*` via `preload.js`),
   `app/renderer/index.html` + `js/*.js` (plain JS, global `window.AV`, no build step), `app/outreader.js` (.out reader).

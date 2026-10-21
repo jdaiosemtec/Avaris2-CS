@@ -1,0 +1,75 @@
+
+<div class="pager" id="pager"></div>
+</article></main>
+<aside class="toc" id="toc"></aside>
+</div>
+<div class="lightbox" id="lb"><img alt=""></div>
+<script>
+(function () {
+  var $ = function (s, r) { return (r || document).querySelector(s); }, $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var topics = $$('section.topic'); var byId = {}; topics.forEach(function (t) { byId[t.id] = t; });
+  // ---- navigation tree (chapters in order of appearance)
+  var nav = $('#nav'), chapters = [], chMap = {};
+  topics.forEach(function (t) { var c = t.dataset.ch; if (!chMap[c]) { chMap[c] = { name: c, items: [] }; chapters.push(chMap[c]); } chMap[c].items.push(t); });
+  chapters.forEach(function (c) {
+    var d = document.createElement('div'); d.className = 'ch';
+    var b = document.createElement('button'); b.className = 'chh'; b.innerHTML = '<span class="tw">▸</span>' + c.name; b.onclick = function () { d.classList.toggle('open'); };
+    var ul = document.createElement('ul');
+    c.items.forEach(function (t) { var li = document.createElement('li'); var a = document.createElement('a'); a.href = '#' + t.id; a.textContent = t.dataset.title; li.appendChild(a); ul.appendChild(li); });
+    d.appendChild(b); d.appendChild(ul); nav.appendChild(d); c.el = d;
+  });
+  // ---- show a topic
+  function show(id) {
+    var hashId = id; var t = byId[id];
+    if (!t) { var el = document.getElementById(id); if (el && el.closest) { t = el.closest('section.topic'); } }
+    if (!t) t = topics[0];
+    topics.forEach(function (x) { x.classList.toggle('on', x === t); if (x !== t) $$('video', x).forEach(function (v) { v.pause(); }); });
+    $$('#nav a').forEach(function (a) { a.classList.toggle('on', a.getAttribute('href') === '#' + t.id); });
+    chapters.forEach(function (c) { if (c.items.indexOf(t) >= 0) c.el.classList.add('open'); });
+    document.title = t.dataset.title + ' — Avaris2 CS User Guide';
+    var cr = $('.crumbs', t); if (!cr) { cr = document.createElement('div'); cr.className = 'crumbs'; t.insertBefore(cr, t.firstChild); }
+    cr.textContent = 'Avaris2 CS User Guide  ›  ' + t.dataset.ch;
+    // table of contents of the topic
+    var toc = $('#toc'); toc.innerHTML = ''; var hs = $$('h2', t);
+    if (hs.length > 1) { var b = document.createElement('b'); b.textContent = 'In this topic'; toc.appendChild(b);
+      hs.forEach(function (h, i) { if (!h.id) h.id = t.id + '-' + (h.textContent.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || i); var a = document.createElement('a'); a.href = '#' + h.id; a.textContent = h.textContent; a.onclick = function (e) { e.preventDefault(); h.scrollIntoView({ behavior: 'smooth' }); history.replaceState(null, '', '#' + h.id); }; toc.appendChild(a); }); }
+    // previous / next
+    var i = topics.indexOf(t), p = topics[i - 1], n = topics[i + 1], pg = $('#pager'); pg.innerHTML = '';
+    if (p) pg.insertAdjacentHTML('beforeend', '<a class="prev" href="#' + p.id + '"><small>‹ Previous</small>' + p.dataset.title + '</a>'); else pg.insertAdjacentHTML('beforeend', '<span style="flex:1"></span>');
+    if (n) pg.insertAdjacentHTML('beforeend', '<a class="next" href="#' + n.id + '"><small>Next ›</small>' + n.dataset.title + '</a>');
+    document.body.classList.remove('navopen');
+    var target = hashId !== t.id ? document.getElementById(hashId) : null;
+    if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+  show(location.hash.slice(1) || topics[0].id);
+  // highlight the TOC entry of the heading in view
+  window.addEventListener('scroll', function () { var links = $$('#toc a'); var cur = null; links.forEach(function (a) { var h = document.getElementById(a.getAttribute('href').slice(1)); if (h && h.getBoundingClientRect().top < 140) cur = a; }); links.forEach(function (a) { a.classList.toggle('on', a === cur); }); }, { passive: true });
+  // ---- search
+  function txt(el) { var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, out = []; while ((n = w.nextNode())) out.push(n.nodeValue); return out.join(' '); }
+  var idx = topics.map(function (t) { return { t: t, title: t.dataset.title, ch: t.dataset.ch, text: (t.dataset.title + ' ' + txt(t)).replace(/\s+/g, ' ') }; });
+  var q = $('#q'), res = $('#res'), sel = -1;
+  function run() {
+    var s = q.value.trim().toLowerCase(); res.innerHTML = ''; sel = -1; if (s.length < 2) { res.style.display = 'none'; return; }
+    var words = s.split(/\s+/);
+    var hits = idx.map(function (d) { var L = d.text.toLowerCase(), sc = 0; for (var k = 0; k < words.length; k++) { var w = words[k]; if (L.indexOf(w) < 0) return null; sc += (d.title.toLowerCase().indexOf(w) >= 0 ? 10 : 0) + Math.min(5, L.split(w).length - 1); } return { d: d, sc: sc, L: L }; }).filter(Boolean).sort(function (a, b) { return b.sc - a.sc; }).slice(0, 12);
+    if (!hits.length) { res.innerHTML = '<a>No results</a>'; res.style.display = 'block'; return; }
+    hits.forEach(function (h) { var p = h.L.indexOf(words[0]); var snip = h.d.text.slice(Math.max(0, p - 50), p + 90); var a = document.createElement('a'); a.href = '#' + h.d.t.id; a.innerHTML = '<span></span><small></small>'; a.firstChild.textContent = h.d.title; a.lastChild.textContent = h.d.ch + ' · …' + snip + '…'; a.onclick = function () { res.style.display = 'none'; q.blur(); }; res.appendChild(a); });
+    res.style.display = 'block';
+  }
+  q.addEventListener('input', run);
+  q.addEventListener('keydown', function (e) { var as = $$('a[href]', res); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(0, Math.min(as.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1))); as.forEach(function (a, i) { a.classList.toggle('on', i === sel); }); } else if (e.key === 'Enter' && as.length) { location.hash = as[Math.max(0, sel)].getAttribute('href'); res.style.display = 'none'; q.blur(); } else if (e.key === 'Escape') { res.style.display = 'none'; } });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.search')) res.style.display = 'none'; });
+  document.addEventListener('keydown', function (e) { if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); } });
+  // ---- image zoom
+  var lb = $('#lb'); $$('figure img').forEach(function (img) { img.loading = 'lazy'; img.addEventListener('click', function () { $('img', lb).src = img.src; lb.classList.add('on'); }); });
+  lb.addEventListener('click', function () { lb.classList.remove('on'); });
+  // ---- mobile contents, theme
+  $('#menuBtn').onclick = function () { document.body.classList.toggle('navopen'); }; $('#backdrop').onclick = function () { document.body.classList.remove('navopen'); };
+  function setTheme(v) { if (v) document.documentElement.setAttribute('data-theme', v); else document.documentElement.removeAttribute('data-theme'); }
+  try { setTheme(localStorage.getItem('av2-guide-theme')); } catch (e) { }
+  $('#themeBtn').onclick = function () { var cur = document.documentElement.getAttribute('data-theme'); var dark = cur ? cur === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; var v = dark ? 'light' : 'dark'; setTheme(v); try { localStorage.setItem('av2-guide-theme', v); } catch (e) { } };
+})();
+</script>
+</body>
+</html>

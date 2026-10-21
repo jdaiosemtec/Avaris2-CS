@@ -1,0 +1,51 @@
+
+<section class="topic" id="param-editors" data-ch="Model parameters" data-title="Parameter editors">
+<h1>Parameter editors</h1>
+<p>Rain gages, aquifers, snow packs, unit hydrographs, LID controls, transects, pollutants, land uses, curves, time series and patterns all use the same type of editor:</p>
+<ul>
+<li>a list of items on the left, with <span class="ui">+</span> (add), <span class="ui">−</span> (delete) and copy buttons;</li>
+<li>the properties of the selected item on the right.</li>
+</ul>
+<p>Open an editor from the <a href="#parameter-view">Parameter View</a>, or from the pencil button next to a reference in the Properties pane, for example the time series of a rain gage. Changes are applied when you click <span class="ui">OK</span> and can be undone.</p>
+<figure><img src="images/raingage_editor.png" alt="Rain Gage Editor"><figcaption>Rain Gage Editor. A time series in other rain units than the project is converted when the model is run.</figcaption></figure>
+<h2>Climatology</h2>
+<p>The Climatology Editor has one tab per climate section: Climate File, Temperature, Evaporation, Wind Speed, Snow Melt, Areal Depletion and Adjustments.</p>
+<figure><img src="images/climatology.png" alt="Climatology Editor"></figure>
+<h2>Time series</h2>
+<p>A time series holds either its own data or a reference to an external file. You can import or export it as text, copy it to Excel or paste it from Excel, and view it as a graph. Dates may be left blank to use elapsed hours since the start of the simulation.</p>
+<figure><img src="images/ts_editor.png" alt="Time Series Editor"></figure>
+<h2>LID controls</h2>
+<p>The LID Control Editor shows a cross section of the selected LID type: bio-retention cell, rain garden, green roof, infiltration trench, permeable pavement, rain barrel, rooftop disconnection or vegetative swale. It also has one tab per layer of that type (Surface, Soil, Pavement, Storage, Drain or Drain Mat).</p>
+<figure><img src="images/lid_editor.png" alt="LID Control Editor"></figure>
+<p>Assign LID controls to a subcatchment with the <span class="ui">LID Usage</span> button in its properties.</p>
+<h2>Curves, patterns, controls and transects</h2>
+<ul>
+<li><b>Curves</b> are grouped by type: Control, Diversion, Pump, Rating, Shape, Storage, Tidal and Weir. The editor shows the curve as a graph.</li>
+<li><b>Time patterns</b>: monthly, daily, hourly and weekend multipliers.</li>
+<li><b>Controls</b>: one control rule per item, edited as text (IF … THEN … ELSE … PRIORITY), plus the VARIABLE and EXPRESSION definitions.</li>
+<li><b>Transects</b>: station and elevation pairs, with the main channel and overbank roughness.</li>
+</ul>
+<h2>Reporting options</h2>
+<p><span class="ui">Parameter View ▸ Options ▸ Reporting</span> chooses which nodes, links and subcatchments are written to the status report, and whether the input summary, control actions and average results are included. The binary results file always holds every object, so maps, plots and themes are not affected.</p>
+</section>
+
+<section class="topic" id="design-storm" data-ch="Model parameters" data-title="Design storm (hyetograph)">
+<h1>Design storm (hyetograph)</h1>
+<p><span class="ui">Tools ▸ Rainfall ▸ Design Storm</span> creates a rainfall time series and, if you want, a rain gage that uses it.</p>
+<figure><img src="images/design_storm.png" alt="Design Storm dialog"><figcaption>A custom pattern of 12 intervals: drag the bars to shape the storm, or paste the pattern from Excel.</figcaption></figure>
+<div class="tablewrap"><table>
+<tr><th>Method</th><th>Input</th></tr>
+<tr><td>Chicago</td><td>IDF parameters <i>i = a / (t + b)<sup>c</sup></i>, duration and the position of the peak.</td></tr>
+<tr><td>SCS Type II</td><td>Total depth. The 24-hour distribution is scaled to the chosen duration.</td></tr>
+<tr><td>Triangular</td><td>Total depth and position of the peak.</td></tr>
+<tr><td>Uniform</td><td>Total depth, spread evenly over the duration.</td></tr>
+<tr><td>Custom pattern</td><td>Percent of the total depth per interval, entered in the table or drawn on the chart.</td></tr>
+</table></div>
+<ol class="steps">
+<li>Choose the method and enter the storm (total depth, duration, time step).</li>
+<li>Set the start date and time. They default to the model's start of analysis.</li>
+<li>Enter the time series name and the rain gage to assign it to.</li>
+<li>Click <span class="ui">Add to Project</span>, or <span class="ui">Copy to Clipboard</span> to paste the values elsewhere.</li>
+</ol>
+<p>The summary line shows the total depth, the peak intensity, the time of the peak and the number of steps, so you can check the storm before adding it.</p>
+</section>

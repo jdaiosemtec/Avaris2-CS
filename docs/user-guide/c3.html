@@ -1,0 +1,163 @@
+
+<section class="topic" id="projects" data-ch="Projects and data" data-title="Create, open and save models">
+<h1>Create, open and save models</h1>
+<p>An Avaris2 CS model is an <code>.inp</code> file in the EPA SWMM 5 format. Avaris2 CS opens models written by EPA SWMM 5.x, Avaris CS, Avaris DS and other programs that use this format, and saves them so that these programs can still read them.</p>
+<h2>Commands</h2>
+<div class="tablewrap"><table>
+<tr><th>Command</th><th>Where</th><th>What it does</th></tr>
+<tr><td>New</td><td><span class="ui">Project ▸ File ▸ New</span>, <kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>Starts an empty model with the default options and units.</td></tr>
+<tr><td>Open</td><td><span class="ui">Project ▸ File ▸ Open</span>, <kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Opens an <code>.inp</code> file. Large files are read in the background with a progress bar.</td></tr>
+<tr><td>Save / Save As</td><td>Quick-access toolbar, <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Writes the <code>.inp</code> and the files that go with it.</td></tr>
+<tr><td>Close</td><td><span class="ui">Project ▸ File ▸ Close</span></td><td>Closes the model. If there are unsaved changes, you are asked whether to save them.</td></tr>
+</table></div>
+<h2>Files that belong to a model</h2>
+<p>To stay compatible with other programs, Avaris2 CS never writes unknown sections into the <code>.inp</code> file. It stores its extra information in comment lines starting with <code>;;@OSEM</code>, which other programs ignore, or in files next to the model:</p>
+<div class="tablewrap"><table>
+<tr><th>File</th><th>Contents</th></tr>
+<tr><td><code>Model.inp</code></td><td>The model.</td></tr>
+<tr><td><code>Model.prj</code></td><td>The coordinate system of the map. It takes priority over the Avaris DS project file.</td></tr>
+<tr><td><code>Model.ini</code></td><td>The Avaris DS project file: coordinate system, layers and 2D settings. Avaris2 CS reads it when you open a model created in Avaris DS.</td></tr>
+<tr><td><code>Model.flags.json</code></td><td>Flag panel settings: parameters, colours and custom flags.</td></tr>
+<tr><td><code>Model.mesh2d.json</code></td><td>The 2D surface mesh.</td></tr>
+<tr><td><code>Model.osemhist.json</code></td><td>The change history.</td></tr>
+<tr><td><code>Model_Results\</code></td><td>One set of files per simulation run: <code>.inp</code>, <code>.rpt</code> (status report), <code>.out</code> (binary results) and <code>.json</code> (run summary). 1D-2D runs use <code>.finp</code>, <code>.frpt</code> and <code>.fout</code>.</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>Copy or archive the whole model folder rather than the <code>.inp</code> file alone, so the coordinate system, flags, mesh, history and results move with the model.</p></div>
+</section>
+
+<section class="topic" id="database" data-ch="Projects and data" data-title="Database: runs and results">
+<h1>Database: runs and results</h1>
+<p>The <b>Database</b> tab, at the bottom of the left pane, lists the base model and every simulation run made from it, with its date, run time, units and continuity errors.</p>
+<figure class="small"><img src="images/database.png" alt="Database pane"><figcaption>The Database pane with three runs. Click a run to load its results.</figcaption></figure>
+<ul>
+<li>Every run has a <b>name</b> that you choose when you start it. Running again under the same name replaces that run; a new name keeps the earlier results.</li>
+<li>Click a run to load its results onto the map, into the report and into graphs.</li>
+<li>Right-click a run for <span class="ui">Open Results</span>, <span class="ui">View Report</span>, <span class="ui">Add to Comparison (Scenario)</span>, <span class="ui">Rename…</span>, <span class="ui">Show in Explorer</span> and <span class="ui">Delete</span>. Right-click the base model to run a simulation, to close the results (<i>Base Model Only</i>) or to open another model.</li>
+</ul>
+</section>
+
+<section class="topic" id="scenarios" data-ch="Projects and data" data-title="Scenarios">
+<h1>Scenarios</h1>
+<p>A scenario is a variant of a model saved as its own <code>.inp</code> file, for example <i>Existing</i>, <i>Upgrade phase 1</i> or <i>Upgrade phase 2</i>. The <b>Scenarios</b> panel (<span class="ui">Project ▸ Scenario ▸ Scenarios</span>) keeps the scenarios of a project together.</p>
+<figure class="narrow"><img src="images/scenarios.png" alt="Scenarios panel"></figure>
+<div class="tablewrap"><table>
+<tr><th>Button</th><th>Action</th></tr>
+<tr><td>New from Current</td><td>Saves a copy of the open model as a new scenario and opens it.</td></tr>
+<tr><td>Open</td><td>Opens the selected scenario.</td></tr>
+<tr><td>Run Selected &amp; Compare</td><td>Runs every ticked scenario, several at the same time, then opens the <a href="#comparison">Scenario Comparison</a>.</td></tr>
+<tr><td>Compare</td><td>Compares the latest results of the ticked scenarios without running them again.</td></tr>
+<tr><td>Load Results</td><td>Loads the results of the selected scenario.</td></tr>
+<tr><td>Remove from List</td><td>Removes the scenario from the list. The files are not deleted.</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="add-data" data-ch="Projects and data" data-title="Add GIS data (Catalog)">
+<h1>Add GIS data (Catalog)</h1>
+<p>The <b>Catalog</b> pane (<span class="ui">Project ▸ Import</span>, or the Catalog tab on the right) works like the ArcGIS Pro Catalog. Browse folders, then double-click a file or drag it onto the map to add it as a layer.</p>
+<figure class="small"><img src="images/catalog.png" alt="Catalog pane"></figure>
+<h2>Supported formats</h2>
+<div class="tablewrap"><table>
+<tr><th>Type</th><th>Formats</th></tr>
+<tr><td>Vector</td><td>Shapefile (also zipped), GeoJSON, KML/KMZ, GPX, DXF, CSV/TXT with X/Y columns, Esri File Geodatabase feature classes.</td></tr>
+<tr><td>Raster</td><td>GeoTIFF, images with a world file, ESRI ASCII grid.</td></tr>
+</table></div>
+<p>Layers with a <code>.prj</code> file, or with a coordinate system stored inside the file, are reprojected to the map's coordinate system as they are added.</p>
+<h2>Import GIS data into the network</h2>
+<p>To turn GIS features into model objects, right-click an added layer and choose <span class="ui">Import into Network…</span>, or use <span class="ui">Project ▸ Import</span>.</p>
+<ul>
+<li><b>Points</b> become junctions, outfalls, storages or dividers.</li>
+<li><b>Lines</b> become conduits. Their ends snap to the nearest nodes within a tolerance, and missing nodes are created.</li>
+<li><b>Polygons</b> become subcatchments.</li>
+</ul>
+<p>You map the GIS fields to model fields (ID, invert, rim, diameter, roughness, outlet…). Common field names are recognised automatically.</p>
+</section>
+
+<section class="topic" id="crs" data-ch="Projects and data" data-title="Coordinate systems and basemaps">
+<h1>Coordinate systems and basemaps</h1>
+<p>A model needs a coordinate system before Avaris2 CS can draw an online basemap under it or reproject GIS layers onto it.</p>
+<h2>Set the coordinate system</h2>
+<ol class="steps">
+<li>In the Layer View, click the <span class="ui">Basemap</span> warning (<i>No coordinate system – click to set</i>), or right-click the basemap and choose <span class="ui">Coordinate System…</span>.</li>
+<li>Choose a preset, for example State Plane or Michigan GeoRef. Alternatively, paste the WKT or load a <code>.prj</code> file.</li>
+<li>Check the line below the text box. It shows where the centre of the model would fall, in latitude and longitude, with a link that opens the location in OpenStreetMap. A red ✗ means the model would land far from the origin of the projection, which usually indicates a wrong system or the wrong units (feet or metres).</li>
+<li>Click <span class="ui">OK</span>. The coordinate system is saved as <code>Model.prj</code>.</li>
+</ol>
+<p>Supported projections are geographic coordinates, Transverse Mercator (UTM and State Plane TM zones), Lambert Conformal Conic with one or two standard parallels, Hotine Oblique Mercator (variants A and B), Mercator and Web Mercator. Units can be metres, feet or US survey feet, in WKT1 (ESRI <code>.prj</code>) or WKT2 format.</p>
+<div class="callout warn"><b class="t">Basemap in the wrong place?</b><p>The most common cause is a <code>.prj</code> file that does not belong to the model, for example a UTM zone attached to a State Plane model. Open the coordinate system dialog, check the lat/lon of the model centre, and choose the correct system.</p></div>
+<h2>Basemaps</h2>
+<p>Right-click the Basemap layer to choose <b>OpenTopoMap</b> or <b>OpenStreetMap</b>; double-click it to set its transparency in Symbology. Map tiles are downloaded while you work and kept in a cache on your computer, so areas you have viewed also show without internet.</p>
+<p>To prepare for working offline, for example on site, right-click the Basemap layer and choose <span class="ui">Download for Offline Use…</span>. Pick the level of detail; the dialog shows how many tiles that takes. The tiles covering the model area and a margin around it are then saved. Cached tiles are refreshed after 30 days when you are online.</p>
+<h2>Convert the model's coordinates</h2>
+<p><span class="ui">Tools ▸ Spatial Reference ▸ Convert Coordinates</span> converts every node, vertex, polygon and rain gage from one coordinate system to another, for example from a local grid to State Plane. Use <span class="ui">Test</span> to check a point before converting. No datum shift is applied: NAD83 and WGS84 are treated as the same.</p>
+<figure class="narrow"><img src="images/convert_coords.png" alt="Convert Spatial Reference dialog"></figure>
+</section>
+
+<section class="topic" id="attribute-table" data-ch="Projects and data" data-title="Attribute tables">
+<h1>Attribute tables</h1>
+<p>An attribute table shows every object of one layer in a grid: network objects (junctions, conduits, subcatchments…), 2D mesh cells, or the features of an added GIS layer such as a Shapefile, GeoJSON, KML or File Geodatabase layer.</p>
+<figure><img src="images/attribute_table.png" alt="Attribute table of conduits"><figcaption>The conduit table, with computed slope and result columns (max flow, max velocity, max capacity).</figcaption></figure>
+<h2>Open a table</h2>
+<ul>
+<li>Click <span class="ui">Attribute Table</span> above the Layer View and choose a layer. Added GIS layers are listed at the end.</li>
+<li>Right-click a layer and choose <span class="ui">Attribute Table</span>.</li>
+<li>In an open table, pick another layer from the list at the top left.</li>
+</ul>
+<h2>Work with the table</h2>
+<ul>
+<li><b>Sort</b>: click a column header.</li>
+<li><b>Statistics, Field Calculator, Colour Map by This Field</b>: right-click a column header.</li>
+<li><b>Filter</b>: type part of an ID. For GIS layers, the filter searches every field.</li>
+<li><b>Select</b>: click a row; <kbd>Ctrl</kbd>+click adds a row and <kbd>Shift</kbd>+click selects a range. The selection is shared with the map; for GIS layers, the selected features are highlighted in cyan.</li>
+<li><b>Edit</b>: double-click a cell. Every edit can be undone.</li>
+<li>Use <span class="ui">Select All</span>, <span class="ui">Invert</span>, <span class="ui">Clear</span>, <span class="ui">Selected only</span> and <span class="ui">Zoom to Selected</span> to manage the selection.</li>
+<li><span class="ui">Copy</span> and <span class="ui">Paste</span> exchange rows with Excel as tab-separated text. Paste needs a header row and the object ID in the first column.</li>
+<li><span class="ui">Export CSV</span> saves the rows that are currently shown.</li>
+</ul>
+<div class="callout"><b class="t">Note:</b><p>Edits to an added GIS layer change it in memory only. Right-click the layer and choose <span class="ui">Export as Shapefile…</span> to save them.</p></div>
+<h2>Select by Attribute</h2>
+<p>Select by Attribute selects the objects that match a condition written in the <a href="#expressions">expression language</a>, for example:</p>
+<pre><code>rptMaxCapacity &gt;= 1 and diam &gt;= 0.6
+type = 'CONDUIT' and slope &lt; 0.1
+name like 'J_5%'</code></pre>
+<figure><img src="images/select_by_attribute.png" alt="Select by Attribute dialog"><figcaption>Double-click a variable to add it to the clause. Use <span class="ui">Verify</span> to check the clause before you run it.</figcaption></figure>
+<p>Choose <i>Create a new selection</i>, <i>Add to current selection</i>, <i>Remove from current selection</i> or <i>Select from current selection</i>.</p>
+</section>
+
+<section class="topic" id="export" data-ch="Projects and data" data-title="Export">
+<h1>Export</h1>
+<p>The <b>Export</b> pane (<span class="ui">Project ▸ Export</span>) writes network objects with their attributes and results to:</p>
+<ul>
+<li>Shapefile;</li>
+<li>Esri File Geodatabase;</li>
+<li>CSV.</li>
+</ul>
+<figure class="small"><img src="images/export_wizard.png" alt="Export pane"></figure>
+<ul>
+<li><b>Content</b>:
+  <ul><li><i>Object attributes only</i>;</li>
+  <li><i>Statistics</i>: maxima and other summary results of the loaded run;</li>
+  <li><i>Snapshot Time</i>: results at the current time step;</li>
+  <li><i>Selected Time Range</i>.</li></ul></li>
+<li><b>Destination folder</b> and <b>file name prefix</b>. One file, or one feature class, is written per object type.</li>
+<li><b>Options</b>: export only the selected objects, and choose which object types to export.</li>
+</ul>
+<p>Graphs, profiles, report tables and the comparison table each have their own <span class="ui">Export CSV</span> or <span class="ui">Save PNG</span> buttons.</p>
+</section>
+
+<section class="topic" id="units" data-ch="Projects and data" data-title="Units">
+<h1>Units</h1>
+<p>The flow units of a model also decide the unit system of every other value.</p>
+<div class="tablewrap"><table>
+<tr><th>Flow units</th><th>System</th><th>Length</th><th>Velocity</th><th>Rainfall</th></tr>
+<tr><td>CFS, GPM, MGD</td><td>US</td><td>ft</td><td>ft/s</td><td>in</td></tr>
+<tr><td>CMS, LPS, MLD</td><td>SI</td><td>m</td><td>m/s</td><td>mm</td></tr>
+</table></div>
+<p>To change the units, click <span class="ui">Flow Units</span> in the status bar or use Simulation Options. Avaris2 CS asks whether to:</p>
+<ul>
+<li><span class="ui">Keep values</span>: only the unit label changes and every number stays as it is, or</li>
+<li><span class="ui">Convert values</span>: every value of the model is converted to the new units (elevations, depths, lengths, diameters, areas, rainfall, curves and so on).</li>
+</ul>
+<p>Flag thresholds follow the units automatically.</p>
+<p><span class="ui">Tools ▸ Utilities ▸ Unit Converter</span> converts single values of flow, length, area, volume, velocity, rainfall intensity and pressure between units.</p>
+<figure class="small"><img src="images/unit_converter.png" alt="Unit Converter"></figure>
+</section>

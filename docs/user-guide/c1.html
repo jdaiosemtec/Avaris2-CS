@@ -1,0 +1,205 @@
+
+<section class="topic" id="home" data-ch="Get started" data-title="Welcome to Avaris2 CS">
+<h1>Welcome to Avaris2 CS</h1>
+<p class="lead">Avaris2 CS (Collection System) is a desktop application for planning, analysing and operating urban drainage, storm water and sanitary sewer networks. It combines the Avaris hydraulic engine, built for large and hard-to-converge models, with a GIS map, result analysis tools and an optional 1D-2D surface flood module.</p>
+<figure><img src="images/main_results.png" alt="Avaris2 CS main window with a model coloured by simulation results"><figcaption>Avaris2 CS playing back a simulation: nodes are coloured by depth relative to full depth, and conduits by flow relative to full-pipe capacity.</figcaption></figure>
+<h2>Where to start</h2>
+<div class="cards">
+  <a class="card" href="#install"><b>Install</b><span>System requirements, installation and the first sign-in.</span></a>
+  <a class="card" href="#quickstart"><b>Quick-start tutorial</b><span>Open a model, run it and look at the results in 15 minutes.</span></a>
+  <a class="card" href="#ui-overview"><b>The user interface</b><span>Ribbon, Parameter View, Layer View, map and docked panes.</span></a>
+  <a class="card" href="#flags"><b>Flags</b><span>One-click warnings for flooding, surcharge, capacity, velocity and more.</span></a>
+  <a class="card" href="#theme"><b>Themes</b><span>Colour and size the network by any attribute or result.</span></a>
+  <a class="card" href="#twod-overview"><b>2D flood modelling</b><span>Couple the pipe network to a 2D surface mesh.</span></a>
+</div>
+<h2>What's new in Avaris2 CS</h2>
+<p>Avaris2 CS replaces Avaris CS 4.x. It opens the same <code>.inp</code> models, and also reads and writes EPA SWMM 5 and Avaris DS models. The main additions are:</p>
+<ul>
+<li><b>Ribbon interface in the style of ArcGIS Pro</b>, with the Project, Operation, Tools, Simulation and Help tabs.</li>
+<li><b>Flag panel</b>: 12 built-in warning rules plus your own rules. You can edit their thresholds directly in the rule text, and units follow the model.</li>
+<li><b>Layer themes</b> modelled on the InfoWorks ICM theme editor, with <b>time functions</b> (<code>dur</code>, <code>run</code>, <code>win</code>, <code>peak</code>…) that work over the whole simulation.</li>
+<li><b>Report viewer</b> with an overview, a water balance, an Insights page and sortable result tables.</li>
+<li><b>Scenario comparison</b> with KPI cards, a difference table, a scatter plot and a difference map.</li>
+<li><b>GIS</b>: online basemaps, coordinate systems (WKT1/WKT2, State Plane, UTM, Hotine Oblique Mercator), and Shapefile, GeoJSON, KML, File Geodatabase and GeoTIFF layers, each with its own attribute table.</li>
+<li><b>Large models</b>: networks with millions of objects stay responsive when you zoom and pan, because a level-of-detail overview is drawn when zoomed out.</li>
+<li><b>Users and change history</b>: every edit is recorded with user, time, old value and new value.</li>
+<li><b>Avaris engine</b> settings: number of threads, dynamic-wave under-relaxation and an extended non-convergence report.</li>
+</ul>
+<div class="callout"><b class="t">Note:</b><p>Throughout this guide, menu paths are written as <span class="ui">Tab ▸ Group ▸ Command</span>. For example, <span class="ui">Simulation ▸ Run ▸ Run</span> is the large Run button on the Simulation tab.</p></div>
+</section>
+
+<section class="topic" id="requirements" data-ch="Get started" data-title="System requirements">
+<h1>System requirements</h1>
+<div class="tablewrap"><table>
+<tr><th>Item</th><th>Minimum</th><th>Recommended</th></tr>
+<tr><td>Operating system</td><td>Windows 10, 64-bit</td><td>Windows 11, 64-bit</td></tr>
+<tr><td>Processor</td><td>2 cores</td><td>8 or more cores. The Avaris engine solves node depths in parallel.</td></tr>
+<tr><td>Memory</td><td>8 GB</td><td>16–32 GB for models with more than 500,000 objects</td></tr>
+<tr><td>Disk</td><td>500 MB for the program</td><td>SSD, plus space for results. A binary results file is roughly <i>objects × variables × time steps × 4 bytes</i>.</td></tr>
+<tr><td>Display</td><td>1366 × 768</td><td>1920 × 1080 or larger</td></tr>
+<tr><td>Internet</td><td>Not required</td><td>Required only for online basemaps and the online user guide</td></tr>
+</table></div>
+<p>Avaris2 CS installs next to Avaris CS 4.x, EPA SWMM and Avaris DS, and does not change their settings or file associations.</p>
+</section>
+
+<section class="topic" id="install" data-ch="Get started" data-title="Install Avaris2 CS">
+<h1>Install Avaris2 CS</h1>
+<ol class="steps">
+<li>Download <code>Avaris2CS-Setup-&lt;version&gt;.exe</code> and double-click it. You need administrator rights.</li>
+<li>Accept the licence agreement.</li>
+<li>Choose the components:
+  <ul><li><b>Avaris2 CS (required)</b>: the program, the Avaris engine and a sample model.</li>
+  <li><b>Desktop shortcut</b>.</li>
+  <li><b>Open .inp files with Avaris2 CS</b> (optional): adds Avaris2 CS to the <i>Open with</i> list of <code>.inp</code> files without replacing your default program.</li></ul></li>
+<li>Keep the default folder <code>C:\Program Files\Avaris2 CS</code>, or choose another one, then click <span class="ui">Install</span>.</li>
+<li>Click <span class="ui">Finish</span> to start Avaris2 CS.</li>
+</ol>
+<div class="callout warn"><b class="t">"Windows protected your PC"</b><p>Microsoft SmartScreen can show this message for newly released programs. Click <span class="ui">More info ▸ Run anyway</span>. If you downloaded the installer from a browser, you can also right-click the file, choose <span class="ui">Properties</span>, tick <span class="ui">Unblock</span> and click <span class="ui">OK</span>.</p></div>
+<h2>Upgrading</h2>
+<p>Run the new installer over the existing installation. Avaris2 CS closes a running copy before it replaces the files.</p>
+<p>An installation that still carries the earlier name <i>Avaris2</i> is removed automatically. Your settings, user accounts and change history are kept, because they are stored in your Windows profile and not in the program folder.</p>
+<h2>Uninstalling</h2>
+<p>Use <span class="ui">Windows Settings ▸ Apps ▸ Avaris2 CS ▸ Uninstall</span>. Your models, results and settings are not deleted.</p>
+</section>
+
+<section class="topic" id="signin" data-ch="Get started" data-title="Sign in and user accounts">
+<h1>Sign in and user accounts</h1>
+<p>Avaris2 CS records <i>who</i> changed a model and when, so every session starts with a sign-in.</p>
+<p>The first time the program starts on a computer, it asks you to create an <b>Administrator</b> account. Later starts show the sign-in dialog. Tick <span class="ui">Sign in automatically on this computer</span> if you are the only user.</p>
+<figure class="narrow"><img src="images/signin.png" alt="Sign In dialog"><figcaption>The Sign In dialog shows the role of the selected user.</figcaption></figure>
+<h2>Roles</h2>
+<div class="tablewrap"><table>
+<tr><th>Role</th><th>Can do</th></tr>
+<tr><td>Administrator</td><td>Everything, including adding and removing users, changing roles and resetting passwords.</td></tr>
+<tr><td>Modeler</td><td>Edit and save models, and run simulations.</td></tr>
+<tr><td>Viewer</td><td>Open models, run simulations and view results. Cannot change or save models.</td></tr>
+</table></div>
+<p>Administrators manage accounts in <span class="ui">Project ▸ User ▸ Manage Users</span>. To change user without restarting, use <span class="ui">Project ▸ User ▸ Switch User</span> or click the user name in the status bar.</p>
+<figure class="narrow"><img src="images/users.png" alt="Manage Users panel"><figcaption>Manage Users: add users, change roles, reset passwords.</figcaption></figure>
+<div class="callout"><b class="t">Note:</b><p>Accounts are stored on this computer, in the Avaris2 CS settings folder of the Windows profile. They are not shared through the model files.</p></div>
+</section>
+
+<section class="topic" id="licensing" data-ch="Get started" data-title="Licensing and registration">
+<h1>Licensing and registration</h1>
+<p class="lead">Each Avaris2 CS licence is for one computer. Your licence is linked to your account on <a href="https://osemtec.com">osemtec.com</a>; the edition and the term follow your purchase.</p>
+<p>There are two editions, each available for 30 days, 1 year or several years:</p>
+<div class="tablewrap"><table>
+<tr><th>Function</th><th>Avaris2 CS 1D</th><th>Avaris2 CS 1D-2D</th></tr>
+<tr><td>Network modelling, editors, GIS, scenarios</td><td>✓</td><td>✓</td></tr>
+<tr><td>1D simulation, results, flags, reports, profiles</td><td>✓</td><td>✓</td></tr>
+<tr><td>2D options, Create Meshes, 1D-2D flood simulation and flood maps</td><td>–</td><td>✓</td></tr>
+</table></div>
+<h2>Read-only mode</h2>
+<p>Without a valid licence, Avaris2 CS runs in <b>read-only mode</b>: you can open and view models and results, but not change, save or run them. This also applies when the licence has expired, was issued for another computer, or when the computer clock has been set back. When you try to edit, save or run, Avaris2 CS tells you why and offers <span class="ui">Register…</span>.</p>
+<figure class="narrow"><img src="images/lic_readonly.png" alt="Read-only notice at start-up"></figure>
+<figure class="narrow"><img src="images/lic_gate.png" alt="Read-only mode message when editing"></figure>
+<p>To get a licence, see <a href="#lic-request">Request and activate a licence</a>.</p>
+<h2>Check your licence</h2>
+<p><span class="ui">Help ▸ Register</span> shows the licence of this computer at the top: edition, licensee, expiry date, days left and serial number. The window title shows the edition (1D or 1D-2D).</p>
+<figure><img src="images/lic_register_ok.png" alt="Register dialog with an active licence"></figure>
+<h2>Upgrades and reinstalling</h2>
+<p>The licence is stored with your Windows user settings, not in the installation folder. Installing a new version, uninstalling and reinstalling, or installing into another folder keeps the licence; you do not need to request a new one.</p>
+<p>If the settings were deleted (for example by a clean-up tool) or you sign in to Windows with another user account, Avaris2 CS starts read-only again. Activate the <b>same licence key</b> again in <span class="ui">Help ▸ Register</span>: it stays valid on this computer until its expiry date. Keep the e-mail or the <code>.avlic</code> file you received from OSEMTEC.</p>
+<h2>Move a licence to another computer</h2>
+<ol class="steps">
+<li>On the old computer, click <span class="ui">Help ▸ Register ▸ Release this Computer…</span> and confirm. Avaris2 CS shows the licence serial, the machine code and a <b>release code</b>, and runs read-only from then on.</li>
+<li>On the new computer, send a licence request (see <a href="#lic-request">Request and activate a licence</a>) and add the release code to the e-mail.</li>
+<li>Activate the new licence key that OSEMTEC sends you.</li>
+</ol>
+<div class="callout"><b class="t">Note:</b><p>The machine code is calculated from the Windows installation, the system drive and the network adapters; two of the three must match. Adding a docking station, a VPN or switching between Wi-Fi and cable does not change the licence. Reinstalling Windows, replacing the system drive or the main board, or a new computer needs a new licence: send a new request.</p></div>
+</section>
+
+<section class="topic" id="lic-request" data-ch="Get started" data-title="Request and activate a licence">
+<h1>Request and activate a licence</h1>
+<p class="lead">You send a licence request for this computer from Avaris2 CS by e-mail. OSEMTEC checks your account and purchase and e-mails you a licence key, which you activate in Avaris2 CS. Activation works offline.</p>
+<h2>Before you start</h2>
+<ul>
+<li>Register an account on <a href="https://osemtec.com">osemtec.com</a> and purchase the edition (1D or 1D-2D) and the term you need.</li>
+<li>Install Avaris2 CS on the computer that will use the licence, and sign in.</li>
+</ul>
+<h2>Step 1 – Send the licence request</h2>
+<ol class="steps">
+<li>Open <span class="ui">Help ▸ Register</span> (or click <span class="ui">Register…</span> in the read-only message). The <b>machine code</b> of this computer is filled in for you, for example <code>AV2-F7ZA-SGGA-KD7L-SJAG</code>.</li>
+<li>Enter the user name of your <b>osemtec.com account</b>.</li>
+<li>Enter the <b>e-mail</b> address the licence should be sent to.</li>
+<li>Choose how to send the request:
+  <ul>
+  <li><i>Gmail</i>, <i>Outlook.com</i> or <i>Microsoft 365</i>: your mailbox opens in the web browser with a new e-mail to <code>info@osemtec.com</code> that is already written. Sign in first if the browser asks you to.</li>
+  <li><i>E-mail program</i>: the e-mail program on this computer (for example Outlook) opens with the e-mail.</li>
+  </ul></li>
+<li>Click <span class="ui">Send by E-mail</span>, check the e-mail and press <b>Send</b> in your mailbox.</li>
+</ol>
+<figure><img src="images/lic_register.png" alt="Register Avaris2 CS dialog"></figure>
+<p>The request e-mail looks like this. Do not change the request code; it identifies this computer.</p>
+<pre><code>To: info@osemtec.com
+Subject: Avaris2 CS licence request - rivercity_eng - AV2-F7ZA-SGGA-KD7L-SJAG
+
+Avaris2 CS licence request
+
+osemtec.com account: rivercity_eng
+E-mail: jane@rivercity-eng.com
+
+Machine code: AV2-F7ZA-SGGA-KD7L-SJAG
+Computer: ENG-WS-07 (Windows_NT 10.0.22631)
+Avaris2 CS version: 2.2.3
+
+--- request code (please do not edit) ---
+AVREQ-eyJ2IjoyLCJ1c2VyIjoicml2ZXJjaXR5X2VuZyIsImVtYWlsIjoiamFuZUByaXZlcmNpdH
+ktZW5nLmNvbSIsImNvZGUiOiJBVjItRjdaQS1TR0dBLUtEN0wtU0pBRyIsImh3Ijp7ImciOiJkMz
+…
+--- end ---</code></pre>
+<p>The request contains only your account, your e-mail address, the machine code and the computer name. Your name, company, edition and term are taken from your osemtec.com account and purchase.</p>
+<div class="callout tip"><b class="t">No e-mail on this computer?</b><p>Click <span class="ui">Copy Request</span> and paste the text into any e-mail to <code>info@osemtec.com</code>, or click <span class="ui">Save Request File…</span> and send the <code>.avreq</code> file from another computer, for example when the computer has no internet access.</p></div>
+<h2>Step 2 – Receive the licence</h2>
+<p>OSEMTEC checks your account and purchase and replies to the e-mail address in the request. The e-mail contains the edition, the validity period, the serial number and the <b>licence key</b>, a long text starting with <code>AV2L-</code>; it may also have the key as an <code>.avlic</code> file.</p>
+<h2>Step 3 – Activate the licence</h2>
+<ol class="steps">
+<li>Open <span class="ui">Help ▸ Register</span>.</li>
+<li>Under <i>2. Activate the licence you received</i>, paste the whole licence key from the e-mail (line breaks do not matter), or click <span class="ui">Load Licence File…</span> and choose the <code>.avlic</code> file.</li>
+<li>Click <span class="ui">Activate</span>.</li>
+</ol>
+<figure><img src="images/lic_activate.png" alt="Licence key pasted in the Register dialog"></figure>
+<p>Avaris2 CS confirms the edition, the licensee and the expiry date. All functions of the edition are available at once; no restart is needed.</p>
+<figure class="narrow"><img src="images/lic_activated.png" alt="Licence activated"></figure>
+<h2>Renew or upgrade a licence</h2>
+<p>From 30 days before the expiry date, Avaris2 CS reminds you at start-up. After you renew or upgrade (for example from 1D to 1D-2D) on osemtec.com, OSEMTEC sends you a new licence key; activate it in <span class="ui">Help ▸ Register</span> in the same way. If OSEMTEC asks for it, send a new request first.</p>
+<h2>If the licence is not accepted</h2>
+<div class="tablewrap"><table>
+<tr><th>Message</th><th>What to do</th></tr>
+<tr><td>This is not an Avaris2 CS licence key / signature check failed</td><td>Copy the whole key from <code>AV2L-</code> to the end, or use the <code>.avlic</code> file.</td></tr>
+<tr><td>This licence was issued for another computer</td><td>The key belongs to another machine code. Send a request from this computer.</td></tr>
+<tr><td>The licence expired on …</td><td>Renew the licence on osemtec.com.</td></tr>
+<tr><td>The computer clock is set earlier than the last time Avaris2 CS was used</td><td>Correct the date and time of the computer, then restart Avaris2 CS.</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="quickstart" data-ch="Get started" data-title="Quick-start tutorial">
+<h1>Quick-start tutorial</h1>
+<p class="lead">This tutorial walks you through the basic workflow: open a model, check it, run it, and read the results on the map, in graphs and in the report.</p>
+<h2>1. Open a model</h2>
+<ol class="steps">
+<li>Start Avaris2 CS and sign in. The start dialog lists recently used models.</li>
+<li>Click <span class="ui">Open Sample</span> to copy the sample model to <code>Documents\Avaris2 CS\Samples</code> and open it. To open your own model, click <span class="ui">Open Model…</span> and pick any EPA SWMM 5.x or Avaris <code>.inp</code> file.</li>
+</ol>
+<figure><img src="images/start_empty.png" alt="Start dialog"><figcaption>The start dialog: open a model, start a new project or open the sample.</figcaption></figure>
+<h2>2. Look around the map</h2>
+<p>Roll the mouse wheel to zoom, and drag with the middle mouse button (or hold <kbd>Space</kbd> and drag) to pan. Press <kbd>Home</kbd> to see the whole model. The Locator in the top-left corner of the map shows where you are.</p>
+<figure><video poster="images/clip_nav_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_nav.webm" type="video/webm"><source src="media/clip_nav.mp4" type="video/mp4"></video><figcaption>Video: zooming and panning. Nodes and links get their full symbols as you zoom in.</figcaption></figure>
+<p>Click an object to see its properties in the <b>Properties</b> pane on the right. Edits you make there are applied immediately and can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
+<h2>3. Check and run</h2>
+<ol class="steps">
+<li>Click <span class="ui">Tools ▸ Utilities ▸ Validate Model</span> to check for missing references, disconnected nodes, zero lengths and similar problems.</li>
+<li>Review the settings in <span class="ui">Simulation ▸ Setup ▸ Options</span>: simulation dates, time steps and routing method.</li>
+<li>Click <span class="ui">Simulation ▸ Run ▸ Run</span> (or press <kbd>F5</kbd>) and give the run a name, for example <i>Design 10yr</i>.</li>
+</ol>
+<p>Each run is saved in the <code>&lt;model&gt;_Results</code> folder next to the model and listed in the <a href="#database">Database</a> pane, so you can keep and compare as many runs as you need.</p>
+<h2>4. Look at the results</h2>
+<ul>
+<li><b>Play</b> the results with <span class="ui">Simulation ▸ Results ▸ Play</span>. The map is coloured by the current depth and flow.</li>
+<li>Open the <b>Report</b> for continuity errors, flooding and surcharge summaries.</li>
+<li>Select two nodes and click <b>Profile</b> for a long section, or select objects and click <b>Plot</b> for time series graphs.</li>
+<li>Open the <b>Flag</b> panel to highlight flooding, surcharge and capacity problems at once.</li>
+</ul>
+<figure><video poster="images/clip_play_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_play.webm" type="video/webm"><source src="media/clip_play.mp4" type="video/mp4"></video><figcaption>Video: playing back results. Conduits change colour as the storm passes through the network.</figcaption></figure>
+<div class="callout tip"><b class="t">Tip:</b><p><span class="ui">Help ▸ Quick Start</span> shows a one-page summary of these steps inside the program, and <span class="ui">Help ▸ Shortcuts</span> lists the keyboard shortcuts.</p></div>
+</section>

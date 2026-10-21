@@ -1,0 +1,126 @@
+
+<section class="topic" id="sim-options" data-ch="Simulation" data-title="Simulation options">
+<h1>Simulation options</h1>
+<p><span class="ui">Simulation ▸ Setup ▸ Options</span> opens the Simulation Options dialog. Its tabs follow the <code>[OPTIONS]</code> section of the <code>.inp</code> file, plus tabs for the Avaris engine, object defaults and 2D flooding.</p>
+<h2>General</h2>
+<figure class="narrow"><img src="images/sim_options.png" alt="Simulation Options, General tab"></figure>
+<p>On this tab you set:</p>
+<ul>
+<li>flow units;</li>
+<li>routing model: Steady, Kinematic Wave or Dynamic Wave;</li>
+<li>infiltration model: Horton, Modified Horton, Green-Ampt, Modified Green-Ampt or Curve Number;</li>
+<li>link offsets (depth or elevation);</li>
+<li>minimum conduit slope, ponding and skipping steady-state periods;</li>
+<li>which process models to ignore: rainfall/runoff, snowmelt, groundwater, RDII, flow routing or water quality.</li>
+</ul>
+<h2>Dates and time steps</h2>
+<p>Set the start and end of the analysis, the start of reporting, the street-sweeping period and the antecedent dry days. Then set the reporting step, the wet-weather and dry-weather runoff steps, the routing step, the control rule step and the steady-state tolerances.</p>
+<figure class="narrow"><img src="images/opt_timesteps.png" alt="Time Steps tab"></figure>
+<div class="callout"><b class="t">Note:</b><p>The reporting step decides how many time steps are saved in the results file. It also sets the accuracy of the time functions used by themes and flags: 15 minutes is a good compromise for most storm events.</p></div>
+<h2>Dynamic Wave</h2>
+<p>The dynamic-wave settings are:</p>
+<ul>
+<li>inertial terms;</li>
+<li>normal flow criterion;</li>
+<li>force main equation;</li>
+<li>surcharge method (EXTRAN or SLOT);</li>
+<li>variable step safety factor;</li>
+<li>minimum variable step;</li>
+<li>conduit lengthening step;</li>
+<li>minimum nodal surface area;</li>
+<li>maximum trials per step;</li>
+<li>head convergence tolerance.</li>
+</ul>
+<h2>Avaris Engine</h2>
+<figure class="narrow"><img src="images/opt_engine.png" alt="Avaris Engine tab"></figure>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Meaning</th></tr>
+<tr><td>Number of Threads</td><td>Conduit flows and node depths are solved in parallel with OpenMP; 0 uses all cores. <span class="ui">Detect &amp; Recommend</span> proposes a value for this computer. Results are identical for any number of threads. Models with fewer than 4 links per thread run on one thread.</td></tr>
+<tr><td>Under-Relaxation Factor</td><td>The weight given to the new value in each dynamic-wave iteration (0.1–1.0). The standard value is 0.5. Lower values damp oscillation at hard-to-converge nodes; higher values converge faster on well-behaved networks.</td></tr>
+<tr><td>Nonconverging Nodes Listed in Report</td><td>Length of the "Most Frequent Nonconverging Nodes" list in the report. The standard report lists 5; Avaris lists up to 500.</td></tr>
+<tr><td>Write time-series tables to report file</td><td>Off by default. Results are read from the binary file, which keeps the report small for large models.</td></tr>
+</table></div>
+<h2>Object Defaults</h2>
+<p>Default values for new nodes, conduits and subcatchments: depths, diameter, roughness, length, area, width, imperviousness and slope. They are saved with your Avaris2 CS settings, not in the model.</p>
+<h2>2D Flood</h2>
+<p>The settings of the 1D-2D flood module. See <a href="#twod-setup">Set up a 2D model</a>.</p>
+</section>
+
+<section class="topic" id="run" data-ch="Simulation" data-title="Run a simulation">
+<h1>Run a simulation</h1>
+<ol class="steps">
+<li>Click <span class="ui">Simulation ▸ Run ▸ Run</span> or press <kbd>F5</kbd>. Avaris2 CS first runs the quick checks of <a href="#validate">Validate Model</a> and shows any problems, with the choice to run anyway.</li>
+<li>Enter a <b>simulation name</b> and an optional description. Click an existing name to reuse it, which replaces that run.</li>
+<li>Watch the progress. Click <span class="ui">Stop</span> to cancel. If 2D flooding is enabled but no mesh exists yet, you can create the mesh first or run the 1D model only.</li>
+</ol>
+<figure class="narrow"><img src="images/run_name.png" alt="Run Simulation dialog"></figure>
+<figure class="narrow"><img src="images/run_progress.png" alt="Running Simulation progress"></figure>
+<p>When the run finishes, the results are loaded automatically. The status bar shows the number of reporting steps, and a summary lists the continuity errors, flooding and warnings.</p>
+<h2>Several runs at the same time</h2>
+<p>From the <a href="#scenarios">Scenarios</a> panel, <span class="ui">Run Selected &amp; Compare</span> runs several scenarios in parallel, each with its own engine process, and then compares them. A panel shows the progress of each run, and <span class="ui">Stop All</span> cancels them.</p>
+<h2>Convergence diagnostics</h2>
+<p>After a dynamic-wave run, <span class="ui">Simulation ▸ Results ▸ Convergence</span> lists the nodes where the engine most often failed to converge, with the share of steps not converged and any orifices next to them. It also shows the routing time step summary from the report.</p>
+<p><span class="ui">Color Map by Nonconvergence</span> shows on the map where the problem is concentrated, and <span class="ui">Select All Listed</span> selects those nodes.</p>
+<figure><img src="images/convergence.png" alt="Nonconvergence Diagnostics"></figure>
+<div class="callout tip"><b class="t">Reducing non-convergence</b><ul>
+<li>Convert problem orifices to equivalent conduits (<a href="#tools-geometry">Orifice to Conduit</a>).</li>
+<li>Lower the under-relaxation factor, for example to 0.3.</li>
+<li>Check very short conduits and large steps in invert levels.</li>
+<li>Re-run and compare the hydrographs to confirm that the results did not change materially.</li>
+</ul></div>
+</section>
+
+<section class="topic" id="twod-overview" data-ch="2D flood modelling" data-title="2D flood modelling overview">
+<h1>2D flood modelling overview</h1>
+<span class="badge">🔒 Avaris2 CS 1D-2D</span>
+<p class="lead">The 2D flood module covers the ground surface with a mesh of square cells, coupled to the manholes of the pipe network. Water that surcharges out of a manhole flows over the surface, following the terrain, and can re-enter the network downstream.</p>
+<figure><video poster="images/clip_2d_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_2d.webm" type="video/webm"><source src="media/clip_2d.mp4" type="video/mp4"></video><figcaption>Video: water depth on the 2D surface during a storm.</figcaption></figure>
+<h2>How it works</h2>
+<ul>
+<li>A <b>2D boundary</b> polygon defines the area. Its attributes set the cell size (<code>length</code>) and the Manning roughness of the ground (<code>roughness</code>).</li>
+<li>The cells take their ground elevation from a <b>DEM</b> (GeoTIFF or ASCII grid).</li>
+<li>Optional <b>water front</b> lines let surface water leave the model, for example at a river bank or coast. <b>Cut-off lines</b> block flow across walls and embankments, and <b>exclusion polygons</b> remove buildings and other areas without cells.</li>
+<li>Every junction, storage unit or divider tagged <code>Link2D</code> is coupled to the cell it lies in.</li>
+<li>The cells and the surface links between them are added to a copy of the model (<code>.finp</code>) and simulated together with the pipe network by the Avaris engine. The approach is compatible with Avaris DS, so models with 2D settings in the Avaris DS project file (<code>.ini [2D]</code>) are taken over automatically when you open them.</li>
+</ul>
+</section>
+
+<section class="topic" id="twod-setup" data-ch="2D flood modelling" data-title="Set up a 2D model">
+<h1>Set up a 2D model</h1>
+<ol class="steps">
+<li>Open <span class="ui">Simulation ▸ Options ▸ 2D Flood</span> and tick <span class="ui">Enable 1D-2D flood simulation</span>.</li>
+<li>Choose the input layers:
+  <ul><li>2D Boundary (polygon);</li>
+  <li>Digital Elevation Model;</li>
+  <li>optionally the Water Front, Cut-off Lines and Exclusion Polygons.</li></ul>
+  Paths inside the model folder are stored as relative paths.</li>
+<li>Set the cell size and roughness, or leave them blank to use the boundary attributes.</li>
+<li>Set the <b>Mesh Units</b>:
+  <ul><li><i>MODEL</i>, as in Avaris DS, uses the values as they are;</li>
+  <li><i>CONVERT</i> converts them from the map units to the model units, for example a metre DEM in a US-units model.</li></ul></li>
+<li>Tick <span class="ui">Tag all nodes "Link2D"</span> to couple every manhole, or tag selected nodes yourself.</li>
+<li>Click <span class="ui">Simulation ▸ Setup ▸ Create Meshes</span>. The mesh is saved as <code>Model.mesh2d.json</code> and appears as the <i>2D Meshes</i> layer, coloured by ground elevation.</li>
+<li>Run the simulation. 1D-2D runs write <code>.finp</code>, <code>.frpt</code> and <code>.fout</code> files.</li>
+</ol>
+<figure><img src="images/opt_2d.png" alt="2D Flood options"></figure>
+<figure><img src="images/mesh_ground.png" alt="2D mesh coloured by ground elevation"><figcaption>The 2D mesh coloured by ground elevation from the DEM.</figcaption></figure>
+<div class="callout"><b class="t">Note:</b><p>Rebuild the mesh after you change the boundary, DEM, cell size, exclusions or the Link2D tags.</p></div>
+</section>
+
+<section class="topic" id="twod-results" data-ch="2D flood modelling" data-title="2D results">
+<h1>2D results</h1>
+<p>After a 1D-2D run, the 2D Meshes layer can show:</p>
+<div class="tablewrap"><table>
+<tr><th>Variable</th><th>Meaning</th></tr>
+<tr><td>Max. Depth</td><td>Greatest water depth on each cell during the run.</td></tr>
+<tr><td>Time Ponded (hr)</td><td>Time the cell was deeper than the Flood Depth Threshold.</td></tr>
+<tr><td>Time to Recede (hr)</td><td>Time from the peak until the depth fell back below the threshold (to the end of the run if it never did).</td></tr>
+<tr><td>Depth (current time)</td><td>Depth at the current time step, while playing.</td></tr>
+<tr><td>Water Surface Elev. (current time)</td><td>Water level at the current time step, while playing.</td></tr>
+<tr><td>Ground Elevation</td><td>Cell elevation from the DEM.</td></tr>
+</table></div>
+<p>Double-click the 2D Meshes layer to choose the variable, the colour ramp (for example <i>Flood Depth</i>), the ranges and the transparency. Cells shallower than the first range are left uncoloured.</p>
+<figure><img src="images/mesh_results.png" alt="Maximum depth on the 2D mesh"><figcaption>Maximum water depth on the 2D surface, with ranges set by <span class="ui">Auto-Theme</span>.</figcaption></figure>
+<figure class="small"><img src="images/mesh_symbology.png" alt="Symbology of the 2D Meshes layer"></figure>
+<p>Hover over a cell to read its values. Click it for details and a depth graph. The mesh also has an attribute table, and it can be exported as a shapefile with its results from the layer's right-click menu.</p>
+</section>

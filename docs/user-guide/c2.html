@@ -1,0 +1,184 @@
+
+<section class="topic" id="ui-overview" data-ch="The user interface" data-title="User interface overview">
+<h1>User interface overview</h1>
+<p class="lead">The Avaris2 CS window has a ribbon at the top, the Designer and Database panes on the left, the map and other views in the centre, docked panes on the right, and a status bar at the bottom.</p>
+<figure><img src="images/main_window.png" alt="Avaris2 CS main window"><figcaption>The main window with a model open.</figcaption></figure>
+<div class="tablewrap"><table>
+<tr><th>Area</th><th>Purpose</th><th>See</th></tr>
+<tr><td>Ribbon</td><td>All commands, grouped on five tabs, plus the quick-access Save, Undo and Redo buttons.</td><td><a href="#ribbon">Ribbon</a></td></tr>
+<tr><td>Parameter View</td><td>The non-visual model data: options, climatology, hydrology, hydraulics, quality, curves, time series and patterns.</td><td><a href="#parameter-view">Parameter View</a></td></tr>
+<tr><td>Layer View</td><td>The map layers: network object types, 2D meshes, added GIS layers and the basemap.</td><td><a href="#layer-view">Layer View</a></td></tr>
+<tr><td>Database tab</td><td>The base model and every simulation run made from it.</td><td><a href="#database">Database</a></td></tr>
+<tr><td>Map and views</td><td>The map, plus tabs for attribute tables, the report, profiles, plots and comparisons.</td><td><a href="#map-view">Map view</a></td></tr>
+<tr><td>Right panes</td><td>Properties (with the change Log and Project Description), Catalog, Symbology and Export.</td><td><a href="#properties">Properties pane</a></td></tr>
+<tr><td>Status bar</td><td>Flow units, offsets, map units, edit mode, messages, the loaded results, the signed-in user and the cursor coordinates.</td><td><a href="#statusbar">Status bar</a></td></tr>
+</table></div>
+<p>You can resize the side panes by dragging their borders. The pane sizes, layer settings and themes are remembered between sessions.</p>
+</section>
+
+<section class="topic" id="ribbon" data-ch="The user interface" data-title="Ribbon">
+<h1>Ribbon</h1>
+<p>The ribbon groups the commands by task. Large buttons start the most common commands, and small buttons sit next to them. Hover over any button to see a description.</p>
+<p>The quick-access toolbar at the top left holds <span class="ui">Save</span> (the arrow next to it offers <span class="ui">Save As</span>), <span class="ui">Undo</span> and <span class="ui">Redo</span>.</p>
+<h2>Project tab</h2>
+<figure><img src="images/ribbon_project.png" alt="Project tab"></figure>
+<ul>
+<li><b>File</b>: New, Open, Close.</li>
+<li><b>Scenario</b>: the <a href="#scenarios">Scenarios</a> panel.</li>
+<li><b>Import</b> and <b>Export</b>: open the <a href="#add-data">Catalog</a> and <a href="#export">Export</a> panes.</li>
+<li><b>User</b>: Switch User, Manage Users, Change History.</li>
+<li><b>Settings</b>: Default Settings.</li>
+</ul>
+<h2>Operation tab</h2>
+<figure><img src="images/ribbon_operation.png" alt="Operation tab"></figure>
+<ul>
+<li><b>Navigate</b>: Pan, Zoom to All, Zoom In, Zoom Out, Zoom to Selection.</li>
+<li><b>Bookmarks</b>: Create Bookmark, Manage Bookmarks.</li>
+<li><b>Selection</b>: Select, Search, Groups.</li>
+<li><b>Edit</b>: Add, Remove, Edit Geometry, Split, Merge, Assign Outlet, Convert Type, Reverse.</li>
+<li><b>Display</b>: Theme.</li>
+<li><b>Flag</b>: the <a href="#flags">Flag</a> panel.</li>
+<li><b>Change Log</b>: Log Window, History.</li>
+</ul>
+<h2>Tools tab</h2>
+<figure><img src="images/ribbon_tools.png" alt="Tools tab"></figure>
+<ul>
+<li><b>Connectivity</b>: Upstream Trace, Downstream Trace, Path, Clear Trace.</li>
+<li><b>Network Geometry</b>: Batch Assign Outlet, Recalculate Subcatchment Area, Recalculate Conduit Length, Derive Elevations, Orifice to Conduit, Measure.</li>
+<li><b>Rainfall</b>: Design Storm.</li>
+<li><b>Spatial Reference</b>: Reproject Raster, Convert Coordinates.</li>
+<li><b>Utilities</b>: Validate Model, Unit Converter.</li>
+</ul>
+<h2>Simulation tab</h2>
+<figure><img src="images/ribbon_simulation.png" alt="Simulation tab"></figure>
+<ul>
+<li><b>Setup</b>: Options, Create Meshes. Create Meshes is marked <i>1D-2D</i> because it belongs to the 2D flood module.</li>
+<li><b>Run</b>.</li>
+<li><b>Results</b>: Play, Profile, Plot, Comparison, Report, Convergence.</li>
+</ul>
+<h2>Help tab</h2>
+<figure><img src="images/ribbon_help.png" alt="Help tab"></figure>
+<p>About, Register, User Guide (this guide), Quick Start, Shortcuts and Diagnostics.</p>
+</section>
+
+<section class="topic" id="parameter-view" data-ch="The user interface" data-title="Parameter View">
+<h1>Parameter View</h1>
+<p>The Parameter View lists the model data that is not drawn on the map. Click an entry to open its editor. The numbers show how many items each section contains.</p>
+<figure class="small"><img src="images/parameter_view.png" alt="Parameter View"></figure>
+<div class="tablewrap"><table>
+<tr><th>Entry</th><th>Opens</th></tr>
+<tr><td>Title / Notes</td><td>The model title and notes (the <code>[TITLE]</code> section).</td></tr>
+<tr><td>Options</td><td><a href="#sim-options">Simulation Options</a> and Reporting (which objects and tables go into the status report).</td></tr>
+<tr><td>Climatology</td><td>Temperature, Evaporation, Wind Speed, Snow Melt, Areal Depletion, Adjustments.</td></tr>
+<tr><td>Hydrology</td><td>Rain Gages, Aquifers, Snow Packs, Unit Hydrographs, LID Controls.</td></tr>
+<tr><td>Hydraulics</td><td>Transects, Controls (rules), Streets, Inlets, Inlet Usage.</td></tr>
+<tr><td>Quality</td><td>Pollutants, Land Uses (with buildup and washoff).</td></tr>
+<tr><td>Curves</td><td>Control, Diversion, Pump, Rating, Shape, Storage, Tidal and Weir curves.</td></tr>
+<tr><td>Time Series, Time Patterns</td><td>The time series and pattern editors.</td></tr>
+<tr><td>Other Sections</td><td>Any other <code>.inp</code> section, as text. Sections Avaris2 CS does not interpret are kept unchanged when you save.</td></tr>
+</table></div>
+<p>See <a href="#param-editors">Parameter editors</a> for details.</p>
+</section>
+
+<section class="topic" id="layer-view" data-ch="The user interface" data-title="Layer View">
+<h1>Layer View</h1>
+<p>The Layer View controls what is drawn on the map and in which order.</p>
+<figure class="small"><img src="images/layer_view.png" alt="Layer View"></figure>
+<ul>
+<li><b>Network</b>: 2D Meshes, Subcatchments, Nodes (Junctions, Outfalls, Storages, Dividers), Links (Conduits, Pumps, Orifices, Weirs, Outlets) and Map Labels. Tick a box to show or hide a layer; the number shows how many objects it holds.</li>
+<li><b>Layers</b>: GIS layers you have added, such as Shapefile, GeoJSON, KML, File Geodatabase, GeoTIFF or CSV.</li>
+<li><b>Basemap</b>: the online background map.</li>
+</ul>
+<h2>Layer commands</h2>
+<p>Right-click a layer for its commands:</p>
+<ul>
+<li><b>Zoom to Layer</b>.</li>
+<li><b>Select All</b>.</li>
+<li><b>Attribute Table</b>.</li>
+<li><b>Symbology…</b>.</li>
+<li><b>Theme…</b>.</li>
+<li>For added layers: <b>Draw Features</b>, <b>Export as Shapefile…</b>, <b>Import into Network…</b>, <b>Move Up / Move Down</b> and <b>Remove</b>.</li>
+</ul>
+<p>Double-click a layer to open its <a href="#symbology">symbology</a>. Drag the 2D Meshes and Subcatchments layers to change their drawing order.</p>
+<p>The <span class="ui">Attribute Table</span> button above the tree opens the table of any layer, including added GIS layers. The <span class="ui">+ Add Layer</span> button adds GIS data.</p>
+</section>
+
+<section class="topic" id="symbology" data-ch="The user interface" data-title="Symbology">
+<h1>Symbology</h1>
+<p>The <b>Symbology</b> pane sets how a layer is drawn when no theme applies. Open it by double-clicking a layer in the Layer View, from the layer's right-click menu, or from the Symbology tab on the right.</p>
+<figure class="small"><img src="images/symbology.png" alt="Symbology pane for conduits"></figure>
+<ul>
+<li><b>Network layers</b>: colour, symbol size or line width, line style, transparency, and the flow direction symbol (style, size, fill). <span class="ui">Reset to Default</span> restores the original style. <span class="ui">Attribute Table</span> and <span class="ui">Theme…</span> open the table and the themes of the layer.</li>
+<li><b>Added GIS layers</b>: line and fill colours, fill and layer transparency, line width, point size, and whether the layer is drawn above or below the network. Rasters (GeoTIFF, grids) get a colour ramp.</li>
+<li><b>Basemap</b>: the source (OpenTopoMap or OpenStreetMap), transparency, and the model coordinate system (<span class="ui">Set…</span>).</li>
+<li><b>2D Meshes</b>: the variable, colour ramp, ranges and transparency; see <a href="#twod-results">2D results</a>.</li>
+</ul>
+<p>The preview at the bottom shows the result. Styles are saved with your settings and used for every model.</p>
+</section>
+
+<section class="topic" id="map-view" data-ch="The user interface" data-title="Map view and navigation">
+<h1>Map view and navigation</h1>
+<p>The map draws the network in the model's coordinate system, over an optional basemap, with the legend of the active themes in the lower right.</p>
+<figure><video poster="images/clip_nav_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_nav.webm" type="video/webm"><source src="media/clip_nav.mp4" type="video/mp4"></video><figcaption>Video: zoom with the mouse wheel and pan with the middle mouse button.</figcaption></figure>
+<h2>Navigate</h2>
+<div class="tablewrap"><table>
+<tr><th>Action</th><th>How</th></tr>
+<tr><td>Zoom</td><td>Mouse wheel (zooms around the cursor), or <span class="ui">Operation ▸ Navigate ▸ Zoom In / Zoom Out</span></td></tr>
+<tr><td>Pan</td><td>Drag with the middle mouse button, hold <kbd>Space</kbd> and drag, or use the <span class="ui">Pan</span> tool</td></tr>
+<tr><td>Whole model</td><td><kbd>Home</kbd> or <span class="ui">Zoom to All</span></td></tr>
+<tr><td>Selected objects</td><td><span class="ui">Zoom to Selection</span></td></tr>
+<tr><td>Saved views</td><td><span class="ui">Create Bookmark</span>, then <span class="ui">Manage Bookmarks ▸ Go To</span></td></tr>
+</table></div>
+<h2>The eye button and the Locator</h2>
+<p>Two buttons sit in the top-left corner of the map:</p>
+<ul>
+<li>The <b>eye</b> button (or the <kbd>T</kbd> key) hides all theme and 2D-result colouring, so you see the plain network symbols. Click it again to bring the colours back.</li>
+<li>The <b>Locator</b> button shows or hides a small overview of the whole model. The red box marks the current view. Click or drag in the Locator to move the map, and roll the wheel over it to zoom.</li>
+</ul>
+<h2>Select</h2>
+<ul>
+<li>Click an object to select it. Hold <kbd>Ctrl</kbd> and click to add objects to the selection.</li>
+<li>Drag a box to select every object in it.</li>
+<li>When symbols overlap, hold <kbd>Shift</kbd> and click to choose from a list. You can switch this behaviour in Default Settings.</li>
+<li>Press <kbd>Esc</kbd> to clear the selection, or <kbd>Ctrl</kbd>+<kbd>A</kbd> to select everything.</li>
+</ul>
+<p>Hovering over an object shows a tooltip with its ID and its value in the current theme.</p>
+<h2>Large models</h2>
+<p>When a model has more than about 60,000 objects and you zoom out, the map shows a pre-drawn overview of the whole network, so zooming and panning stay fast. When you zoom in, the full symbols, labels and themes are drawn again.</p>
+<p>Turn on <span class="ui">Default Settings ▸ Simplify the map when zoomed out</span> to make panning even smoother.</p>
+</section>
+
+<section class="topic" id="properties" data-ch="The user interface" data-title="Properties pane">
+<h1>Properties pane</h1>
+<p>The Properties pane shows the properties of the selected object, grouped as in Avaris DS:</p>
+<ul>
+<li><b>General</b>, with sub-groups such as RDII, Inflows and Infiltration;</li>
+<li><b>Statistic Results</b> from the status report after a run.</li>
+</ul>
+<p>Click a group header to fold or unfold it.</p>
+<figure class="small"><img src="images/properties.png" alt="Properties pane"><figcaption>Properties of a junction. The pencil buttons open the Direct Inflows and Dry Weather Flows editors.</figcaption></figure>
+<ul>
+<li><b>Edit a value</b>: type a new value and press <kbd>Enter</kbd>, or pick it from the list. Every change can be undone.</li>
+<li><b>Several objects selected</b>: choose the object type at the top. Fields with different values show <i>*Multiple Values</i>, and a value you type is applied to all selected objects of that type.</li>
+<li><b>Computed values</b>, such as conduit slope, map length and polygon area, are shown read-only below the editable fields.</li>
+<li><b>Filter the change log</b>: click a property <i>name</i> to show only the changes to that variable in the <a href="#history">Log</a> below. Click it again to show all changes. The filter is cleared when you select another object.</li>
+</ul>
+<p>Below the properties, the <b>Log</b> lists the recorded changes of the selected object. The <b>Project Description</b> box holds the model notes.</p>
+</section>
+
+<section class="topic" id="statusbar" data-ch="The user interface" data-title="Status bar">
+<h1>Status bar</h1>
+<figure><img src="images/statusbar.png" alt="Status bar"></figure>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td>Flow Units</td><td>The model flow units: CFS, GPM or MGD (US units, lengths in ft) and CMS, LPS or MLD (SI units, lengths in m). Click to change them. Avaris2 CS can also convert every value of the model to the new unit system; see <a href="#units">Units</a>.</td></tr>
+<tr><td>Offsets</td><td>Whether link offsets are measured as a depth above the node invert (DEPTH) or as an elevation (ELEVATION).</td></tr>
+<tr><td>Map Units</td><td>The unit of the map coordinates, used for lengths and areas measured on the map.</td></tr>
+<tr><td>Edit</td><td>Whether node dragging is switched on.</td></tr>
+<tr><td>Message</td><td>The result of the last command.</td></tr>
+<tr><td>Results</td><td>The loaded run: number of reporting steps and step length.</td></tr>
+<tr><td>Selection statistics</td><td>The number of selected objects, with total subcatchment area and conduit length.</td></tr>
+<tr><td>User</td><td>The signed-in user and role. Click to switch user or change your password.</td></tr>
+<tr><td>X, Y</td><td>The map coordinates of the cursor.</td></tr>
+</table></div>
+</section>
