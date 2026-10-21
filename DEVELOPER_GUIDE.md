@@ -64,7 +64,7 @@ Avaris2CS.exe (Electron)
 | `tools/peicon.py` | 把 PNG 图标写入 Windows exe 的图标资源（Linux 上没有 rcedit 时使用）。 |
 | `tools/iconnorm.py` | Ribbon 图标视觉尺寸统一工具（裁边、按内容面积缩放、居中到画布）。用法：`python3 iconnorm.py 源文件夹 输出文件夹 0.86 96`。 |
 | `tools/make_insights.py` | 旧版本用来生成 Insight Flag 主题 json 的脚本，已被 Flag 面板取代，仅作参考。 |
-| `license-tools/keygen.js` | 许可证生成器：`node keygen.js --edition 1D\|2D --name "客户" [--expiry 2027-12-31]`。 |
+| `license-tools/keygen.js` | 命令行版许可证签发：`node keygen.js --request "<申请邮件全文或 AVREQ-…>" [--edition 1D\|2D] [--term 30d\|1y\|3y] [--start YYYY-MM-DD]`。日常签发建议用软件里的 Licence Issuer（Ctrl+Alt+L）。 |
 | `license-tools/public_key.pem` | 公钥，已嵌入 `main.js` 用于离线验证。 |
 | `license-tools/private_key.pem` | **私钥，务必保密，不能随软件发布**，也不进 git。源码包里如果附带，要单独妥善保管。 |
 | `installer/avaris.nsi` | NSIS 安装脚本：安装目录、开始菜单和桌面快捷方式、可选的 .inp 关联、卸载；安装前会自动卸载旧名称 "Avaris2" 的版本。 |
@@ -137,7 +137,7 @@ Avaris2CS.exe (Electron)
 | `export.js` | 186 | Export Wizard：网络对象连同属性和结果导出为 Shapefile / GDB / CSV。 |
 | `mesh2d.js` | 346 | **2D 地表淹没模块**：在边界多边形内生成方格网（按 DEM 取高程），2D 网格写入 .inp（`AV.mesh2DToINP`），导入 Avaris DS 的 `.ini [2D]` 设置，2D 结果（水深、最大水深、积水时长、退水时间）计算、绘制和图例。 |
 | `history.js` | 485 | 用户登录和角色（Administrator 管理员、Modeler 建模员、Viewer 只读），**修改记录**（谁在什么时候改了哪个对象的哪个变量，旧值和新值），保存在 `<模型>.osemhist.json`。 |
-| `licence.js` | 70 | 许可证：1D 和 1D-2D 两个版本、`AV.has2D()`、注册对话框。**目前 `AV.LICENSING = false`，所有功能开放。** |
+| `licence.js` | 230 | **许可证**：<br>• 版本分 1D / 1D-2D，期限 30 天、1 年或 N 年，许可证绑定机器码；<br>• 没有有效许可证时（未激活、过期、换了电脑、系统时间被回调）进入只读模式：`AV.licenceGate`，由 `canModify`、`save`、`sim.run` 和方案批量运行调用；<br>• Help ▸ Register 对话框：生成激活申请（发邮件 / 复制 / 保存 .avreq）、导入许可证（粘贴或 .avlic 文件）、释放本机；<br>• **Licence Issuer**（Ctrl+Alt+L，OSEMTEC 内部用，需要私钥文件）：粘贴申请邮件即可签发许可证，自动记入 `licence_ledger.csv`。 |
 | `clip.js` | 95 | 复制粘贴对象（连同它们用到的曲线、时间序列等），可以跨模型、跨窗口。 |
 
 ### 2.4 `engine/src/`：计算引擎（C）
@@ -306,3 +306,34 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
   git push -u origin main --tags
   ```
 - **不在 git 里的大文件**：`app/gdal/`（约 76 MB）、`dist/`、私钥。源码包会单独附带 GDAL。
+
+---
+
+## 9. 许可证（第一阶段：邮件申请、人工签发）
+
+**流程**
+1. 用户在 Help ▸ Register 里填写 osemtec.com 账号、姓名、公司、邮箱、版本和期限，点 *Send Request by E-mail*。软件会打开用户自己的邮件程序，内容已填好，发往 info@osemtec.com。
+2. OSEMTEC 在网站后台核对账号和付款，然后在 Avaris2 CS 里按 Ctrl+Alt+L 打开 Licence Issuer：粘贴整封申请邮件，确认版本和期限，签发许可证，再点 *E-mail to Customer*。
+3. 用户把收到的许可证粘贴到 Register 里，点 Activate。之后全程离线验证。
+
+**许可证格式**
+- 格式为 `AV2L-<base64url JSON>.<base64url Ed25519 签名>`。
+- JSON 字段：`{v:2, ed, term, user, name, company, email, iss, exp, ser, mc, hw:{g, v, m[]}}`。
+
+**机器码**
+- 由 Windows MachineGuid（g）、系统盘卷序列号（v）、物理网卡 MAC（m）三部分分别哈希组成。
+- 三部分中至少两项一致才算同一台机器。所以换扩展坞、VPN、Wi‑Fi 不会让许可证失效。
+
+**只读模式**
+- 触发条件：没有许可证、许可证过期、换了电脑、系统时间被往回调（`<userData>/licstate.json` 记录最后使用日期）。
+- 只读时可以打开和查看模型与结果，不能编辑、保存或运行。
+
+**换电脑**
+用户点 *Release this Computer*，得到释放码，发给 OSEMTEC。Licence Issuer 里的 *Check a release code* 用来核对释放码。
+
+**私钥**
+- `license-tools/private_key.pem` 绝不能随软件发布，也不能进 git。
+- 公钥写在 `main.js` 的 `LIC_PUB` 里。如果更换密钥对，已发出的许可证会全部失效。
+
+**第二阶段**
+服务器用同一私钥、同一格式自动签发，替代"邮件 + 人工"这一步。已发出的许可证继续有效。

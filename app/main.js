@@ -134,23 +134,76 @@ const usersFile = () => path.join(app.getPath('userData'), 'users.json');
 ipcMain.handle('app:users:get', async () => { try { return JSON.parse(fs.readFileSync(usersFile(), 'utf8')); } catch (e) { return null; } });
 ipcMain.handle('app:hash', async (e, pw, salt) => { const c = require('crypto'); if (!salt) salt = c.randomBytes(16).toString('hex'); return { salt, hash: c.pbkdf2Sync(String(pw), salt, 120000, 32, 'sha256').toString('hex') }; });
 ipcMain.handle('app:users:set', async (e, u) => { fs.mkdirSync(path.dirname(usersFile()), { recursive: true }); fs.writeFileSync(usersFile(), JSON.stringify(u, null, 2)); return true; });
-// ---------------------------------------------------------------- licence (offline Ed25519-signed keys)
-// key = OSEMCM-<base64url payload>.<base64url signature>, payload = ver|edition(1D|2D)|licensee|expiry|serial|issued
+// ---------------------------------------------------------------- licence (offline Ed25519-signed, bound to the computer)
+// key = AV2L-<base64url JSON>.<base64url Ed25519 signature>
+//   JSON {v:2, ed:'1D'|'2D', term:'30d'|'1y'|'<n>y', user (osemtec.com account), name, company, email, iss, exp 'YYYY-MM-DD',
+//         ser, mc (machine code), hw:{g, v, m:[...]}}
+// The computer is identified by three hashed parts: Windows MachineGuid (g), system volume serial (v) and the physical
+// network adapters (m). A licence stays valid while at least 2 of the 3 still match (new dock / VPN adapter, Wi-Fi vs LAN).
+const crypto = require('crypto');
 const LIC_PUB = '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAY6AEfM7kFpdG4rajIfIEUwJA7Iw7nGIgUovmv9x++2g=\n-----END PUBLIC KEY-----\n';
+const b64u = (b) => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+const hpart = (tag, val) => crypto.createHash('sha256').update('avaris2|' + tag + '|' + String(val).trim().toLowerCase()).digest('hex').slice(0, 16);
+let machineCache = null;
+function machineInfo() {
+  if (machineCache) return machineCache;
+  const { execFileSync } = require('child_process'); const run = (cmd, args) => { try { return execFileSync(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 5000 }); } catch (e) { return ''; } };
+  let guid = '', vol = '';
+  if (process.platform === 'win32') {
+    const r = run('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid', '/reg:64']); const m = /MachineGuid\s+REG_SZ\s+([0-9a-f-]+)/i.exec(r); guid = m ? m[1] : '';
+    const sys = (process.env.SystemDrive || 'C:'); const v = run('cmd', ['/c', 'vol', sys]); const mv = /([0-9A-F]{4}-[0-9A-F]{4})\s*$/im.exec(v); vol = mv ? mv[1] : '';
+  } else {
+    try { guid = fs.readFileSync('/etc/machine-id', 'utf8').trim(); } catch (e) { guid = ''; }
+    vol = os.hostname();
+  }
+  const VIRT = /virtual|vmware|vbox|virtualbox|hyper-v|vethernet|docker|wsl|loopback|bluetooth|tap|tun|vpn|miniport|npcap|zerotier|tailscale|wireguard|clash|utun|veth|br-|virbr/i;
+  const macs = new Set();
+  for (const [name, list] of Object.entries(os.networkInterfaces())) { if (VIRT.test(name)) continue; for (const a of list || []) { if (a.internal || !a.mac || /^(00:){5}00$/.test(a.mac)) continue; const first = parseInt(a.mac.slice(0, 2), 16); if (first & 2) continue; macs.add(a.mac.toLowerCase()); } }
+  const hw = { g: guid ? hpart('g', guid) : '', v: vol ? hpart('v', vol) : '', m: [...macs].sort().map(x => hpart('m', x)).slice(0, 6) };
+  const digest = crypto.createHash('sha256').update([hw.g, hw.v, hw.m[0] || ''].join('|')).digest();
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code = ''; for (let i = 0; i < 16; i++) code += A[digest[i] % 32];
+  machineCache = { code: 'AV2-' + code.match(/.{4}/g).join('-'), hw, host: os.hostname(), os: os.type() + ' ' + os.release() };
+  return machineCache;
+}
+function hwMatches(lic, cur) { let n = 0; if (lic.g && lic.g === cur.g) n++; if (lic.v && lic.v === cur.v) n++; if ((lic.m || []).some(x => cur.m.includes(x))) n++; return n; }
+// last date the program ran, so a clock set back cannot extend a licence
+const licStateFile = () => path.join(app.getPath('userData'), 'licstate.json');
+function clockCheck() {
+  let st = {}; try { st = JSON.parse(fs.readFileSync(licStateFile(), 'utf8')); } catch (e) { }
+  const now = Date.now(); const last = +st.last || 0; const back = last && now < last - 2 * 86400e3;
+  if (!back && now > last) { try { fs.mkdirSync(path.dirname(licStateFile()), { recursive: true }); fs.writeFileSync(licStateFile(), JSON.stringify({ last: now })); } catch (e) { } }
+  return { back, last };
+}
 function verifyLicence(raw) {
-  const out = { valid: false, edition: null, licensee: '', expiry: '', serial: '', issued: '', error: '' };
-  const key = String(raw || '').replace(/\s+/g, ''); if (!key) { out.error = 'No licence key.'; return out; }
-  const m = /^OSEMCM-([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(key); if (!m) { out.error = 'This is not an Avaris2 CS licence key.'; return out; }
-  const dec = (s) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-  let ok = false; const payload = dec(m[1]);
-  try { ok = require('crypto').verify(null, payload, require('crypto').createPublicKey(LIC_PUB), dec(m[2])); } catch (e) { ok = false; }
+  const out = { valid: false, edition: null, licensee: '', user: '', company: '', expiry: '', serial: '', issued: '', term: '', daysLeft: null, error: '', machine: machineInfo().code };
+  const key = String(raw || '').replace(/\s+/g, ''); if (!key) { out.error = 'No licence.'; return out; }
+  const m = /^AV2L-([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(key); if (!m) { out.error = 'This is not an Avaris2 CS licence key.'; return out; }
+  const payload = unb64u(m[1]); let ok = false;
+  try { ok = crypto.verify(null, payload, crypto.createPublicKey(LIC_PUB), unb64u(m[2])); } catch (e) { ok = false; }
   if (!ok) { out.error = 'The licence key is not valid (signature check failed).'; return out; }
-  const f = payload.toString('utf8').split('|'); if (f[0] !== '1' || !['1D', '2D'].includes(f[1])) { out.error = 'Unsupported licence key version.'; return out; }
-  Object.assign(out, { edition: f[1], licensee: f[2] || '', expiry: f[3] || '', serial: f[4] || '', issued: f[5] || '' });
-  if (out.expiry && new Date(out.expiry + 'T23:59:59') < new Date()) { out.error = 'The licence expired on ' + out.expiry + '.'; return out; }
+  let L; try { L = JSON.parse(payload.toString('utf8')); } catch (e) { out.error = 'The licence key is damaged.'; return out; }
+  if (L.v !== 2 || !['1D', '2D'].includes(L.ed)) { out.error = 'Unsupported licence version.'; return out; }
+  Object.assign(out, { edition: L.ed, licensee: L.name || '', user: L.user || '', company: L.company || '', expiry: L.exp || '', serial: L.ser || '', issued: L.iss || '', term: L.term || '', licMachine: L.mc || '' });
+  if (hwMatches(L.hw || {}, machineInfo().hw) < 2) { out.error = 'This licence was issued for another computer (' + (L.mc || '?') + '). This computer: ' + machineInfo().code + '.'; out.wrongMachine = true; return out; }
+  const ck = clockCheck(); if (ck.back) { out.error = 'The computer clock is set earlier than the last time Avaris2 CS was used. Correct the date and time, then restart.'; out.clock = true; return out; }
+  if (out.expiry) { const end = new Date(out.expiry + 'T23:59:59'); out.daysLeft = Math.floor((end - Date.now()) / 86400e3); if (end < new Date()) { out.error = 'The licence expired on ' + out.expiry + '.'; out.expired = true; return out; } }
   out.valid = true; return out;
 }
 ipcMain.handle('license:verify', async (e, key) => verifyLicence(key));
+ipcMain.handle('license:machine', async () => machineInfo());
+// ---- licence issuing (OSEMTEC staff only: needs the private key file, which is never shipped)
+ipcMain.handle('license:issue', async (e, pemPath, lic) => {
+  const pem = fs.readFileSync(pemPath, 'utf8'); const key = crypto.createPrivateKey(pem);
+  const pub = crypto.createPublicKey(key).export({ type: 'spki', format: 'pem' }).toString().replace(/\r/g, '');
+  if (pub.trim() !== LIC_PUB.trim()) throw new Error('This private key does not belong to Avaris2 CS.');
+  const body = Buffer.from(JSON.stringify(Object.assign({ v: 2 }, lic)), 'utf8');
+  const k = 'AV2L-' + b64u(body) + '.' + b64u(crypto.sign(null, body, key));
+  const ledger = path.join(path.dirname(pemPath), 'licence_ledger.csv'); const q = (x) => '"' + String(x === undefined || x === null ? '' : x).replace(/"/g, '""') + '"';
+  if (!fs.existsSync(ledger)) fs.writeFileSync(ledger, 'issued,serial,user,name,company,email,edition,term,expiry,machine,host,key\n');
+  fs.appendFileSync(ledger, [lic.iss, lic.ser, lic.user, lic.name, lic.company, lic.email, lic.ed, lic.term, lic.exp, lic.mc, lic.host, k].map(q).join(',') + '\n');
+  return { key: k, ledger };
+});
 ipcMain.handle('app:settings:get', async () => loadSettings());
 // ---- file browsing for the Catalog pane
 ipcMain.handle('fs:list', async (e, dir) => {

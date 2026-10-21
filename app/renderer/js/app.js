@@ -47,6 +47,7 @@
       this.dirty = false; this.updateTitle();
       this.showWelcome(true);
       await this.auth.init();
+      this.licenceStartup();
       window.host.onRequestClose(async () => { if (await this.checkSave()) window.host.confirmClose(); });
       window.host.onOpenFile((p) => this.openFile(p));
       window.host.onProgress((p, id) => this.sim.onProgress(p, id));
@@ -445,6 +446,7 @@
       } catch (e) { AV.alert('Could not open file:\n' + e.message, 'Error'); this.status('Ready'); }
     }
     async save(as) {
+      if (!AV.licenceGate(this, 'Saving a model')) return false;
       let p = this.filePath;
       if (as || !p) {
         p = await window.host.saveDialog({ title: 'Save model', defaultPath: p || 'model.inp', filters: [{ name: 'Avaris / SWMM input', extensions: ['inp'] }] });
@@ -480,7 +482,7 @@
     status(msg) { AV.$('#sbMsg').textContent = msg; if (this.feat) this.feat.log(msg); }
 
     // ---------------------------------------------------------------- undo / redo
-    canModify(quiet) { if (!this.auth || !this.auth.current || this.auth.canEdit) return true; if (!quiet) AV.toast('Your role (' + this.auth.roleLabel + ') cannot change the model. Ask an Administrator, or switch user from the status bar.', true); return false; }
+    canModify(quiet) { if (!AV.licenceGate(this, 'Changing or saving a model', quiet)) return false; if (!this.auth || !this.auth.current || this.auth.canEdit) return true; if (!quiet) AV.toast('Your role (' + this.auth.roleLabel + ') cannot change the model. Ask an Administrator, or switch user from the status bar.', true); return false; }
     exec(cmd) { if (!this.canModify()) { this.panels.showProps(); return false; } cmd.do(); this.undoStack.push(cmd); if (this.undoStack.length > 1000) this.undoStack.shift(); this.redoStack = []; if (this.hist) this.hist.record(cmd, 'do'); this.afterEdit(cmd); return true; }
     undo() { if (!this.canModify()) return; const c = this.undoStack.pop(); if (!c) return; c.undo(); this.redoStack.push(c); if (this.hist) this.hist.record(c, 'undo'); this.afterEdit(c); this.status('Undo: ' + c.label); }
     redo() { if (!this.canModify()) return; const c = this.redoStack.pop(); if (!c) return; c.do(); this.undoStack.push(c); if (this.hist) this.hist.record(c, 'do'); this.afterEdit(c); this.status('Redo: ' + c.label); }
@@ -810,6 +812,7 @@
     onKey(e) {
       const tag = (e.target.tagName || '').toLowerCase();
       const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'l') { e.preventDefault(); AV.licenceIssuer(this); return; }
       if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.save(e.shiftKey); return; }
       if (e.ctrlKey && e.key.toLowerCase() === 'o') { e.preventDefault(); this.openDialog(); return; }
       if (e.ctrlKey && e.key.toLowerCase() === 'n') { e.preventDefault(); this.newProject(); return; }

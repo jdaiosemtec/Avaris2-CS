@@ -301,6 +301,7 @@
     // =============================================================== run
     async run() {
       const m = this.model, app = this.app;
+      if (!AV.licenceGate(app, 'Running a simulation')) return;
       if (!m.nodes.size) { AV.alert('The model has no nodes to simulate.'); return; }
       const v = AV.validateQuick(m);
       if (v.length) { if (!await AV.confirm('Possible problems found:\n\n' + v.slice(0, 15).join('\n') + (v.length > 15 ? '\n... (' + v.length + ' total)' : '') + '\n\nRun anyway?', 'Run Simulation', 'Run')) return; }

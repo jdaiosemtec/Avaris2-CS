@@ -593,6 +593,7 @@
     // - 1 at once, each engine with 1 thread), each with its own progress bar; then show them together
     async runScenarios(paths) {
       const app = this.app, sim = app.sim; const norm = (p) => p.replace(/\\/g, '/').toLowerCase();
+      if (!AV.licenceGate(app, 'Running simulations')) return;
       const rn = await AV.askRunName(app, 'Run Scenarios', { ok: 'Run ' + paths.length + ' scenario' + (paths.length > 1 ? 's' : '') }); if (!rn) return;
       const limit = Math.max(1, Math.min(paths.length, (app.info.cpus || 2) - 1));
       const one = (t) => /^\s*THREADS\s/im.test(t) ? t.replace(/^(\s*THREADS\s+)\S+/im, '$11') : t.replace(/^\[OPTIONS\][^\n]*\n/im, (x) => x + 'THREADS              1\n');

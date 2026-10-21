@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('host', {
   prepareSample: (n) => ipcRenderer.invoke('app:prepareSample', n),
   getSettings: () => ipcRenderer.invoke('app:settings:get'),
   licenseVerify: (k) => ipcRenderer.invoke('license:verify', k),
+  licenseMachine: () => ipcRenderer.invoke('license:machine'),
+  licenseIssue: (pem, lic) => ipcRenderer.invoke('license:issue', pem, lic),
   setSettings: (s) => ipcRenderer.invoke('app:settings:set', s),
   listDir: (d) => ipcRenderer.invoke('fs:list', d),
   drives: () => ipcRenderer.invoke('fs:drives'),

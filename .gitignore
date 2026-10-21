@@ -3,3 +3,4 @@ node_modules/
 app/gdal/
 *.log
 license-tools/private_key.pem
+license-tools/licence_ledger.csv
