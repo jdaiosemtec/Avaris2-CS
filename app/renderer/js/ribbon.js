@@ -50,6 +50,7 @@
               { id: 'convert', label: 'Convert Type', img: 'convert', fn: () => F().convertType(), tip: 'Convert selected objects to another type' },
               { id: 'reverse', label: 'Reverse', img: 'reverse', fn: () => T().reverseLinks(), tip: 'Reverse the direction of selected links' }] }] },
           { name: 'Display', items: [{ id: 'theme', label: 'Theme', img: 'theme', fn: () => this.theme.dialog(), tip: 'Layer theme editor' }] },
+          { name: 'Flag', items: [{ id: 'flag', label: 'Flag', img: 'flag', fn: () => AV.openFlags(this), active: () => !!(this.flags && this.flags.open), tip: 'Flags: show model insight flags (flooding, surcharge, capacity, velocity, reverse flow ...) with adjustable parameters' }] },
           { name: 'Change Log', items: [
             { id: 'window', label: 'Log Window', img: 'window', fn: () => this.toggleLogPane(), active: () => this.prefs.logPane !== false, tip: 'Show / hide the change log under the Properties panel' },
             { id: 'table', label: 'History', img: 'table', fn: () => this.hist.openWindow(), tip: 'Change history table: every recorded change with version, user, role, time, old / new value and description' }] },

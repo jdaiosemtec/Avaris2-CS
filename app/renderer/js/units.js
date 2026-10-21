@@ -80,6 +80,7 @@
     app.exec({ label: 'Flow units ' + from + ' → ' + to + (r === 'conv' ? ' (values converted)' : ''), do: () => restore(after), undo: () => restore(before), changes: [{ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: 'FLOW_UNITS', old: from, nw: to }] });
     if (m.geomVersion !== undefined) m.geomVersion++;
     app.refreshAll(); app.map.redraw(); app.panels.showProps();
+    if (app.flags) app.flags.changed();   // flag parameters follow the unit system
     if (app.results) AV.toast('The loaded results are still in ' + from + '; run the model again.', false, 6000);
     AV.alert('Flow units changed to ' + to + (r === 'conv' ? ', values converted.' : ', values kept.') + (left.length ? '\n\nNot converted (check these sections by hand): ' + left.join(', ') + '.' : '') + (sys && app.mesh2d ? '\n\nThe 2D mesh keeps its elevations; rebuild it (Create Meshes) if the DEM units no longer match.' : ''), 'Flow Units');
   };

@@ -27,6 +27,7 @@
       await this.loadLicence();
       this.buildLayout();
       this.theme = new AV.Theme(this);
+      this.flags = new AV.Flags(this);
       this.map = new AV.MapView(AV.$('#mapWrap'), this);
       this.corner = new AV.MapCorner(this, AV.$('#mapWrap'));
       this.panels = new AV.Panels(this);
@@ -331,6 +332,7 @@
 
     // ---------------------------------------------------------------- model / file
     setModel(m, path) {
+      if (this.flags) { this.flags.reset(); if (this.flags.render) setTimeout(() => this.flags.render && this.flags.render(), 0); }
       this.crs = null; this.crsWKT = null; this.crsName = '';
       this.model = m; this.filePath = path; this.selection.clear(); this.undoStack = []; this.redoStack = [];
       if (this.hist) this.hist.load(path);
@@ -424,6 +426,7 @@
           }
         }
         this.setCRS(this.crsWKT, null, true);
+        await this.flags.load(); if (this.flags.render) this.flags.render();
         if (this.crsWKT && (m.mapInfo.units || 'None').toUpperCase() === 'NONE') {
           try { const P = AV.Proj.parse(this.crsWKT); m.mapInfo.units = P.type === 'geographic' ? 'Degrees' : (Math.abs(P.unit - 1) < 1e-6 ? 'Meters' : 'Feet'); this.refreshAll(); } catch (e) { }
         }

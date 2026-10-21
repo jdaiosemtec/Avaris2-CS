@@ -87,6 +87,9 @@
       for (const r of t.ranges) if (v <= r.v) return r;
       return t.ranges[t.ranges.length - 1] || null;
     }
+    // the themes that draw a layer: the layer's own list, or - while Flags are shown - only the selected flag of that layer
+    // (all other themes are suspended until the Flag panel is closed or no flag is selected)
+    subsOf(layer) { const F = this.app.flags; if (F && F.on()) { const s = F.sub(layer); return s ? [s] : []; } return this.layers[layer].subs; }
     // while the map draws, each object's style is computed once per frame (colour, size and visibility all read it)
     // and a layer without any active theme returns at once
     style(layer, o) {
@@ -94,7 +97,7 @@
       const fr = AV._drawing ? AV.frameId : 0;
       if (fr) {
         const c = o[STY]; if (c && c.f === fr && c.l === layer) return c.s;
-        if (this._actF !== fr) { this._actF = fr; this._act = {}; for (const k of ['node', 'link', 'sub']) this._act[k] = this.layers[k].subs.some(t => t.ranges && t.ranges.length && this.active(t)); }
+        if (this._actF !== fr) { this._actF = fr; this._act = {}; for (const k of ['node', 'link', 'sub']) this._act[k] = this.subsOf(k).some(t => t.ranges && t.ranges.length && this.active(t)); }
         if (!this._act[layer]) return EMPTY_STYLE;
         const s = this._style(layer, o); o[STY] = { f: fr, l: layer, s }; return s;
       }
@@ -102,7 +105,7 @@
     }
     _style(layer, o) {
       const out = { color: null, size: null, hide: false };
-      for (const t of this.layers[layer].subs) {
+      for (const t of this.subsOf(layer)) {
         if (!this.active(t) || !t.ranges.length) continue;
         if (t.where && !this.passWhere(layer, t, o)) continue;
         const r = this.rowFor(t, this.value(layer, o, t));
@@ -192,12 +195,13 @@
     updateLegend() {
       const el = AV.$('#legend'); if (!el) return; el.innerHTML = ''; let any = false;
       if (this.app.themeHidden) { el.style.display = 'none'; return; }
-      for (const layer of ['node', 'link', 'sub']) for (const t of this.layers[layer].subs) {
+      for (const layer of ['node', 'link', 'sub']) for (const t of this.subsOf(layer)) {
+        if (t.flag && !this.active(t)) { any = true; el.appendChild(h('div', { class: 'lt', style: { color: 'var(--muted)', fontWeight: 400 } }, LAYER_NAME[layer] + ': ' + t.name + (this.app.playMode ? ' - Σ shown outside play mode' : ' - ▶ shown while playing'))); continue; }
         if (!this.active(t) || !t.legend || !t.ranges.length) continue; any = true;
         el.appendChild(h('div', { class: 'lt' }, LAYER_NAME[layer] + ': ' + t.name));
         t.ranges.slice(0, 14).forEach((r, i) => {
           const txt = r.label ? r.label : t.kind === 'individual' ? String(r.v) : (i === 0 ? '≤ ' + AV.fmt(+r.v) : AV.fmt(+t.ranges[i - 1].v) + ' – ' + AV.fmt(+r.v));
-          const sw = layer === 'node' && t.useSize ? h('span', { class: 'lc', style: { width: '14px', height: Math.max(4, r.size * 1.4) + 'px', borderRadius: '50%', background: t.useColor ? r.color : '#1e88e5' } })
+          const sw = r.color === null ? h('span', { class: 'lc', title: 'no fill (base symbol)', style: { background: 'transparent', border: '1px dashed #90a4ae', height: '8px' } }) : layer === 'node' && t.useSize ? h('span', { class: 'lc', style: { width: '14px', height: Math.max(4, r.size * 1.4) + 'px', borderRadius: '50%', background: t.useColor ? r.color : '#1e88e5' } })
             : h('span', { class: 'lc', style: { background: t.useColor ? r.color : '#546e7a', height: t.useSize ? Math.max(2, r.size) + 'px' : '8px' } });
           el.appendChild(h('div', { class: 'lr', style: { opacity: r.show === false ? .4 : 1 } }, sw, txt));
         });

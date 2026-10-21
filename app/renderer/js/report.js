@@ -157,9 +157,8 @@
     const R = app.results; const th = app.theme;
     if (!R) { el.appendChild(h('div', { class: 'rpempty' }, 'Load or run results first: the statistics are computed from the results file.')); return; }
     const flags = [];
-    for (const layer of ['node', 'link', 'sub']) for (const t of th.layers[layer].subs) {
-      if (!t.field || !t.field.startsWith('x:')) continue; const src = t.field.slice(2);
-      if (!AV.exprIsDynamic(src)) continue;   // "worst over run" variants repeat a dynamic flag
+    // the flags of the Flag panel with their current parameters (those using dur / run / win)
+    for (const { layer, t, src } of AV.flagsForReport(app)) {
       const c = th.compiled(layer, src); if (!c) continue;
       const stats = []; const seen = new Set();
       for (const n of c.temporals) { if (!STAT[n.fn] || seen.has(n.key)) continue; seen.add(n.key); const cond = n.key.slice(n.fn.length + 1, -1).replace(/,\s*[\d.]+\s*$/, n.fn === 'win' ? '' : '$&');
@@ -168,8 +167,8 @@
       flags.push({ layer, t, src, stats });
     }
     if (!flags.length) {
-      el.appendChild(h('div', { class: 'rpempty' }, h('div', { style: { fontWeight: 600, marginBottom: '6px' } }, 'No theme uses the time functions dur, run or win.'),
-        h('div', null, 'Load the Insight Flags theme file (Theme → Load… → Add), or write your own theme expression with dur(condition), run(condition) or win(condition, minutes). Their duration statistics then appear here.')));
+      el.appendChild(h('div', { class: 'rpempty' }, h('div', { style: { fontWeight: 600, marginBottom: '6px' } }, 'No flag uses the time functions dur, run or win.'),
+        h('div', null, 'Add a flag with dur(condition), run(condition) or win(condition, minutes) in the Flag panel (Operation ▸ Flag); its duration statistics then appear here.')));
       return;
     }
     const status = h('div', { class: 'rpnote' }, 'Computing statistics from ' + R.meta.nPeriods + ' time steps…'); el.appendChild(status);
@@ -203,6 +202,6 @@
         rows.length ? h('div', { class: 'rptablew small' }, h('table', { class: 'grid' }, h('thead', null, h('tr', null, h('th', null, 'ID'), h('th', null, 'Type'), h('th', null, 'Worst level'), h('th', null, 'Time of worst'), J.S.map(s => h('th', { title: s.fn + '(' + s.cond + ')' }, s.label)))), tb)) : null,
         rows.length > 3000 ? h('div', { class: 'rpnote' }, 'First 3000 of ' + rows.length + ' shown; Export CSV has all.') : null));
     }
-    el.insertBefore(h('div', { class: 'rpnote' }, 'Duration statistics of the themes that use dur / run / win (accuracy = report time step, ' + (R.meta.reportStep / 60) + ' min). Worst level = highest theme value during the run.'), el.firstChild);
+    el.insertBefore(h('div', { class: 'rpnote' }, 'Duration statistics of the flags that use dur / run / win, with the parameters set in the Flag panel (accuracy = report time step, ' + (R.meta.reportStep / 60) + ' min). Worst level = highest theme value during the run.'), el.firstChild);
   }
 })(window.AV);
