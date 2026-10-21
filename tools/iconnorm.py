@@ -2,7 +2,7 @@
 # (corrected a little for ink density) is the same for every icon, long side capped; centre on a 64x64 canvas.
 import sys,glob,os
 from PIL import Image,ImageDraw
-src,dst=sys.argv[1],sys.argv[2]; C=64; T=float(sys.argv[3]) if len(sys.argv)>3 else 0.80
+src,dst=sys.argv[1],sys.argv[2]; C=int(sys.argv[4]) if len(sys.argv)>4 else 64; T=float(sys.argv[3]) if len(sys.argv)>3 else 0.80
 rows=[]
 for f in sorted(glob.glob(src+'/*.png')):
     im=Image.open(f).convert('RGBA'); a=im.split()[3]; bb=a.point(lambda v:255 if v>40 else 0).getbbox()

@@ -349,6 +349,9 @@
       this.setModel(AV.newModel(), null); this.dirty = false; this.updateTitle(); this.showWelcome(true);
     }
     refreshAll() {
+      const _t0 = performance.now(); try { this._refreshAll(); } finally { AV.perf.rec('Panels: refresh all', performance.now() - _t0); }
+    }
+    _refreshAll() {
       if (this.descBox) this.descBox.value = (this.model.title || []).join('\n');
       this.panels.refreshTree(); this.panels.refreshLayers(); this.panels.showProps();
       AV.$('#sbUnits').textContent = this.model.flowUnits;
@@ -401,26 +404,26 @@
       if (!skipCheck && !await this.checkSave()) return;
       this.status('Opening ' + p + ' ...');
       try {
-        const text = await window.host.readText(p);
+        const _tr = performance.now(); const text = await window.host.readText(p); AV.perf.rec('Open: read file', performance.now() - _tr, (text.length / 1048576).toFixed(0) + ' MB');
         const t0 = performance.now();
-        const m = AV.Model.parse(text);
+        const _tp = performance.now(); const m = AV.Model.parse(text); AV.perf.rec('Open: parse .inp', performance.now() - _tp);
         this.setModel(m, p); this.dirty = false; this.updateTitle(); this.showWelcome(false);
         this.addRecent(p);
         this.status(`Opened ${AV.basename(p)} (${m.nodes.size} nodes, ${m.links.size} links, ${m.subcatchments.size} subcatchments) in ${((performance.now() - t0) / 1000).toFixed(2)} s`);
         if (m.warnings && m.warnings.length) AV.alert('Some lines could not be read:\n\n' + m.warnings.slice(0, 30).join('\n'), 'Import warnings');
-        // coordinate system from an Avaris DS project file (.ini / .sw [Reference])
-        this.crsWKT = null;
-        for (const ext of ['.ini', '.sw']) {
+        // coordinate system: <model>.prj first (written by Map Coordinate System or by hand), else the Avaris DS project file (.ini / .sw [Reference])
+        this.crsWKT = null; this.crsSource = '';
+        { const pp = p.replace(/\.inp$/i, '.prj'); if (pp !== p && await window.host.exists(pp)) { try { this.crsWKT = (await window.host.readText(pp)).trim() || null; if (this.crsWKT) this.crsSource = AV.basename(pp); } catch (e) { } } }
+        if (!this.crsWKT) for (const ext of ['.ini', '.sw']) {
           const pp = p.replace(/\.inp$/i, ext);
           if (pp !== p && await window.host.exists(pp)) {
             // [Reference] keeps a list 1="WKT", 2="WKT" ... and current = 0-based index of the one in use
             const t = await window.host.readText(pp); const sec = /\[Reference\]([\s\S]*?)(?:\n\[|$)/.exec(t); const cur = sec && /^\s*current=(\d+)/m.exec(sec[1]);
             if (cur) { const get = (k) => { const mm = new RegExp('^' + k + '="(.+)"\\s*$', 'm').exec(sec[1]); const w = mm ? mm[1].replace(/\\"/g, '"') : null; return w && /^\s*(PROJCS|GEOGCS|PROJCRS|GEOGCRS|COMPD_CS)/i.test(w) ? w : null; };
-              const w = get(+cur[1] + 1) || get(cur[1]); if (w) { this.crsWKT = w; break; } }
+              const w = get(+cur[1] + 1) || get(cur[1]); if (w) { this.crsWKT = w; this.crsSource = AV.basename(pp) + ' [Reference]'; break; } }
           }
         }
-        if (!this.crsWKT) { const pp = p.replace(/\.inp$/i, '.prj'); if (pp !== p && await window.host.exists(pp)) { try { this.crsWKT = (await window.host.readText(pp)).trim(); } catch (e) { } } }
-        this.setCRS(this.crsWKT);
+        this.setCRS(this.crsWKT, null, true);
         if (this.crsWKT && (m.mapInfo.units || 'None').toUpperCase() === 'NONE') {
           try { const P = AV.Proj.parse(this.crsWKT); m.mapInfo.units = P.type === 'geographic' ? 'Degrees' : (Math.abs(P.unit - 1) < 1e-6 ? 'Meters' : 'Feet'); this.refreshAll(); } catch (e) { }
         }

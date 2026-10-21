@@ -121,6 +121,9 @@
 
     // ---------------------------------------------------------- index
     rebuildIndex() {
+      const _t0 = performance.now(); try { this._rebuildIndex(); } finally { AV.perf.rec('Map: spatial index build', performance.now() - _t0); }
+    }
+    _rebuildIndex() {
       const m = this.model; if (!m) return;
       const b = m.bounds(false) || { x1: 0, y1: 0, x2: 1, y2: 1 };
       const n = Math.max(1, m.nodes.size + m.links.size);
@@ -264,7 +267,7 @@
       try { this.drawBase(); } finally { this.ctx = real; }
       this.baseDirty = false; this.baseKey = this.viewKey(); this.baseView = { cx: this.cx, cy: this.cy, scale: this.scale };
       this.blitBase();
-      this._baseMs = performance.now() - t0;
+      this._baseMs = performance.now() - t0; AV.perf.rec('Map: full redraw', this._baseMs);
     }
     drawBase() {
       const ctx = this.ctx, m = this.model;

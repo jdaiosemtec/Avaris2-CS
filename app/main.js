@@ -6,6 +6,10 @@ const fs = require('fs');
 const os = require('os');
 const { spawn } = require('child_process');
 const OutReader = require('./outreader');
+// large models (hundreds of MB of .inp): let the renderer use up to 4 GB of JS heap (the default follows the RAM size, often
+// 2 GB, and a model near that limit spends most of its time in garbage collection)
+try { app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096'); } catch (e) { }
+try { app.commandLine.appendSwitch('enable-precise-memory-info'); } catch (e) { }
 // settings, users and change history stay in the folder used before the rename to Avaris2 (shared with OsemCM V1.0)
 try { app.setPath('userData', path.join(app.getPath('appData'), 'OsemCM')); } catch (e) { }
 

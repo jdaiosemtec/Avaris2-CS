@@ -74,14 +74,14 @@
       const two = h('div', { class: 'rptwo' }); el.appendChild(two);
       if (P.freq.length) {
         const mx = Math.max(...P.freq.map(f => f.p), 1);
-        two.appendChild(sec('Routing time steps', h('div', { class: 'tsbars' }, P.freq.map(f => h('div', { class: 'tsb' }, h('div', { class: 'tsv', style: { height: Math.max(2, 90 * f.p / mx) + 'px' }, title: f.p + ' %' }), h('div', { class: 'tsn' }, f.p.toFixed(1) + '%'), h('div', { class: 'tsl' }, f.b + '–' + f.a + ' s')))),
+        two.appendChild(sec('Routing time steps', h('div', { class: 'tsbars' }, P.freq.map(f => h('div', { class: 'tsb' }, h('div', { class: 'tsv', style: { height: Math.max(2, 90 * f.p / mx) + 'px' }, title: f.p + ' %' }), h('div', { class: 'tsn' }, f.p.toFixed(1) + '%'), h('div', { class: 'tsl' }, AV.fmt(f.b, 2) + '–', h('br'), AV.fmt(f.a, 2) + ' s')))),
           h('table', { class: 'rpkv' }, ['Minimum Time Step', 'Average Time Step', 'Maximum Time Step', 'Average Iterations per Step', '% of Steps Not Converging'].filter(k => P.ts[k]).map(k => h('tr', null, h('td', null, k), h('td', null, P.ts[k]))))));
       }
       if (P.opts.length) two.appendChild(sec('Analysis options', h('table', { class: 'rpkv' }, P.opts.map(([k, v]) => h('tr', null, h('td', null, k), h('td', null, v))))));
-      const top = (title, rows, cols, map) => rows.length ? sec(title, h('table', { class: 'rptop' }, h('tr', null, cols.map(c => h('th', null, c))), rows.slice(0, 8).map(r => h('tr', { onclick: () => locate(r[0]) }, map(r).map((v, i) => h('td', { class: i ? 'n' : '' }, i ? v : idCell(v))))))) : null;
+      const top = (title, rows, cols, map) => rows.length ? sec(title, h('div', { class: 'rpscroll' }, h('table', { class: 'rptop' }, h('tr', null, cols.map(c => h('th', null, c))), rows.slice(0, 8).map(r => h('tr', { onclick: () => locate(r[0]) }, map(r).map((v, i) => h('td', { class: i ? 'n' : '' }, i ? v : idCell(v)))))))) : null;
       const three = h('div', { class: 'rpthree' }); el.appendChild(three);
       if (fl) { const ci = fl.cols.indexOf('Total Flood Volume'), hi = fl.cols.indexOf('Hours Flooded'); const r = fl.rows.slice().sort((a, b) => (num(b[ci]) || 0) - (num(a[ci]) || 0)); const t = top('Most flooding (volume)', r, ['Node', 'Hours', 'Volume'], x => [x[0], x[hi], x[ci]]); if (t) three.appendChild(t); }
-      const lf = P.tables['Link Flow Summary']; if (lf) { const ci = lf.cols.indexOf('Max/Full Flow'); const r = lf.rows.filter(x => num(x[ci]) !== null).sort((a, b) => num(b[ci]) - num(a[ci])); const t = top('Highest max / full flow', r, ['Link', 'Type', 'Max/Full'], x => [x[0], x[1], x[ci]]); if (t) three.appendChild(t); }
+      const lf = P.tables['Link Flow Summary']; if (lf) { const ci = lf.cols.indexOf('Max/Full Flow'); const r = lf.rows.filter(x => num(x[ci]) !== null).sort((a, b) => num(b[ci]) - num(a[ci])); const t = top('Highest max / full flow', r, ['Link', 'Max / Full'], x => [x[0], x[ci]]); if (t) three.appendChild(t); }
       if (P.nonconv.length) { const t = top('Most frequent nonconverging nodes', P.nonconv.map(x => [x.id, x.v]), ['Node', '% steps'], x => [x[0], x[1].toFixed(2)]); if (t) three.appendChild(t); }
     };
     addNav('ov', 'Overview', null, '', overview);

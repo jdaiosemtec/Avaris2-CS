@@ -30,7 +30,10 @@
               { id: 'zoomin', label: 'Zoom In', img: 'zoomin', mode: 'zoomin' },
               { id: 'zoomout', label: 'Zoom Out', img: 'zoomout', mode: 'zoomout' },
               { id: 'zoomsel', label: 'Zoom to Selection', img: 'zoomsel', fn: () => this.map.zoomToObjects([...this.selection]) }] },
-            { id: 'bm', label: 'Bookmarks', img: 'bmcreate', caret: true, tip: 'Create or manage map bookmarks', menu: () => [{ label: 'Create Bookmark...', fn: () => this.createBookmark() }, { label: 'Manage Bookmarks...', fn: () => F().manageBookmarks() }] }] },
+            ] },
+          { name: 'Bookmarks', items: [
+            { id: 'bmc', label: 'Create Bookmark', img: 'bmcreate', fn: () => this.createBookmark(), tip: 'Save the current map view as a bookmark' },
+            { id: 'bmm', label: 'Manage Bookmarks', img: 'bmmanage', fn: () => F().manageBookmarks(), tip: 'Go to, rename or delete bookmarks' }] },
           { name: 'Selection', items: [
             { id: 'select', label: 'Select', img: 'select', mode: 'select' },
             { id: 'search', label: 'Search', img: 'search', fn: () => T().find() },
@@ -46,7 +49,7 @@
               { id: 'assign', label: 'Assign Outlet', img: 'assign', fn: () => F().assignMode(), tip: 'Assign the runoff target: click a subcatchment (Ctrl+click for several), then the junction it drains to' },
               { id: 'convert', label: 'Convert Type', img: 'convert', fn: () => F().convertType(), tip: 'Convert selected objects to another type' },
               { id: 'reverse', label: 'Reverse', img: 'reverse', fn: () => T().reverseLinks(), tip: 'Reverse the direction of selected links' }] }] },
-          { name: 'Display', launcher: () => this.theme.dialog(), items: [{ id: 'theme', label: 'Theme', img: 'theme', fn: () => this.theme.dialog(), tip: 'Layer theme editor' }] },
+          { name: 'Display', items: [{ id: 'theme', label: 'Theme', img: 'theme', fn: () => this.theme.dialog(), tip: 'Layer theme editor' }] },
           { name: 'Change Log', items: [
             { id: 'window', label: 'Log Window', img: 'window', fn: () => this.toggleLogPane(), active: () => this.prefs.logPane !== false, tip: 'Show / hide the change log under the Properties panel' },
             { id: 'table', label: 'History', img: 'table', fn: () => this.hist.openWindow(), tip: 'Change history table: every recorded change with version, user, role, time, old / new value and description' }] },
@@ -57,7 +60,7 @@
           { name: 'Connectivity', items: [
             { id: 'up', label: 'Upstream Trace', img: 'upstream', fn: () => F().traceTool('up') },
             { id: 'down', label: 'Downstream Trace', img: 'downstream', fn: () => F().traceTool('down') },
-            { small: [{ id: 'path', label: 'Path', img: 'path', fn: () => F().pathTool() }, { id: 'cleartrace', label: 'Clear Trace', svg: 'del', fn: () => T().clearTrace() }] }] },
+            { small: [{ id: 'path', label: 'Path', img: 'path', fn: () => F().pathTool() }, { id: 'cleartrace', label: 'Clear Trace', img: 'clear', fn: () => T().clearTrace() }] }] },
           { name: 'Network Geometry', items: [
             { small: [
               { id: 'batch', label: 'Batch Assign Outlet', img: 'batchassign', fn: () => T().batchAssignOutlet() },
@@ -66,7 +69,7 @@
             { small: [
               { id: 'derive', label: 'Derive Elevations', img: 'derive', fn: () => T().deriveElevation() },
               { id: 'ori', label: 'Orifice to Conduit', svg: 'convert', fn: () => T().orificeToConduit() },
-              { id: 'measure', label: 'Measure', svg: 'measure', mode: 'measure' }] }] },
+              { id: 'measure', label: 'Measure', img: 'ruler', mode: 'measure' }] }] },
           { name: 'Rainfall', items: [{ id: 'gen', label: 'Design Storm', img: 'hyetograph', fn: () => AV.hyetographDialog(this), tip: 'Design storm / hyetograph generator (Chicago, SCS, triangular, uniform, custom pattern)' }] },
           { name: 'Spatial Reference', items: [{ small: [{ id: 'rr', label: 'Reproject Raster', img: 'reprojraster', fn: () => F().reprojectRaster() }, { id: 'csr', label: 'Convert Coordinates', img: 'convertsr', fn: () => F().convertSR() }] }] },
           { name: 'Utilities', items: [
@@ -76,7 +79,7 @@
       },
       {
         name: 'Simulation', groups: [
-          { name: 'Setup', launcher: () => S().optionsDialog(), items: [
+          { name: 'Setup', items: [
             { id: 'options', label: 'Options', img: 'options', fn: () => S().optionsDialog() },
             { id: 'meshes', label: 'Create Meshes', img: 'meshes', lic: '2D', badge: '1D-2D', fn: () => AV.createMeshes(this), tip: 'Create the 2D surface mesh from the boundary, DEM and lines set in Options → 2D Flood' }] },
           { name: 'Run', items: [{ id: 'run', label: 'Run', img: 'run', hero: true, fn: () => S().run(), tip: 'Run simulation (F5)' }] },
@@ -97,7 +100,8 @@
             { id: 'register', label: 'Register', img: 'register', fn: () => this.registerDialog() },
             { id: 'guide', label: 'User Guide', img: 'guide', fn: () => window.host.openExternal('https://osemtec.com/avaris.html') },
             { id: 'qs', label: 'Quick Start', svg: 'report', fn: () => this.quickStart() },
-            { id: 'keys', label: 'Shortcuts', svg: 'options', fn: () => this.shortcuts() }] },
+            { id: 'keys', label: 'Shortcuts', svg: 'options', fn: () => this.shortcuts() },
+            { id: 'diag', label: 'Diagnostics', img: 'hourglass', fn: () => AV.perfDialog(this), tip: 'Performance timings of this session (open, draw, results, play) and memory' }] },
         ]
       },
     ];

@@ -386,10 +386,10 @@
       if (/\.fout$/i.test(out) && !AV.has2D(this.app)) { AV.need2D(this.app, '1D-2D results (.fout)'); return; }
       try {
         if (this.results) await this.clearResults(true);
-        const meta = await window.host.outOpen(out);
+        let _t = performance.now(); const meta = await window.host.outOpen(out); AV.perf.rec('Results: open file', performance.now() - _t);
         const R = new Results(this, meta, rpt);
         this.app.status('Reading results...');
-        await R.load();
+        _t = performance.now(); await R.load(); AV.perf.rec('Results: statistics pass (whole file)', performance.now() - _t);
         this.results = this.app.results = R; await AV.computeMeshResults(this.app); this.app._meshRange = null;
         try { const t = await window.host.readText(rpt); R.nonconv = this.parseNonconv(t); R.reportText = t; } catch (e) { R.nonconv = new Map(); }
         // unmatched IDs check
@@ -494,7 +494,7 @@
       const R = this.results; if (!R) return;
       if (this._busy) { this._pending = p; return; }
       this._busy = true;
-      try { await R.setPeriod(p); } finally { this._busy = false; }
+      const _t = performance.now(); try { await R.setPeriod(p); } finally { this._busy = false; AV.perf.rec('Results: read one time step', performance.now() - _t); }
       if (this.slider) { this.slider.value = R.period; this.timeEl.textContent = R.timeLabel(R.period); }
       this.app._meshRange = null; this.app.map.redraw(); this.updatePropsResults(); if (this.app.timeStep) this.app.timeStep.refresh();
       for (const pv of this.profileViews) pv.draw();
