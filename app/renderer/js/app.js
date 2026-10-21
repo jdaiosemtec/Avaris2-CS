@@ -38,6 +38,7 @@
       this.symPane = new AV.SymPane(this, AV.$('#rp-sym')); this.symPane.render();
       this.catalog = new AV.Catalog(this, AV.$('#rp-catalog'));
       this.exporter = new AV.ExportPane(this, AV.$('#rp-export'));
+      this.db = new AV.DatabasePane(this, AV.$('#lp-database'));
       this.updateRightPanes();
       this.setTool('select');
       this.setModel(AV.newModel(), null);
@@ -46,7 +47,7 @@
       await this.auth.init();
       window.host.onRequestClose(async () => { if (await this.checkSave()) window.host.confirmClose(); });
       window.host.onOpenFile((p) => this.openFile(p));
-      window.host.onProgress((p) => this.sim.onProgress(p));
+      window.host.onProgress((p, id) => this.sim.onProgress(p, id));
       document.addEventListener('keydown', (e) => this.onKey(e));
       document.addEventListener('mousedown', (e) => { if (!e.target.closest('.menu') && !e.target.closest('.ctxmenu')) this.closeMenus(); });
       this.engineVersion = await window.host.engineVersion();
@@ -54,11 +55,16 @@
     }
 
     // drag handle between Parameter View and Layer View (like Avaris): sets the Parameter View height, remembered in the preferences
+    showLeftTab(t) {
+      this.leftTab = t; for (const k of ['designer', 'database']) { const p = AV.$('#lp-' + k); if (p) p.style.display = k === t ? 'flex' : 'none'; }
+      AV.$$('#leftTabs .rt').forEach(e => e.classList.toggle('active', e.dataset.t === t));
+      if (t === 'database' && this.db) this.db.render();
+    }
     makeVSplitter() {
       const sp = h('div', { class: 'vsplitter', title: 'Drag to resize Parameter View / Layer View' }, h('span', null, '⋯'));
       const apply = (px) => { const tp = AV.$('#treePane'); if (!tp || !px) return; tp.style.flex = '0 0 ' + px + 'px'; };
       setTimeout(() => apply(this.prefs && this.prefs.treeH), 0);
-      sp.addEventListener('mousedown', (e) => { e.preventDefault(); const tp = AV.$('#treePane'), lf = AV.$('#left'); const y0 = e.clientY, h0 = tp.getBoundingClientRect().height, max = lf.getBoundingClientRect().height - 120;
+      sp.addEventListener('mousedown', (e) => { e.preventDefault(); const tp = AV.$('#treePane'), lf = AV.$('#lp-designer'); const y0 = e.clientY, h0 = tp.getBoundingClientRect().height, max = lf.getBoundingClientRect().height - 120;
         document.body.style.cursor = 'row-resize';
         const mv = (ev) => { const px = Math.max(80, Math.min(max, h0 + ev.clientY - y0)); apply(px); this.prefs.treeH = Math.round(px); };
         const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); document.body.style.cursor = ''; this.savePrefs(); };
@@ -71,11 +77,15 @@
       const app = AV.$('#app');
       const ribbon = h('div', { id: 'ribbon' });
       this.buildRibbon(ribbon);
-      const left = h('div', { id: 'left' },
+      // left dock: Designer (Parameter View + Layer View) and Database (base model + its simulation results)
+      const ltab = (t, l) => h('div', { class: 'rt' + (t === 'designer' ? ' active' : ''), 'data-t': t, onclick: () => this.showLeftTab(t) }, l);
+      const left = h('div', { id: 'left' }, h('div', { class: 'lpage', id: 'lp-designer' },
         h('div', { id: 'treePane' }, h('div', { class: 'ptitle' }, h('span', null, 'Parameter View'), h('span', { class: 'sub', id: 'modelCount' })), h('div', { class: 'pbody', id: 'tree' })),
         this.makeVSplitter(),
         h('div', { id: 'layerPane' }, h('div', { class: 'ptitle' }, h('span', null, 'Layer View'), h('span', { class: 'lpbtns' }, h('button', { class: 'btn small', title: 'Add a GIS layer (Catalog)', onclick: () => this.showRightTab('catalog') }, '+ Add Layer'),
-          h('button', { class: 'btn small', title: 'Open the attribute table of a layer', onclick: (e) => this.attrTableMenu(e) }, 'Attribute Table'))), h('div', { class: 'pbody', id: 'layers' })));
+          h('button', { class: 'btn small', title: 'Open the attribute table of a layer', onclick: (e) => this.attrTableMenu(e) }, 'Attribute Table'))), h('div', { class: 'pbody', id: 'layers' }))),
+        h('div', { class: 'lpage', id: 'lp-database', style: { display: 'none' } }),
+        h('div', { id: 'leftTabs' }, ltab('designer', 'Designer'), ltab('database', 'Database')));
       const center = h('div', { id: 'center' },
         h('div', { id: 'doctabs' }),
         h('div', { id: 'views' },
@@ -329,6 +339,7 @@
       this.map.grid = null; this.mesh2d = null; this.meshResults = null; this._meshRange = null;
       this.refreshAll();
       setTimeout(() => this.map.zoomAll(), 0);
+      if (this.db) setTimeout(() => this.db.render(), 0);
     }
     on(ev, fn) { (this.listeners[ev] || (this.listeners[ev] = [])).push(fn); return () => { this.listeners[ev] = this.listeners[ev].filter(f => f !== fn); }; }
     emit(ev, ...a) { for (const fn of (this.listeners[ev] || []).slice()) { try { fn(...a); } catch (e) { console.error(e); } } }
@@ -417,8 +428,12 @@
         if (AV.has2D(this) && !this.mesh2d && !this._meshRemoved && AV.f2dEnabled(m) && AV.f2d(m).BOUNDARY && AV.f2d(m).DEM) await AV.createMeshes(this, true);
         if (this.mesh2d) { this.panels.refreshLayers(); this.map.redraw(); }
         // auto-load previous results if they exist next to the model (1D-2D results first)
+        // simulation results of this model (Database panel); older result files next to the model are still offered
+        if (this.db) this.db.render();
+        const runs = await AV.listRuns(p); const last = runs.find(r => r.out && (!r.is2D || this.mesh2d));
         const fout = p.replace(/\.inp$/i, '.fout'), out = p.replace(/\.inp$/i, '.out');
-        if (this.mesh2d && fout !== p && await window.host.exists(fout)) this.sim.offerExistingResults(fout, p.replace(/\.inp$/i, '.frpt'));
+        if (last) this.sim.offerExistingResults(last.out, last.rpt, last.name);
+        else if (this.mesh2d && fout !== p && await window.host.exists(fout)) this.sim.offerExistingResults(fout, p.replace(/\.inp$/i, '.frpt'));
         else if (out !== p && await window.host.exists(out)) this.sim.offerExistingResults(out, p.replace(/\.inp$/i, '.rpt'));
       } catch (e) { AV.alert('Could not open file:\n' + e.message, 'Error'); this.status('Ready'); }
     }
@@ -431,7 +446,7 @@
       if (!this.canModify()) return false;
       try {
         await window.host.writeText(p, this.model.toINP());
-        const moved = this.filePath !== p; this.filePath = p;
+        const moved = this.filePath !== p; this.filePath = p; if (moved && this.db) setTimeout(() => this.db.render(), 0);
         if (this.mesh2d && moved) { try { await window.host.writeText(AV.meshPath(this), JSON.stringify(this.mesh2d)); } catch (e) { } } this.dirty = false; this.updateTitle(); this.addRecent(p);
         if (this.hist) await this.hist.commit(p);
         this.status('Saved ' + p); return true;

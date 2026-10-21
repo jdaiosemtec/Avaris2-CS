@@ -81,6 +81,17 @@
     }
   }
   AV.FLOW_UNIT_NAMES = ['CFS', 'GPM', 'MGD', 'CMS', 'LPS', 'MLD'];
+  // recommended engine threads: by the size of the dynamic-wave problem (links incl. 2D surface links), at most
+  // logical processors - 1, and never more than the engine accepts (4 links per thread)
+  AV.recommendThreads = function (app, cpu) {
+    const m = app.model; const mesh = AV.f2dEnabled(m) && app.mesh2d ? app.mesh2d : null;
+    const links = m.links.size + (mesh ? mesh.links.length + mesh.couplings.length + mesh.outfalls.length : 0), nodes = m.nodes.size + (mesh ? mesh.cells.length + mesh.outfalls.length : 0);
+    const max = Math.max(1, (cpu.logical || 1) - 1);
+    let rec = links < 1000 ? 1 : links < 3000 ? 2 : links < 10000 ? 4 : links < 30000 ? 6 : 8;
+    rec = Math.max(1, Math.min(rec, max, cpu.physical || max, Math.floor(links / 4) || 1));
+    const text = m.nodes.size + ' nodes, ' + m.links.size + ' links' + (mesh ? ' + 2D: ' + mesh.cells.length + ' cells, ' + (mesh.links.length + mesh.couplings.length) + ' surface links' : '') + ' (' + nodes + ' nodes / ' + links + ' links in total)';
+    return { max, rec, text, links, nodes };
+  };
 
   // "Time Step" pane (right side): drag the slider / step buttons to see the selected object's results at each reporting time
   class TimeStepPane {
@@ -184,7 +195,7 @@
           { k: 'LENGTHENING_STEP', l: 'Conduit Lengthening Step (sec)', t: 'text' }, { k: 'MIN_SURFAREA', l: 'Minimum Nodal Surface Area', t: 'text' },
           { k: 'MAX_TRIALS', l: 'Maximum Trials per Step', t: 'text' }, { k: 'HEAD_TOLERANCE', l: 'Head Convergence Tolerance', t: 'text' }],
         'Avaris Engine': [
-          { k: 'THREADS', l: 'Number of Threads (0 = all cores)', t: 'text', note: 'Node depths are solved in parallel with OpenMP. This PC has ' + this.app.info.cpus + ' logical processors. The engine uses 1 thread when the model has fewer than 4 links per thread.' },
+          { k: 'THREADS', l: 'Number of Threads (0 = all cores)', t: 'threads', note: 'Conduit flows and node depths are solved in parallel (OpenMP); results are identical for any number of threads. The engine uses 1 thread when the model has fewer than 4 links per thread.' },
           { k: 'UNDER_RELAXATION', l: 'Under-Relaxation Factor (0.1 - 1.0)', t: 'text', note: 'Weight given to the new iterate in the dynamic-wave Picard iterations (stock SWMM fixes this at 0.5). Lower values damp oscillation at hard-to-converge nodes; higher values converge faster on well-behaved networks.' },
           { k: 'NONCONV_REPORT_COUNT', l: 'Nonconverging Nodes Listed in Report', t: 'text', note: 'Length of the "Most Frequent Nonconverging Nodes" list (stock SWMM lists 5; max 500).' },
           { k: 'detail', l: 'Write time-series tables to report file', t: 'check', note: 'Off by default: results are read from the binary output file, which keeps the report file small for large models.' }],
@@ -222,6 +233,14 @@
           let inp;
           if (f.t === 'choice') { inp = h('select', null, f.o.map(x => h('option', { value: x }, x))); inp.value = String(v[f.k]).toUpperCase(); }
           else if (f.t === 'check') inp = h('input', { type: 'checkbox', checked: !!v[f.k] });
+          else if (f.t === 'threads') { const ti = h('input', { type: 'text', value: v[f.k], style: { width: '70px' } }); inputs[f.k] = ti; const info = h('div', { class: 'note thrinfo' });
+            const detect = async () => { info.textContent = 'Scanning the system...'; const c = await window.host.cpuInfo(); const R = AV.recommendThreads(this.app, c);
+              info.innerHTML = ''; info.append(h('div', null, h('b', null, 'This computer: '), (c.model ? c.model + ' - ' : '') + (c.physical ? c.physical + ' cores, ' : '') + c.logical + ' logical processors' + (c.memGB ? ', ' + c.memGB + ' GB RAM' : '')),
+                h('div', null, h('b', null, 'Maximum recommended: '), String(R.max) + ' threads (logical processors - 1, one is left for OsemCM and Windows)'),
+                h('div', null, h('b', null, 'For this model: '), R.text + ' → ', h('b', null, R.rec + (R.rec > 1 ? ' threads' : ' thread')), ' ', h('button', { class: 'btn small', onclick: () => { ti.value = R.rec; } }, 'Use ' + R.rec)),
+                h('div', null, 'Enter the number you want to use; scenarios running at the same time always use 1 thread each.')); };
+            form.appendChild(h('label', null, f.l)); form.appendChild(h('div', { class: 'fpick', style: { maxWidth: 'none' } }, ti, h('button', { class: 'btn small', onclick: detect, title: 'Scan the processors of this computer and recommend a number of threads' }, 'Detect && Recommend')));
+            form.appendChild(info); if (f.note) form.appendChild(h('div', { class: 'note' }, f.note)); continue; }
           else if (f.t === 'file') { const ti = h('input', { type: 'text', value: v[f.k] || '', style: { width: '190px' }, placeholder: '(none)' }); ti.title = v[f.k] || '';
             const app = this.app; inputs[f.k] = ti;
             form.appendChild(h('label', null, f.l)); form.appendChild(h('div', { class: 'fpick' }, ti,
@@ -285,12 +304,15 @@
       if (!m.nodes.size) { AV.alert('The model has no nodes to simulate.'); return; }
       const v = AV.validateQuick(m);
       if (v.length) { if (!await AV.confirm('Possible problems found:\n\n' + v.slice(0, 15).join('\n') + (v.length > 15 ? '\n... (' + v.length + ' total)' : '') + '\n\nRun anyway?', 'Run Simulation', 'Run')) return; }
-      const dir = app.filePath ? AV.dirname(app.filePath) : AV.joinPath(app.info.temp, 'avaris');
-      const base = app.filePath ? AV.basename(app.filePath).replace(/\.inp$/i, '') : 'untitled';
+      // every run is named; its files go to <model>_Results (Database panel)
+      const rn = await AV.askRunName(app); if (!rn) return;
+      const dir = app.filePath ? AV.resultsDir(app.filePath) : AV.joinPath(app.info.temp, 'osemcm-runs');
+      try { await window.host.mkdir(dir); } catch (e) { }
+      const base = rn.name;
       if (this.results) await this.clearResults(true);
       const bar = h('div'); const pct = h('div', { style: { marginTop: '6px', color: 'var(--muted)' } }, 'Starting engine...');
       const t0 = Date.now();
-      this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { style: { marginBottom: '8px' } }, 'Avaris engine: ' + (m.options.FLOW_ROUTING || 'KINWAVE') + ' routing, ' + m.nodes.size + ' nodes, ' + m.links.size + ' links'), h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false });
+      this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { style: { marginBottom: '8px' } }, 'Avaris engine: ' + (m.options.FLOW_ROUTING || 'KINWAVE') + ' routing, ' + m.nodes.size + ' nodes, ' + m.links.size + ' links'), h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine('main'); return false; } }], enterSubmits: false });
       this.progEls = { bar, pct, t0 };
       app.status('Running simulation...');
       const encoding = app.filePath ? await window.host.encoding(app.filePath) : 'utf8';
@@ -305,13 +327,16 @@
           this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false });
         } else { inpText = AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m); flood2d = true; pct.textContent = 'Starting engine (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' surface cells)...'; }
       }
-      const res = await window.host.runEngine({ inpText, dir, base, detail: !!this.detailReport, encoding, flood2d });
+      const res = await window.host.runEngine({ inpText, dir, base, detail: !!this.detailReport, encoding, flood2d, named: true, id: 'main' });
       this.runDlg.close(); this.runDlg = null;
       const secs = ((Date.now() - t0) / 1000).toFixed(1);
       if (res.canceled) { app.status('Simulation stopped by user.'); AV.toast('Simulation stopped.'); return; }
       this.lastRun = res;
       let rptText = ''; try { rptText = await window.host.readText(res.rpt); } catch (e) { }
       const warnings = (rptText.match(/WARNING \d+[^\n]*/g) || []);
+      { const ts0 = this.parseTimeStepSummary(rptText); await AV.writeRunMeta(AV.dirname(res.out), base, { name: base, desc: rn.desc, date: new Date().toISOString(), model: app.filePath ? AV.basename(app.filePath) : 'Untitled', type: flood2d ? '1D-2D' : '1D', flowUnits: m.flowUnits,
+        code: res.code !== 0 || res.errors.length ? (res.code || 1) : 0, seconds: +secs, massBal: res.massBal, warnings: warnings.length, notConv: ts0['% of Steps Not Converging'] !== undefined ? +ts0['% of Steps Not Converging'] : undefined }); }
+      if (app.db) app.db.render();
       if (res.code !== 0 || res.errors.length) {
         const errs = (rptText.match(/ERROR \d+[^\n]*/g) || res.errors).slice(0, 40);
         app.status('Simulation failed.');
@@ -332,7 +357,8 @@
         buttons: [{ label: 'Convergence Diagnostics', value: 'conv' }, { label: 'View Report', value: 'rpt' }, { label: 'OK', primary: true, value: 'ok' }] }).done;
       if (r === 'rpt') this.showReport(); else if (r === 'conv') this.convergenceDiagnostics();
     }
-    onProgress(p) {
+    onProgress(p, id) {
+      if (id && id !== 'main') { if (this.scenProgress) this.scenProgress(id, p); return; }
       if (!this.progEls) return;
       this.progEls.bar.style.width = Math.min(100, p) + '%';
       const el = (Date.now() - this.progEls.t0) / 1000; const eta = p > 1 ? el * (100 - p) / p : 0;
@@ -349,8 +375,8 @@
       for (const line of lines) { const m = /^\s*Node\s+(\S+)\s+\(([\d.]+)%\)/.exec(line); if (m) map.set(m[1], parseFloat(m[2])); else if (line.trim() && !line.includes('Convergence obtained')) { if (map.size || line.includes('***')) break; } }
       return map;
     }
-    async offerExistingResults(out, rpt) {
-      if (await AV.confirm('Results from a previous run were found next to this model:\n' + out + '\n\nLoad them?', 'Load Results', 'Load', 'No')) this.loadResults(out, rpt, false);
+    async offerExistingResults(out, rpt, name) {
+      if (await AV.confirm((name ? 'The latest simulation results of this model are "' + name + '".\n(All results are listed in the Database panel.)' : 'Results from a previous run were found next to this model:\n' + out) + '\n\nLoad them?', 'Load Results', 'Load', 'No')) this.loadResults(out, rpt, false);
     }
     async loadOutDialog() {
       const p = await window.host.openDialog({ title: 'Load results', filters: [{ name: 'Binary output', extensions: ['out', 'fout'] }] });
@@ -384,6 +410,7 @@
         await this.setPeriod(tPeak);
         this.buildPlaybar(); this.togglePlaybar(true);
         this.app.panels.showProps(); this.app.map.redraw();
+        if (this.app.db) this.app.db.render();
         this.app.status('Results loaded' + (missing ? ' (' + missing + ' model nodes not found in results file)' : ''));
       } catch (e) { AV.alert('Could not load results:\n' + e.message, 'Results'); }
     }
@@ -397,6 +424,7 @@
       AV.$('#sbResults') && (AV.$('#sbResults').textContent = 'No results');
       this.app.theme.invalidate();
       if (!silent) { this.app.panels.showProps(); this.app.map.redraw(); }
+      if (this.app.db && this.app.leftTab === 'database') this.app.db.render();
     }
 
     // =============================================================== playback
@@ -450,6 +478,7 @@
       const ex = (f) => f ? window.host.exists(f) : false; const lr = this.lastRun;
       if (lr && lr.out && await ex(lr.out)) return { out: lr.out, rpt: lr.rpt };
       const fp = this.app.filePath; if (!fp) return null;
+      const runs = await AV.listRuns(fp); const ok = runs.find(r => r.out && (!r.is2D || (this.app.mesh2d && AV.has2D(this.app)))); if (ok) return { out: ok.out, rpt: ok.rpt };
       const two = this.app.mesh2d && AV.has2D(this.app) ? [[fp.replace(/\.inp$/i, '.fout'), fp.replace(/\.inp$/i, '.frpt')]] : [];
       for (const [o, r] of two.concat([[fp.replace(/\.inp$/i, '.out'), fp.replace(/\.inp$/i, '.rpt')]])) if (o !== fp && await ex(o)) return { out: o, rpt: r };
       return null;

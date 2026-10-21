@@ -676,3 +676,29 @@ table.edtbl th { background: #f3f5f7; font-weight: 600; }
 .lidtop { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
 .lidsketch { width: 300px; height: 164px; flex: 0 0 300px; border: 1px solid var(--border); border-radius: 4px; background: #fbfcfd; padding: 2px; }
 .sbclick { cursor: pointer; } .sbclick:hover { background: rgba(255,255,255,.12); }
+/* left dock pages (Designer / Database) */
+#left .lpage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+#leftTabs { display: flex; border-top: 1px solid var(--border); background: var(--panel2); flex: none; }
+#leftTabs .rt { flex: 1 1 0; text-align: center; padding: 5px 4px; cursor: pointer; font-size: 12.5px; color: #455a64; border-right: 1px solid var(--border); }
+#leftTabs .rt.active { background: #fff; color: var(--accent3); font-weight: 600; box-shadow: inset 0 2px 0 var(--accent3); }
+.dbpane { flex: 1; overflow: auto; padding: 6px 0; font-size: 12.5px; }
+.dbhead { padding: 6px 10px 4px; color: var(--accent3); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.dbhead .sp { flex: 1; }
+.dbrow { margin: 3px 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; }
+.dbrow:hover { border-color: var(--accent); background: #f5f9fe; }
+.dbrow.cur { border-color: var(--accent3); box-shadow: inset 3px 0 0 var(--accent3); }
+.dbrow .n { font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.dbrow .n .badge { font-size: 10.5px; font-weight: 600; padding: 0 5px; border-radius: 8px; background: #e3f2fd; color: #1565c0; }
+.dbrow .n .badge.f { background: #ffebee; color: #c62828; }
+.dbrow .n .badge.d2 { background: #e8f5e9; color: #2e7d32; }
+.dbrow .m { color: var(--muted); font-size: 11.5px; margin-top: 2px; line-height: 1.4; }
+.dbempty { padding: 8px 12px; color: var(--muted); line-height: 1.5; }
+.runpick { max-height: 170px; overflow: auto; border: 1px solid var(--border); border-radius: 4px; }
+.runpickrow { padding: 4px 8px; cursor: pointer; border-bottom: 1px solid #eef0f2; font-size: 12px; }
+.runpickrow:hover { background: #f0f6fd; }
+.runpickrow span { color: var(--muted); }
+.thrinfo { line-height: 1.6; } .thrinfo:empty { display: none; }
+.sclist { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow: auto; }
+.scrow { display: grid; grid-template-columns: 150px 1fr 70px; gap: 8px; align-items: center; }
+.scname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.scst { font-size: 11.5px; color: var(--muted); text-align: right; }

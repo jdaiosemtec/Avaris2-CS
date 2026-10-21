@@ -9,7 +9,8 @@ const OutReader = require('./outreader');
 
 let win = null;
 let forceClose = false;
-let engineProc = null;
+let engineProc = null; // last started engine (single run)
+const engineProcs = new Map(); // job id -> engine process (several scenarios run at the same time)
 const outFiles = new Map();   // handle -> OutReader
 let outHandleSeq = 1;
 
@@ -61,7 +62,7 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => {
-  if (engineProc) try { engineProc.kill(); } catch (e) {}
+  for (const p of engineProcs.values()) try { p.kill(); } catch (e) {}
   app.quit();
 });
 
@@ -209,9 +210,10 @@ ipcMain.handle('engine:run', async (e, job) => {
   catch (err) { dir = path.join(os.tmpdir(), 'avaris'); }
   fs.mkdirSync(dir, { recursive: true });
   const base = (job.base || 'model').replace(/[^\w\-. ]/g, '_');
-  // 2D runs use the Avaris DS file names: <model>.finp / .frpt / .fout
-  const f2 = !!job.flood2d;
-  const inp = path.join(dir, base + (f2 ? '.finp' : '.run.inp'));
+  // 2D runs use the Avaris DS file names: <model>.finp / .frpt / .fout. Named runs (results folder of the model)
+  // keep the engine input as <run>.inp next to <run>.rpt / <run>.out.
+  const f2 = !!job.flood2d; const jobId = job.id || 'main';
+  const inp = path.join(dir, base + (f2 ? '.finp' : job.named ? '.inp' : '.run.inp'));
   const rpt = path.join(dir, base + (f2 ? '.frpt' : '.rpt'));
   const out = path.join(dir, base + (f2 ? '.fout' : '.out'));
   // release any open handle on the old output file (Windows file locking)
@@ -220,12 +222,12 @@ ipcMain.handle('engine:run', async (e, job) => {
   return new Promise((resolve) => {
     let buf = '', result = { code: -1, errors: [], rpt, out, inp, massBal: null, seconds: 0, canceled: false };
     try {
-      engineProc = spawn(enginePath(), [inp, rpt, out].concat(job.detail ? [] : ['-nodetail']), { cwd: dir, windowsHide: true });
+      engineProc = spawn(enginePath(), [inp, rpt, out].concat(job.detail ? [] : ['-nodetail']), { cwd: dir, windowsHide: true }); engineProcs.set(jobId, engineProc);
     } catch (err) {
       result.errors.push('Unable to start engine: ' + err.message); resolve(result); return;
     }
     const handleLine = (line) => {
-      if (line.startsWith('PROGRESS ')) { if (win) win.webContents.send('engine:progress', parseFloat(line.slice(9))); }
+      if (line.startsWith('PROGRESS ')) { if (win) win.webContents.send('engine:progress', parseFloat(line.slice(9)), jobId); }
       else if (line.startsWith('ERROR ')) result.errors.push(line.slice(6));
       else if (line.startsWith('DONE ')) {
         const t = line.split(/\s+/);
@@ -234,23 +236,34 @@ ipcMain.handle('engine:run', async (e, job) => {
         result.seconds = parseFloat(t[5]);
       }
     };
-    engineProc.stdout.on('data', (d) => {
+    const proc = engineProc;
+    proc.stdout.on('data', (d) => {
       buf += d.toString();
       let i; while ((i = buf.indexOf('\n')) >= 0) { handleLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
     });
-    engineProc.on('error', (err) => { result.errors.push('Engine error: ' + err.message); });
-    engineProc.on('close', (code, signal) => {
+    proc.on('error', (err) => { result.errors.push('Engine error: ' + err.message); });
+    proc.on('close', (code, signal) => {
       if (buf.trim()) handleLine(buf.trim());
       // the report starts directly with the analysis (no engine banner)
       try { const t = fs.readFileSync(rpt, 'latin1'); const t2 = t.replace(/^\s*OSEMCM HYDRAULIC ENGINE[^\n]*\n[^\n]*EPA SWMM[^\n]*\n\s*-{10,}\s*\n/, ''); if (t2 !== t) fs.writeFileSync(rpt, t2, 'latin1'); } catch (e) { }
       if (signal) result.canceled = true;
       if (result.code === -1 && !signal) result.code = code;
-      engineProc = null;
+      if (engineProcs.get(jobId) === proc) engineProcs.delete(jobId); if (engineProc === proc) engineProc = null;
       resolve(result);
     });
   });
 });
-ipcMain.handle('engine:cancel', async () => { if (engineProc) { engineProc.kill(); return true; } return false; });
+ipcMain.handle('engine:cancel', async (e, id) => { let n = 0; for (const [k, p] of engineProcs) if (!id || k === id) { try { p.kill(); n++; } catch (err) { } } return n > 0; });
+// processor information for the thread recommendation (physical cores from Windows when available)
+ipcMain.handle('sys:cpu', async () => {
+  const logical = os.cpus().length; let physical = null;
+  if (process.platform === 'win32') physical = await new Promise((resolve) => { try { const p = spawn('powershell.exe', ['-NoProfile', '-Command', '(Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum'], { windowsHide: true }); let s = ''; const t = setTimeout(() => { try { p.kill(); } catch (e) { } resolve(null); }, 6000); p.stdout.on('data', d => s += d); p.on('close', () => { clearTimeout(t); const n = parseInt(s.trim()); resolve(n > 0 ? n : null); }); p.on('error', () => { clearTimeout(t); resolve(null); }); } catch (e) { resolve(null); } });
+  return { logical, physical, model: (os.cpus()[0] || {}).model || '', memGB: Math.round(os.totalmem() / 1073741824) };
+});
+// simulation results of a model live in <model>_Results; only files there may be deleted / renamed from the Database panel
+const inResults = (p) => /_Results[\\/][^\\/]+$/i.test(p);
+ipcMain.handle('fs:rmRun', async (e, files) => { for (const f of files) if (inResults(f)) { try { await fs.promises.unlink(f); } catch (err) { } } return true; });
+ipcMain.handle('fs:renameRun', async (e, pairs) => { for (const [a, b] of pairs) { if (!inResults(a) || !inResults(b)) throw new Error('refused'); if (fs.existsSync(a)) await fs.promises.rename(a, b); } return true; });
 
 // ---------------------------------------------------------------- binary results
 ipcMain.handle('out:open', async (e, file) => {

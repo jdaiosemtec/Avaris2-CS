@@ -566,38 +566,56 @@
       AV.floatPanel({ id: 'scen', title: 'Scenarios', w: 600, h: 340, body }); refresh();
     }
 
-    // run the given scenario .inp files one after another (the open model is run from memory), then show them together
+    // run the given scenario .inp files at the same time: one engine process per scenario (at most logical processors
+    // - 1 at once, each engine with 1 thread), each with its own progress bar; then show them together
     async runScenarios(paths) {
       const app = this.app, sim = app.sim; const norm = (p) => p.replace(/\\/g, '/').toLowerCase();
-      const bar = h('div'); const pct = h('div', { style: { marginTop: '6px', color: 'var(--muted)' } }); const lbl = h('div', { style: { marginBottom: '8px', fontWeight: 600 } });
-      let stop = false;
-      const dlg = AV.modal({ title: 'Running Scenarios', width: 460, body: h('div', null, lbl, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { stop = true; window.host.cancelEngine(); return false; } }], enterSubmits: false });
-      const done = [], failed = [];
-      for (const [i, p] of paths.entries()) {
-        if (stop) break;
-        const name = AV.basename(p).replace(/\.inp$/i, ''); const isCur = app.filePath && norm(p) === norm(app.filePath);
-        lbl.textContent = 'Scenario ' + (i + 1) + ' / ' + paths.length + ': ' + name; bar.style.width = '0%';
-        sim.progEls = { bar, pct, t0: Date.now() };
+      const rn = await AV.askRunName(app, 'Run Scenarios', { ok: 'Run ' + paths.length + ' scenario' + (paths.length > 1 ? 's' : '') }); if (!rn) return;
+      const limit = Math.max(1, Math.min(paths.length, (app.info.cpus || 2) - 1));
+      const one = (t) => /^\s*THREADS\s/im.test(t) ? t.replace(/^(\s*THREADS\s+)\S+/im, '$11') : t.replace(/^\[OPTIONS\][^\n]*\n/im, (x) => x + 'THREADS              1\n');
+      const jobs = paths.map((p, i) => ({ id: 'scen' + i + '_' + Date.now().toString(36), p, name: AV.basename(p).replace(/\.inp$/i, ''), isCur: !!(app.filePath && norm(p) === norm(app.filePath)), state: 'waiting', pct: 0 }));
+      const rows = jobs.map(j => { const bar = h('div'); const st = h('span', { class: 'scst' }, 'waiting'); j.el = { bar, st }; return h('div', { class: 'scrow' }, h('div', { class: 'scname', title: j.p }, (j.isCur ? '● ' : '') + j.name), h('div', { class: 'progress' }, bar), st); });
+      let stopped = false; const t0 = Date.now(); const head = h('div', { style: { marginBottom: '8px' } });
+      const dlg = AV.modal({ title: 'Running Scenarios - ' + rn.name, width: 560, body: h('div', null, head, h('div', { class: 'sclist' }, rows)), enterSubmits: false,
+        buttons: [{ label: 'Stop All', danger: true, onClick: () => { stopped = true; for (const j of jobs) if (j.state === 'running') window.host.cancelEngine(j.id); return false; } }] });
+      const upd = () => { const run = jobs.filter(j => j.state === 'running').length, fin = jobs.filter(j => /done|failed|stopped/.test(j.state)).length; head.textContent = 'Running ' + run + ' at the same time (up to ' + limit + ', 1 thread each) · ' + fin + ' / ' + jobs.length + ' finished · ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s'; };
+      const tick = setInterval(upd, 1000); upd();
+      sim.scenProgress = (id, p) => { const j = jobs.find(x => x.id === id); if (!j) return; j.pct = p; j.el.bar.style.width = Math.min(100, p) + '%'; j.el.st.textContent = p.toFixed(0) + ' %'; };
+      const runOne = async (j) => {
+        j.state = 'running'; j.el.st.textContent = 'starting'; const ts = Date.now(); upd();
         try {
-          let text, enc;
-          if (isCur) { text = app.model.toINP({ reportAll: true }); enc = await window.host.encoding(p); }
-          else { if (!await window.host.exists(p)) throw new Error('file not found'); const raw = await window.host.readText(p); enc = await window.host.encoding(p); text = AV.Model.parse(raw).toINP({ reportAll: true }); }
-          const res = await window.host.runEngine({ inpText: text, dir: AV.dirname(p), base: name, detail: false, encoding: enc });
-          if (res.canceled) break;
-          if (res.code !== 0) { failed.push(name + ': ' + (res.errors[0] || 'engine code ' + res.code)); continue; }
-          done.push({ name, out: res.out, rpt: res.rpt, isCur });
-        } catch (e) { failed.push(name + ': ' + e.message); }
-      }
-      sim.progEls = null; dlg.close();
+          let text, enc, flood2d = false, m;
+          if (j.isCur) { m = app.model; enc = await window.host.encoding(j.p);
+            if (AV.f2dEnabled(m) && AV.has2D(app) && app.mesh2d && app.mesh2d.cells.length) { text = AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m); flood2d = true; } else text = m.toINP({ reportAll: true }); }
+          else { if (!await window.host.exists(j.p)) throw new Error('file not found'); enc = await window.host.encoding(j.p); m = AV.Model.parse(await window.host.readText(j.p)); text = m.toINP({ reportAll: true }); }
+          const dir = AV.resultsDir(j.p); try { await window.host.mkdir(dir); } catch (e) { }
+          const res = await window.host.runEngine({ inpText: one(text), dir, base: rn.name, detail: false, encoding: enc, flood2d, named: true, id: j.id });
+          const secs = (Date.now() - ts) / 1000;
+          if (res.canceled) { j.state = 'stopped'; j.el.st.textContent = 'stopped'; return; }
+          const ok = res.code === 0 && !res.errors.length;
+          await AV.writeRunMeta(dir, rn.name, { name: rn.name, desc: rn.desc, date: new Date().toISOString(), model: AV.basename(j.p), type: flood2d ? '1D-2D' : '1D', flowUnits: m.flowUnits, code: ok ? 0 : (res.code || 1), seconds: +secs.toFixed(1), massBal: res.massBal, scenario: true });
+          if (!ok) { j.state = 'failed'; j.err = res.errors[0] || 'engine code ' + res.code; j.el.st.textContent = 'failed'; j.el.bar.style.background = 'var(--danger)'; return; }
+          j.state = 'done'; j.out = res.out; j.rpt = res.rpt; j.el.bar.style.width = '100%'; j.el.st.textContent = secs.toFixed(0) + ' s ✓';
+        } catch (e) { j.state = 'failed'; j.err = e.message; j.el.st.textContent = 'failed'; }
+        upd();
+      };
+      // simple pool: start up to "limit" engines, start the next one as soon as one finishes
+      let next = 0; const worker = async () => { while (next < jobs.length && !stopped) { const j = jobs[next++]; await runOne(j); } };
+      await Promise.all([...Array(limit)].map(worker));
+      for (const j of jobs) if (j.state === 'waiting') { j.state = 'stopped'; j.el.st.textContent = 'not run'; }
+      clearInterval(tick); sim.scenProgress = null; dlg.close();
+      const done = jobs.filter(j => j.state === 'done'), failed = jobs.filter(j => j.state === 'failed').map(j => j.name + ': ' + j.err);
       for (const d of done) { if (d.isCur) await sim.loadResults(d.out, d.rpt, true); }
       for (const d of done) { if (!d.isCur) { try { await sim.loadScenario(d.out, d.rpt, d.name); } catch (e) { failed.push(d.name + ': ' + e.message); } } }
+      if (app.db) app.db.render();
       if (failed.length) AV.alert('Some scenarios did not run:\n\n' + failed.join('\n'), 'Scenarios');
-      if (done.length) this.afterScenarios(done.length);
+      if (done.length) { AV.toast(done.length + ' scenario(s) finished in ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s (run in parallel).', false, 6000); this.afterScenarios(done.length); }
     }
     async loadScenarioResults(paths) {
       const app = this.app, sim = app.sim; const norm = (p) => p.replace(/\\/g, '/').toLowerCase(); let n = 0; const miss = [];
       for (const p of paths) {
-        const name = AV.basename(p).replace(/\.inp$/i, ''); const out = p.replace(/\.inp$/i, '.out'), rpt = p.replace(/\.inp$/i, '.rpt');
+        const name = AV.basename(p).replace(/\.inp$/i, ''); let out = p.replace(/\.inp$/i, '.out'), rpt = p.replace(/\.inp$/i, '.rpt');
+        const runs = await AV.listRuns(p); const last = runs.find(r => r.out && !r.is2D); if (last) { out = last.out; rpt = last.rpt; } // latest named results of that scenario
         if (!await window.host.exists(out)) { miss.push(name); continue; }
         if (app.filePath && norm(p) === norm(app.filePath)) await sim.loadResults(out, rpt, false); else await sim.loadScenario(out, rpt, name);
         n++;
