@@ -160,7 +160,7 @@
         row('Upstream Node', txt(o.from, setEnd('from')), 'from'); row('Downstream Node', txt(o.to, setEnd('to')), 'to');
       }
       G.layout(AV.propLayout(app, o), [o]);
-      // map position and computed values (Avaris2 additions)
+      // map position and computed values (Avaris2 CS additions)
       const ro = (label, val) => row(label, h('div', { class: 'ro' }, val));
       if (o.kind === 'NODE' || o.kind === 'GAGE') {
         const setXY = (k) => (v, i) => { const x = parseFloat(v); if (!isFinite(x)) { i.value = o[k]; return; } const old = o[k]; app.exec({ label: 'Move', do: () => o[k] = x, undo: () => o[k] = old, changes: [{ o, key: k, old, nw: x }] }); };

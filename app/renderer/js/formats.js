@@ -260,7 +260,7 @@
       return finishVector(app, Object.assign(L, { name: layer, path, gdb, visible: true, opacity: 1 }));
     }
     const e = ext(path); const name = AV.basename(path);
-    if (NOT[e]) throw new Error(NOT[e] + ' cannot be read by Avaris2 yet. Export the data to Shapefile, GeoJSON, KML, CSV or GeoTIFF and add that file instead.');
+    if (NOT[e]) throw new Error(NOT[e] + ' cannot be read by Avaris2 CS yet. Export the data to Shapefile, GeoJSON, KML, CSV or GeoTIFF and add that file instead.');
     let L;
     if (e === 'shp') L = await readShapefile(path);
     else if (e === 'geojson' || e === 'json') { L = AV.SHP.readGeoJSON(await window.host.readText(path)); const sample = L.features.slice(0, 50).flatMap(f => f.type === 'point' ? f.coords : f.coords.flat()); L.prjWKT = sample.length && sample.every(p => Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90) ? GEO() : null; }

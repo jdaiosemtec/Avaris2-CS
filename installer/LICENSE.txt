@@ -6,7 +6,7 @@ This software is provided for use by authorized users of OSEMTEC.
 THIRD-PARTY COMPONENTS
 
 1. Computational engine
-   The Avaris2 engine is built on the EPA Storm Water Management Model (SWMM)
+   The Avaris2 CS engine is built on the EPA Storm Water Management Model (SWMM)
    version 5.2.4, developed by the U.S. Environmental Protection Agency. The
    SWMM source code is in the public domain. Avaris modifications include:
      - user-configurable dynamic-wave under-relaxation (UNDER_RELAXATION)

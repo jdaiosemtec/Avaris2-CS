@@ -1,4 +1,4 @@
-// Avaris2 - user login / roles and model change history (audit trail)
+// Avaris2 CS - user login / roles and model change history (audit trail)
 'use strict';
 (function (AV) {
   const h = AV.h;
@@ -49,7 +49,7 @@
       const full = h('input', { type: 'text', value: '', style: { width: '220px' } });
       const p1 = h('input', { type: 'password', style: { width: '220px' } }), p2 = h('input', { type: 'password', style: { width: '220px' } });
       for (;;) {
-        const r = await AV.modal({ title: 'Avaris2 - Create Administrator Account', autofocus: true,
+        const r = await AV.modal({ title: 'Avaris2 CS - Create Administrator Account', autofocus: true,
           body: h('div', { style: { width: '430px' } }, h('div', { class: 'note', style: { marginBottom: '10px' } }, 'No user accounts exist on this computer yet. Create the administrator account. Every change to a model is recorded with the name of the signed-in user.'),
             h('div', { class: 'form' }, h('label', null, 'User name'), name, h('label', null, 'Full name (optional)'), full, h('label', null, 'Password'), p1, h('label', null, 'Confirm password'), p2)),
           buttons: [{ label: 'Create', primary: true, value: true }] }).done;
@@ -73,7 +73,7 @@
       const showRole = () => { const u = this.find(sel.value); roleInfo.textContent = u ? 'Role: ' + ROLES[u.role].label + ' - ' + ROLES[u.role].desc : ''; };
       sel.addEventListener('change', showRole); showRole();
       for (;;) {
-        const dlg = AV.modal({ title: 'Avaris2 - Sign In', autofocus: false,
+        const dlg = AV.modal({ title: 'Avaris2 CS - Sign In', autofocus: false,
           body: h('div', { style: { width: '420px' } }, h('div', { class: 'form' }, h('label', null, 'User'), sel, h('label', null, 'Password'), pw), roleInfo,
             h('label', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' } }, auto, 'Sign in automatically on this computer')),
           buttons: required ? [{ label: 'Sign In', primary: true, value: true }, { label: 'Exit', value: 'exit' }] : [{ label: 'Sign In', primary: true, value: true }, { label: 'Cancel', value: null }] });

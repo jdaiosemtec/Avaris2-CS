@@ -1,4 +1,4 @@
-// Avaris2 - Electron main process
+// Avaris2 CS - Electron main process
 'use strict';
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const path = require('path');
@@ -10,7 +10,7 @@ const OutReader = require('./outreader');
 // 2 GB, and a model near that limit spends most of its time in garbage collection)
 try { app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096'); } catch (e) { }
 try { app.commandLine.appendSwitch('enable-precise-memory-info'); } catch (e) { }
-// settings, users and change history stay in the folder used before the rename to Avaris2 (shared with OsemCM V1.0)
+// settings, users and change history stay in the folder used before the rename to Avaris2 CS (shared with OsemCM V1.0)
 try { app.setPath('userData', path.join(app.getPath('appData'), 'OsemCM')); } catch (e) { }
 
 let win = null;
@@ -48,7 +48,7 @@ function saveSettings(s) {
 function createWindow() {
   win = new BrowserWindow({
     width: 1500, height: 920, minWidth: 1000, minHeight: 640,
-    title: 'Avaris2',
+    title: 'Avaris2 CS',
     backgroundColor: '#1e2329',
     icon: path.join(__dirname, 'renderer', 'icon.png'),
     webPreferences: {
@@ -118,7 +118,7 @@ const LIC_PUB = '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAY6AEfM7kFpdG4rajIfI
 function verifyLicence(raw) {
   const out = { valid: false, edition: null, licensee: '', expiry: '', serial: '', issued: '', error: '' };
   const key = String(raw || '').replace(/\s+/g, ''); if (!key) { out.error = 'No licence key.'; return out; }
-  const m = /^OSEMCM-([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(key); if (!m) { out.error = 'This is not an Avaris2 licence key.'; return out; }
+  const m = /^OSEMCM-([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(key); if (!m) { out.error = 'This is not an Avaris2 CS licence key.'; return out; }
   const dec = (s) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
   let ok = false; const payload = dec(m[1]);
   try { ok = require('crypto').verify(null, payload, require('crypto').createPublicKey(LIC_PUB), dec(m[2])); } catch (e) { ok = false; }
@@ -172,7 +172,7 @@ function gdalDir() {
 }
 ipcMain.handle('gdal:available', async () => !!gdalDir());
 ipcMain.handle('gdal:run', async (e, tool, args) => {
-  const d = gdalDir(); if (!d) throw new Error('The GDAL tools are not installed with this copy of Avaris2.');
+  const d = gdalDir(); if (!d) throw new Error('The GDAL tools are not installed with this copy of Avaris2 CS.');
   if (!['ogrinfo', 'ogr2ogr'].includes(tool)) throw new Error('bad tool');
   const exe = path.join(d, tool + (process.platform === 'win32' ? '.exe' : ''));
   const env = Object.assign({}, process.env, { PROJ_DATA: path.join(d, 'proj'), PROJ_LIB: path.join(d, 'proj'), GDAL_DATA: path.join(d, 'gdal-data'), PROJ_NETWORK: 'OFF', CPL_LOG: '' });
@@ -188,7 +188,7 @@ ipcMain.handle('fs:rm', async (e, p) => { if (!/osemcm-/.test(p) && !/\.gdb[\\/]
 ipcMain.handle('fs:mkdir', async (e, p) => { await fs.promises.mkdir(p, { recursive: true }); return true; });
 // copy a bundled sample into Documents\Avaris\Samples so it can be run and saved
 ipcMain.handle('app:prepareSample', async (e, name) => {
-  const dst = path.join(app.getPath('documents'), 'Avaris2', 'Samples');
+  const dst = path.join(app.getPath('documents'), 'Avaris2 CS', 'Samples');
   fs.mkdirSync(dst, { recursive: true });
   const target = path.join(dst, name);
   if (!fs.existsSync(target)) fs.copyFileSync(path.join(samplesDir(), name), target);

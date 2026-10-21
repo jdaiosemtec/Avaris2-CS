@@ -124,7 +124,7 @@
       const icon = it.img ? h('img', { src: IMG(it.img), draggable: 'false' }) : h('span', { class: 'svgi' }, AV.icon(it.svg || 'select'));
       const b = h('button', { class: (small ? 'rsmall' : 'rbig') + (it.hero ? ' hero' : ''), title: typeof it.tip === 'function' ? '' : (it.tip || it.label) }, icon, h('span', { class: 'rl' }, it.label, it.caret ? h('span', { class: 'rcar' }, ' ▾') : null));
       if (it.badge && !small) b.appendChild(h('span', { class: 'rbadge' }, it.badge));
-      if (it.lic) b.appendChild(h('span', { class: 'rlock', title: 'Requires an Avaris2 1D-2D licence' }, '🔒'));
+      if (it.lic) b.appendChild(h('span', { class: 'rlock', title: 'Requires an Avaris2 CS 1D-2D licence' }, '🔒'));
       b.addEventListener('click', (e) => {
         if (it.lic === '2D' && !AV.has2D(this)) { AV.need2D(this, it.label); return; }
         if (it.menu) { const r = b.getBoundingClientRect(); this.contextMenu(r.left, r.bottom + 2, it.menu()); return; }
@@ -150,7 +150,7 @@
       tabs.appendChild(t);
     });
     tabs.appendChild(h('div', { style: { flex: 1 } }));
-    tabs.appendChild(h('div', { class: 'rtitle', id: 'rtitle' }, 'Avaris2'));
+    tabs.appendChild(h('div', { class: 'rtitle', id: 'rtitle' }, 'Avaris2 CS'));
   };
   AV.App.prototype.refreshRibbon = function () {
     if (!this.ribbonButtons) return;

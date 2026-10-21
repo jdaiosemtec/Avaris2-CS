@@ -212,15 +212,15 @@
     toJSON() { return JSON.stringify({ osemcmTheme: 1, layers: this.layers }, null, 1); }
     // mode 'add': the file's themes go on top of the current list (same name = replaced), labels kept; otherwise replace all
     fromJSON(txt, mode) {
-      const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 theme file'); let n = 0;
+      const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 CS theme file'); let n = 0;
       for (const k of ['node', 'link', 'sub']) { const L = j.layers[k]; if (!L) continue;
         if (mode === 'add') { const subs = (L.subs || []).map(s => Object.assign({}, s)); n += subs.length; const names = new Set(subs.map(s => s.name)); this.layers[k].subs = subs.concat(this.layers[k].subs.filter(s => !names.has(s.name))); }
         else { this.layers[k] = L; n += (L.subs || []).length; } }
       this.invalidate(); this.app.map.redraw(); return n;
     }
     async loadFile(after, path) {
-      const p = path || await window.host.openDialog({ filters: [{ name: 'Avaris2 theme', extensions: ['json'] }] }); if (!p) return;
-      let txt; try { txt = await window.host.readText(p); const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 theme file'); } catch (e) { AV.alert(e.message); return; }
+      const p = path || await window.host.openDialog({ filters: [{ name: 'Avaris2 CS theme', extensions: ['json'] }] }); if (!p) return;
+      let txt; try { txt = await window.host.readText(p); const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 CS theme file'); } catch (e) { AV.alert(e.message); return; }
       const has = ['node', 'link', 'sub'].some(k => this.layers[k].subs.length);
       const mode = !has ? 'replace' : await AV.modal({ title: 'Load Themes', width: 460, body: h('div', { style: { lineHeight: 1.55 } }, h('div', null, 'Load ' + AV.basename(p) + '.'),
         h('div', null, h('b', null, 'Add'), ': put the loaded themes on top of your current themes (a theme with the same name is updated).'), h('div', null, h('b', null, 'Replace'), ': remove your current themes first.')),
@@ -335,7 +335,7 @@
       const r = await AV.modal({
         title: 'Layer Theme Editor', body, width: 940, enterSubmits: false, buttons: [
           { label: 'Load...', onClick: async () => { await this.loadFile(() => render()); return false; } },
-          { label: 'Save...', onClick: async () => { await AV.downloadText(this.toJSON(), 'theme.json', [{ name: 'Avaris2 theme', extensions: ['json'] }]); return false; } },
+          { label: 'Save...', onClick: async () => { await AV.downloadText(this.toJSON(), 'theme.json', [{ name: 'Avaris2 CS theme', extensions: ['json'] }]); return false; } },
           { label: 'Cancel', value: 'cancel' }, { label: 'Apply', onClick: () => { render(); return false; } }, { label: 'OK', primary: true, value: 'ok' }]
       }).done;
       if (r !== 'ok') { this.layers = JSON.parse(snapshot); }

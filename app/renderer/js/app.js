@@ -1,4 +1,4 @@
-// Avaris2 - application core
+// Avaris2 CS - application core
 'use strict';
 (function (AV) {
   const h = AV.h;
@@ -366,8 +366,8 @@
     setDirty() { this.dirty = true; this.model.touch(); this.updateTitle(); this.refreshRibbon(); }
     updateTitle() {
       const name = this.filePath ? AV.basename(this.filePath) : 'Untitled';
-      window.host.setTitle('Avaris2 ' + (AV.editionLabel(this) ? AV.editionLabel(this) + ' ' : '') + '-- ' + name + (this.dirty ? ' *' : ''));
-      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'Avaris2 ' + (AV.editionLabel(this) ? AV.editionLabel(this) + ' ' : '') + '-- ' + name + (this.dirty ? ' *' : '');
+      window.host.setTitle('Avaris2 CS ' + (AV.editionLabel(this) ? AV.editionLabel(this) + ' ' : '') + '-- ' + name + (this.dirty ? ' *' : ''));
+      const rt = AV.$('#rtitle'); if (rt) rt.textContent = 'Avaris2 CS ' + (AV.editionLabel(this) ? AV.editionLabel(this) + ' ' : '') + '-- ' + name + (this.dirty ? ' *' : '');
       const m = this.model;
       AV.$('#modelCount').textContent = m ? `${m.nodes.size} nodes · ${m.links.size} links` : '';
     }
@@ -469,7 +469,7 @@
       w.style.display = 'flex';
       const recent = (this.settings.recent || []).slice(0, 5);
       w.appendChild(h('div', { class: 'card' },
-        h('h2', null, 'Avaris2'),
+        h('h2', null, 'Avaris2 CS'),
         h('p', null, 'Urban drainage & sewer network modeling - opens Avaris DS and EPA SWMM .inp models (SWMM 5.2 engine with Avaris convergence upgrades).'),
         h('div', { class: 'btns' },
           h('button', { class: 'btn primary', onclick: () => this.openDialog() }, 'Open Model...'),
@@ -796,9 +796,9 @@
         'Space + drag / middle mouse  Pan', 'Mouse wheel  Zoom', 'Ctrl+click  Add to selection', 'Shift+click  Choose from overlapping objects (Default Settings)', 'Drag a selected node  Move it (Edit mode ON)', 'Backspace  Remove last vertex while drawing', 'Enter / double-click  Finish polygon'].join('\n'), 'Keyboard Shortcuts');
     }
     about() {
-      AV.alert('Avaris2 (' + this.info.version + ')' + (AV.LICENSING ? '\nEdition: ' + (this.license && this.license.valid ? AV.EDITIONS[this.license.edition] + ' — licensed to ' + this.license.licensee : 'Avaris2 1D (unregistered)') : '') + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
+      AV.alert('Avaris2 CS (' + this.info.version + ')' + (AV.LICENSING ? '\nEdition: ' + (this.license && this.license.valid ? AV.EDITIONS[this.license.edition] + ' — licensed to ' + this.license.licensee : 'Avaris2 CS 1D (unregistered)') : '') + '\n\nEngine: ' + this.engineVersion + '\n\nComputational engine: EPA SWMM 5.2.4 (public domain) with Avaris modifications:\n'
         + '  - user-set dynamic-wave under-relaxation (UNDER_RELAXATION option)\n  - OpenMP parallel node-depth solution with per-node convergence flags\n'
-        + '  - extended "Most Frequent Nonconverging Nodes" list (NONCONV_REPORT_COUNT)\n  - outfalls excluded from nonconvergence statistics\n\nCPU threads available: ' + this.info.cpus, 'About Avaris2');
+        + '  - extended "Most Frequent Nonconverging Nodes" list (NONCONV_REPORT_COUNT)\n  - outfalls excluded from nonconvergence statistics\n\nCPU threads available: ' + this.info.cpus, 'About Avaris2 CS');
     }
     onKey(e) {
       const tag = (e.target.tagName || '').toLowerCase();

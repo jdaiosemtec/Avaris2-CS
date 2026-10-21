@@ -205,7 +205,7 @@
           { k: 'def_conduitLength', l: 'Conduit length (if not auto)', t: 'text' }, { k: 'def_autoLength', l: 'Auto length from map', t: 'check' },
           { t: 'h', l: 'Subcatchments' }, { k: 'def_subArea', l: 'Area (if no map units)', t: 'text' }, { k: 'def_subWidth', l: 'Width', t: 'text' },
           { k: 'def_subImperv', l: '% Impervious', t: 'text' }, { k: 'def_subSlope', l: '% Slope', t: 'text' },
-          { t: 'note', l: 'Applied to objects you add from now on; saved with your Avaris2 settings, not in the .inp file.' }],
+          { t: 'note', l: 'Applied to objects you add from now on; saved with your Avaris2 CS settings, not in the .inp file.' }],
         '2D Flood': [
           { k: 'f2d_ENABLED', l: 'Enable 1D-2D flood simulation', t: 'check' },
           { k: 'f2d_TAGALL', l: 'Tag all nodes "Link2D"', t: 'check', note: 'Writes the tag Link2D on every junction, storage unit and divider, so that all manholes are coupled to the 2D surface (only nodes tagged Link2D are coupled when any node has that tag). Rebuild the mesh afterwards.' },
@@ -236,7 +236,7 @@
           else if (f.t === 'threads') { const ti = h('input', { type: 'text', value: v[f.k], style: { width: '70px' } }); inputs[f.k] = ti; const info = h('div', { class: 'note thrinfo' });
             const detect = async () => { info.textContent = 'Scanning the system...'; const c = await window.host.cpuInfo(); const R = AV.recommendThreads(this.app, c);
               info.innerHTML = ''; info.append(h('div', null, h('b', null, 'This computer: '), (c.model ? c.model + ' - ' : '') + (c.physical ? c.physical + ' cores, ' : '') + c.logical + ' logical processors' + (c.memGB ? ', ' + c.memGB + ' GB RAM' : '')),
-                h('div', null, h('b', null, 'Maximum recommended: '), String(R.max) + ' threads (logical processors - 1, one is left for Avaris2 and Windows)'),
+                h('div', null, h('b', null, 'Maximum recommended: '), String(R.max) + ' threads (logical processors - 1, one is left for Avaris2 CS and Windows)'),
                 h('div', null, h('b', null, 'For this model: '), R.text + ' → ', h('b', null, R.rec + (R.rec > 1 ? ' threads' : ' thread')), ' ', h('button', { class: 'btn small', onclick: () => { ti.value = R.rec; } }, 'Use ' + R.rec)),
                 h('div', null, 'Enter the number you want to use; scenarios running at the same time always use 1 thread each.')); };
             form.appendChild(h('label', null, f.l)); form.appendChild(h('div', { class: 'fpick', style: { maxWidth: 'none' } }, ti, h('button', { class: 'btn small', onclick: detect, title: 'Scan the processors of this computer and recommend a number of threads' }, 'Detect && Recommend')));
@@ -318,7 +318,7 @@
       const encoding = app.filePath ? await window.host.encoding(app.filePath) : 'utf8';
       // 2D flood module: the mesh cells / surface links / couplings are added to a copy of the model (<model>.finp)
       let inpText = m.toINP({ reportAll: true }); let flood2d = false;
-      if (AV.f2dEnabled(m) && !AV.has2D(app)) AV.toast('This model has 2D flood settings, but your licence is Avaris2 1D: running the 1D model only.', false, 6000);
+      if (AV.f2dEnabled(m) && !AV.has2D(app)) AV.toast('This model has 2D flood settings, but your licence is Avaris2 CS 1D: running the 1D model only.', false, 6000);
       if (AV.f2dEnabled(m) && AV.has2D(app)) {
         if (!app.mesh2d || !app.mesh2d.cells.length) { this.runDlg.close(); this.runDlg = null;
           const a = await AV.modal({ title: 'Run Simulation', body: h('div', { style: { maxWidth: '480px', lineHeight: 1.5 } }, '2D flooding is enabled but no mesh has been created for this model yet.'), buttons: [{ label: 'Cancel', value: null }, { label: 'Run 1D only', value: '1d' }, { label: 'Create Meshes', primary: true, value: 'mesh' }] }).done;

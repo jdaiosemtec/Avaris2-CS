@@ -117,7 +117,7 @@
     save() { clearTimeout(this._st); this._st = setTimeout(async () => { const p = this.path(); if (!p) return; try { await window.host.writeText(p, JSON.stringify(this.toJSON(), null, 1)); } catch (e) { } }, 400); }
     toJSON() { const S = this.S; return { avarisFlags: 1, vals: S.vals, sys: S.sys, col: S.col, mode: S.mode, active: S.active, custom: S.custom.map(f => ({ id: f.id, name: f.name, layer: f.layer, mode: f.mode, desc: f.desc, alg: f.alg, P: f.P, cond: f.cond, where: f.where || '', levels: f.levels, when: f.when })) }; }
     fromJSON(j, merge) {
-      if (!j || !j.avarisFlags) throw new Error('Not an Avaris2 flags file');
+      if (!j || !j.avarisFlags) throw new Error('Not an Avaris2 CS flags file');
       const S = this.S; const cust = (j.custom || []).map(f => Object.assign({ custom: true }, f));
       if (merge) { const ids = new Set(cust.map(f => f.id)); S.custom = S.custom.filter(f => !ids.has(f.id)).concat(cust); for (const k of ['vals', 'sys', 'col', 'mode']) Object.assign(S[k], j[k] || {}); }
       else { this.S = { vals: j.vals || {}, sys: j.sys || {}, col: j.col || {}, mode: j.mode || {}, custom: cust, active: Object.assign({ node: null, link: null, sub: null }, j.active || {}) }; }
@@ -245,9 +245,9 @@
     if (isNew) { F.S.custom.push(f); F.S.active[f.layer] = f.id; } else delete F.S.vals[f.id];
     F.changed();
   }
-  async function exportFlags(app) { await AV.downloadText(JSON.stringify(app.flags.toJSON(), null, 1), (app.filePath ? AV.basename(app.filePath).replace(/\.inp$/i, '') : 'model') + '.flags.json', [{ name: 'Avaris2 flags', extensions: ['json'] }]); }
+  async function exportFlags(app) { await AV.downloadText(JSON.stringify(app.flags.toJSON(), null, 1), (app.filePath ? AV.basename(app.filePath).replace(/\.inp$/i, '') : 'model') + '.flags.json', [{ name: 'Avaris2 CS flags', extensions: ['json'] }]); }
   async function importFlags(app) {
-    const p = await window.host.openDialog({ filters: [{ name: 'Avaris2 flags', extensions: ['json'] }] }); if (!p) return;
+    const p = await window.host.openDialog({ filters: [{ name: 'Avaris2 CS flags', extensions: ['json'] }] }); if (!p) return;
     try { app.flags.fromJSON(JSON.parse(await window.host.readText(p)), true); app.flags.changed(); AV.toast('Flags imported.'); } catch (e) { AV.alert(e.message); }
   }
 
