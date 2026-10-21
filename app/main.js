@@ -204,7 +204,7 @@ ipcMain.on('app:set-title', (e, t) => { if (win) win.setTitle(t); });
 ipcMain.handle('engine:version', async () => new Promise((resolve) => {
   try {
     const p = spawn(enginePath(), ['-v']);
-    let s = ''; p.stdout.on('data', d => s += d); p.on('close', () => resolve(s.trim())); p.on('error', err => resolve('Engine not found: ' + err.message));
+    let s = ''; p.stdout.on('data', d => s += d); p.on('close', () => resolve(s.trim().replace(/OsemCM Engine/gi, 'Avaris Engine'))); p.on('error', err => resolve('Engine not found: ' + err.message));
   } catch (err) { resolve('Engine not found'); }
 }));
 
