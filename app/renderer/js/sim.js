@@ -196,8 +196,8 @@
           { k: 'MAX_TRIALS', l: 'Maximum Trials per Step', t: 'text' }, { k: 'HEAD_TOLERANCE', l: 'Head Convergence Tolerance', t: 'text' }],
         'Avaris Engine': [
           { k: 'THREADS', l: 'Number of Threads (0 = all cores)', t: 'threads', note: 'Conduit flows and node depths are solved in parallel (OpenMP); results are identical for any number of threads. The engine uses 1 thread when the model has fewer than 4 links per thread.' },
-          { k: 'UNDER_RELAXATION', l: 'Under-Relaxation Factor (0.1 - 1.0)', t: 'text', note: 'Weight given to the new iterate in the dynamic-wave Picard iterations (stock SWMM fixes this at 0.5). Lower values damp oscillation at hard-to-converge nodes; higher values converge faster on well-behaved networks.' },
-          { k: 'NONCONV_REPORT_COUNT', l: 'Nonconverging Nodes Listed in Report', t: 'text', note: 'Length of the "Most Frequent Nonconverging Nodes" list (stock SWMM lists 5; max 500).' },
+          { k: 'UNDER_RELAXATION', l: 'Under-Relaxation Factor (0.1 - 1.0)', t: 'text', note: 'Weight given to the new iterate in the dynamic-wave Picard iterations (the standard value is 0.5). Lower values damp oscillation at hard-to-converge nodes; higher values converge faster on well-behaved networks.' },
+          { k: 'NONCONV_REPORT_COUNT', l: 'Nonconverging Nodes Listed in Report', t: 'text', note: 'Length of the "Most Frequent Nonconverging Nodes" list (the standard report lists 5; max 500).' },
           { k: 'detail', l: 'Write time-series tables to report file', t: 'check', note: 'Off by default: results are read from the binary output file, which keeps the report file small for large models.' }],
         'Object Defaults': [
           { t: 'h', l: 'Nodes' }, { k: 'def_junctionDepth', l: 'Node max. depth', t: 'text' },

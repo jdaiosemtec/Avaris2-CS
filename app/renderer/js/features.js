@@ -62,7 +62,7 @@
       pre.scrollTop = 1e9; return p;
     }
     notAvailable(name, what) {
-      AV.alert(name + ' is not available in this version of Avaris2 CS.\n\nAvaris2 CS currently runs 1D network (SWMM-engine) simulations. ' + what.charAt(0).toUpperCase() + what.slice(1) + ' will be added in a later release; until then use Avaris DS for this step.', name);
+      AV.alert(name + ' is not available in this version of Avaris2 CS.\n\nAvaris2 CS currently runs 1D network simulations. ' + what.charAt(0).toUpperCase() + what.slice(1) + ' will be added in a later release; until then use Avaris DS for this step.', name);
     }
 
     // ================================================================ picking helper

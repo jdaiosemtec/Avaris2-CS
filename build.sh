@@ -19,6 +19,7 @@ cp $P/app/engine/win/* $ST/resources/engine/
 cp $P/app/samples/* $ST/resources/samples/
 mkdir -p $ST/resources/gdal && cp -r $P/app/gdal/win/* $ST/resources/gdal/
 cp $P/installer/LICENSE.txt $ST/LICENSE-Avaris2CS.txt
+{ cat $P/installer/THIRD-PARTY-NOTICES.txt; printf '\n\nGDAL LICENCE\n============\n\n'; cat $P/app/gdal/win/GDAL-LICENSE.txt; printf '\n\nPROJ LICENCE\n============\n\n'; cat $P/app/gdal/win/PROJ-LICENSE.txt; } > $ST/THIRD-PARTY-NOTICES.txt
 cd $P/installer
 NSISDIR=$NSIS $NSIS/linux/makensis -V2 -DVER=$VER -DSTAGE=$ST -DICON=$P/build/icon.ico -DOUTFILE=$P/dist/Avaris2CS-Setup-$VER.exe avaris.nsi
 ls -la $P/dist/*.exe

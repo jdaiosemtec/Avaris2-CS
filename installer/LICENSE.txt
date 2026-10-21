@@ -1,29 +1,13 @@
-OSEMCM 1.1.0
+Avaris2 CS
 Copyright (c) 2026 OSEMTEC. All rights reserved.
 
-This software is provided for use by authorized users of OSEMTEC.
-
-THIRD-PARTY COMPONENTS
-
-1. Computational engine
-   The Avaris2 CS engine is built on the EPA Storm Water Management Model (SWMM)
-   version 5.2.4, developed by the U.S. Environmental Protection Agency. The
-   SWMM source code is in the public domain. Avaris modifications include:
-     - user-configurable dynamic-wave under-relaxation (UNDER_RELAXATION)
-     - OpenMP parallel node-depth solution with per-node convergence flags
-     - extended "Most Frequent Nonconverging Nodes" report (NONCONV_REPORT_COUNT)
-     - outfalls excluded from node nonconvergence statistics
-     - non-SWMM input sections (e.g. Avaris DS [GROUPS]) are skipped instead of failing
-
-2. LLVM OpenMP runtime (libomp.dll)
-   Apache License v2.0 with LLVM Exceptions.
-
-3. Electron / Chromium runtime
-   Electron is licensed under the MIT License. Chromium and its components
-   are licensed under BSD-style and other open source licenses; see
-   LICENSE and LICENSES.chromium.html in the installation folder.
+This software is licensed to authorized users of OSEMTEC. It may not be copied,
+distributed, reverse engineered or modified except as permitted by your licence
+agreement with OSEMTEC.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED. MODEL RESULTS MUST BE REVIEWED BY A QUALIFIED ENGINEER BEFORE USE.
 
-4. Ribbon icons are reproduced from Avaris DS with the owner's permission.
+Avaris2 CS includes third-party open-source components, which remain under
+their own licences. See THIRD-PARTY-NOTICES.txt in the installation folder
+(also available from Help > About > Third-party notices).

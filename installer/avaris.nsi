@@ -34,7 +34,7 @@ VIAddVersionKey "LegalCopyright" "(c) 2026 ${COMPANY}"
 !define MUI_UNICON "${ICON}"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Welcome to ${APPNAME} ${VERSION} Setup"
-!define MUI_WELCOMEPAGE_TEXT "This will install ${APPNAME} on your computer.$\r$\n$\r$\nUrban drainage and sewer network modeling with 1D-2D surface flood simulation (formerly Avaris2 / OsemCM V2.0: an earlier Avaris2 installation is removed first, settings are kept; installs next to OsemCM V1.0). Opens Avaris DS and EPA SWMM models; engine: EPA SWMM 5.2.4 core with Avaris convergence modifications.$\r$\n$\r$\nRequirements: Windows 10 or 11, 64-bit.$\r$\n$\r$\nClick Next to continue."
+!define MUI_WELCOMEPAGE_TEXT "This will install ${APPNAME} on your computer.$\r$\n$\r$\nUrban drainage and sewer network modeling with 1D-2D surface flood simulation (formerly Avaris2 / OsemCM V2.0: an earlier Avaris2 installation is removed first, settings are kept; installs next to OsemCM V1.0). Opens Avaris DS and EPA SWMM 5 models.$\r$\n$\r$\nRequirements: Windows 10 or 11, 64-bit.$\r$\n$\r$\nClick Next to continue."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${EXENAME}"
 !define MUI_FINISHPAGE_RUN_TEXT "Launch ${APPNAME}"
 

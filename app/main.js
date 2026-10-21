@@ -218,6 +218,10 @@ ipcMain.handle('app:prepareSample', async (e, name) => {
 });
 ipcMain.handle('app:settings:set', async (e, s) => { saveSettings(s); return true; });
 ipcMain.handle('app:openExternal', async (e, url) => { await shell.openExternal(url); return true; });
+ipcMain.handle('app:openNotices', async () => {
+  const c = [path.join(path.dirname(process.execPath), 'THIRD-PARTY-NOTICES.txt'), path.join(__dirname, '..', 'installer', 'THIRD-PARTY-NOTICES.txt')];
+  for (const f of c) if (fs.existsSync(f)) { await shell.openPath(f); return true; } return false;
+});
 ipcMain.handle('app:showItem', async (e, p) => { shell.showItemInFolder(p); return true; });
 ipcMain.on('app:close-confirmed', () => { forceClose = true; if (win) win.close(); });
 ipcMain.on('app:set-title', (e, t) => { if (win) win.setTitle(t); });
@@ -226,7 +230,7 @@ ipcMain.on('app:set-title', (e, t) => { if (win) win.setTitle(t); });
 ipcMain.handle('engine:version', async () => new Promise((resolve) => {
   try {
     const p = spawn(enginePath(), ['-v']);
-    let s = ''; p.stdout.on('data', d => s += d); p.on('close', () => resolve(s.trim().replace(/OsemCM Engine/gi, 'Avaris Engine'))); p.on('error', err => resolve('Engine not found: ' + err.message));
+    let s = ''; p.stdout.on('data', d => s += d); p.on('close', () => resolve('Avaris hydraulic engine, build ' + ((/(\d+\.\d+\.\d+)/.exec(s) || [])[1] || '') + '-A2')); p.on('error', err => resolve('Engine not found: ' + err.message));
   } catch (err) { resolve('Engine not found'); }
 }));
 

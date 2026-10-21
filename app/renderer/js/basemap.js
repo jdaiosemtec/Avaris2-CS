@@ -100,8 +100,8 @@
       try { const res = await fetch('avtile://t/' + bm.src + '/' + z + '/' + x + '/' + y + '.png?u=' + encodeURIComponent(web(z, x, y))); if (!res.ok) fail++; } catch (e) { fail++; }
       done++; if (done % 10 === 0 || done === tiles.length) { bar.style.width = (100 * done / tiles.length).toFixed(1) + '%'; txt.textContent = done + ' / ' + tiles.length + (fail ? ' (' + fail + ' failed)' : ''); } } };
     await Promise.all([worker(), worker(), worker()]);
-    dlg.close(); app.map.redraw();
-    AV.toast((stop ? 'Stopped: ' : 'Basemap downloaded: ') + (done - fail) + ' tiles saved' + (fail ? ', ' + fail + ' failed (offline?)' : '') + '.', !!fail);
+    const stopped = stop; dlg.close(); app.map.redraw();
+    AV.toast((stopped ? 'Stopped: ' : 'Basemap downloaded: ') + (done - fail) + ' tiles saved' + (fail ? ', ' + fail + ' failed (offline?)' : '') + '.', !!fail);
   };
   AV.MapView.prototype.drawBasemap = function () {
     const app = this.app, bm = AV.basemapState(app); if (!bm.on || !app.crs) return;

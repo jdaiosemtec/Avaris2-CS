@@ -1,0 +1,43 @@
+Avaris2 CS - Third-party notices
+================================
+
+Avaris2 CS uses the open-source components listed below. Each component is
+distributed under its own licence; the licence texts are reproduced or referenced
+here. OSEMTEC's own code is not covered by these licences.
+
+1. Electron
+   Copyright (c) Electron contributors; Copyright (c) 2013-2020 GitHub Inc.
+   MIT License - full text in the file "LICENSE" in the installation folder.
+
+2. Chromium and Node.js (part of Electron)
+   Chromium and its components are licensed under BSD-style and other open-source
+   licences; Node.js under the MIT License. The complete list and texts are in
+   "LICENSES.chromium.html" in the installation folder.
+
+3. GDAL / OGR (ogr2ogr, ogrinfo - used to read and write Esri File Geodatabases)
+   Copyright (c) the GDAL/OGR project contributors. MIT / X11 style licence.
+   Full text below and in resources\gdal\GDAL-LICENSE.txt.
+
+4. PROJ (coordinate transformation data and library used by GDAL)
+   Copyright (c) the PROJ contributors. MIT / X11 style licence.
+   Full text below and in resources\gdal\PROJ-LICENSE.txt.
+
+5. LLVM OpenMP runtime (libomp.dll, used by the hydraulic engine for multi-threading)
+   Copyright (c) LLVM Project contributors.
+   Apache License v2.0 with LLVM Exceptions.
+   https://llvm.org/LICENSE.txt
+
+6. Hydraulic engine
+   The Avaris hydraulic engine incorporates public-domain source code of the
+   U.S. Environmental Protection Agency. No licence restrictions apply to that code.
+
+7. Basemap data (online, not distributed with the software)
+   OpenStreetMap: (c) OpenStreetMap contributors, Open Database License (ODbL).
+   OpenTopoMap: (c) OpenTopoMap (CC-BY-SA); elevation data SRTM.
+   The attribution is shown on the map whenever a basemap is displayed and must
+   not be removed. Tiles downloaded for offline use are subject to the same terms.
+
+8. Ribbon icons
+   Some ribbon icons are reproduced from Avaris DS with the owner's permission.
+
+-------------------------------------------------------------------------------

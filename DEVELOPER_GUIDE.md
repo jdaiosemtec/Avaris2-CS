@@ -69,6 +69,7 @@ Avaris2CS.exe (Electron)
 | `license-tools/private_key.pem` | **私钥，务必保密，不能随软件发布**，也不进 git。源码包里如果附带，要单独妥善保管。 |
 | `installer/avaris.nsi` | NSIS 安装脚本：安装目录、开始菜单和桌面快捷方式、可选的 .inp 关联、卸载；安装前会自动卸载旧名称 "Avaris2" 的版本。 |
 | `installer/LICENSE.txt` | 安装时显示的许可协议，同时复制为 `LICENSE-Avaris2CS.txt`。 |
+| `installer/THIRD-PARTY-NOTICES.txt` | 第三方组件声明。`build.sh` 会把 GDAL 和 PROJ 的许可全文接在后面，生成安装目录里的 `THIRD-PARTY-NOTICES.txt`；Help ▸ About ▸ Third-party notices 打开的就是这个文件。**新增任何开源库、字体或数据，都要把它补进这个文件。** |
 | `dist/` | 构建输出（不进 git）。`dist/stage/` 是解压后的 Windows 版 Electron 和组装好的程序，`dist/*.exe` 是安装包。 |
 
 ### 2.2 `app/`：Electron 程序
@@ -106,7 +107,7 @@ Avaris2CS.exe (Electron)
 | `ribbon.js` | 165 | Ribbon 功能区：Project / Operation / Tools / Simulation / Help 选项卡，分组和按钮（大图标、小图标、hero 按钮），按钮状态刷新。新增功能入口在这里加。 |
 | `map.js` | 880 | **地图视图 `MapView`**：Canvas 绘制网络、标签、选择、编辑交互（拖动、加点、画管线、框选、测量），外部图层绘制（`drawExt`），属性表选中要素的高亮。**大模型 LOD**：对象数 ≥ 60000 且缩小时用 4096 px 概览位图分块渲染，缩放和平移约 10 ms。样式按帧缓存。 |
 | `locator.js` | 81 | 地图角的"眼睛"按钮（T 键，隐藏/显示 Theme 着色）和 Locator 鹰眼图。 |
-| `basemap.js` | 118 | 在线底图（XYZ 瓦片，OpenStreetMap / OpenTopoMap 等），按模型坐标系重投影显示；模型坐标系 `app.crs`。 |
+| `basemap.js` | 150 | 在线底图（XYZ 瓦片，OpenStreetMap / OpenTopoMap 等），按模型坐标系重投影显示；模型坐标系 `app.crs`。瓦片通过主进程的 `avtile://` 协议加载：<br>• 缓存目录是 `<userData>/tiles/<源>/<z>/<x>/<y>.png`，30 天后刷新，离线时直接用缓存；<br>• `AV.downloadTiles` 对应 Basemap 右键菜单的 Download for Offline Use。 |
 | `proj.js` | 144 | 自写的地图投影引擎：经纬度、横轴墨卡托（UTM、State Plane TM）、兰伯特（含 Michigan）、Hotine 斜轴墨卡托 A/B、墨卡托、Web Mercator；解析 WKT1 和 WKT2。 |
 | `panels.js` | 450 | 左侧模型树（Parameter View）、属性面板（Property Browser，可折叠分组，点击属性名按变量筛选修改记录）、多选编辑、Model Summary。 |
 | `props.js` | 383 | 属性面板的字段布局（`AV.propLayout`，Avaris DS 风格分组）和每个字段的输入控件（`AV.propInput`），以及 Direct Inflows、DWF、地下水、LID Usage 编辑器。 |
