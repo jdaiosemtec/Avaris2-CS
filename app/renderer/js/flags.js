@@ -137,10 +137,13 @@
   // ---------------------------------------------------------------- panel
   AV.openFlags = function (app) {
     const F = app.flags; if (!F) return;
-    const P = AV.floatPanel({ id: 'flags', title: 'Flags', w: 470, h: Math.min(760, window.innerHeight - 160), body: h('div', { class: 'flp' }), onClose: () => { F.open = false; F.render = null; app.theme.invalidate(); app.map.redraw(); app.refreshRibbon && app.refreshRibbon(); } });
+    const P = AV.floatPanel({ id: 'flags', title: 'Flags', minimize: true, onMinimize: (m) => { P.setTitle(m ? minTitle() : 'Flags'); }, w: 470, h: Math.min(760, window.innerHeight - 160), body: h('div', { class: 'flp' }), onClose: () => { F.open = false; F.render = null; app.theme.invalidate(); app.map.redraw(); app.refreshRibbon && app.refreshRibbon(); } });
+    // minimized title: the flags shown on the map
+    const minTitle = () => { const n = ['node', 'link', 'sub'].map(k => F.S.active[k] && F.def(F.S.active[k])).filter(Boolean).map(f => f.name); return 'Flags' + (n.length ? ' — ' + n.join(', ') : ''); };
     F.open = true; app.theme.invalidate(); app.map.redraw(); app.refreshRibbon && app.refreshRibbon();
     const root = P.el ? AV.$('.flp', P.el) : AV.$('.flp');
     const render = F.render = () => {
+      if (P.minimized) P.setTitle(minTitle());
       // keep the list scrolled where it was (re-rendered after every change)
       const old = AV.$('.fllist', root); const st = old ? old.scrollTop : 0;
       root.innerHTML = '';

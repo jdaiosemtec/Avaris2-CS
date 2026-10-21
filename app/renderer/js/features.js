@@ -8,17 +8,18 @@
   const panels = new Map();
   let zTop = 1500, cascade = 0;
   AV.floatPanel = function (opts) {
-    if (opts.id && panels.has(opts.id)) { const p = panels.get(opts.id); p.focus(); return p; }
+    if (opts.id && panels.has(opts.id)) { const p = panels.get(opts.id); p.restore(); p.focus(); return p; }
     const W = opts.w || 560, H = opts.h || 420;
     const area = AV.$('#views').getBoundingClientRect();
     const x = opts.x !== undefined ? opts.x : Math.max(10, area.right - W - 16 - (cascade % 5) * 24), y = opts.y !== undefined ? opts.y : area.top + 12 + (cascade % 5) * 24; cascade++;
     const title = h('span', { class: 'ft' }, opts.title || '');
     const body = h('div', { class: 'fb' });
     const el = h('div', { class: 'fpanel', style: { left: x + 'px', top: y + 'px', width: W + 'px', height: H + 'px', zIndex: ++zTop } },
-      h('div', { class: 'fh' }, title, opts.dock ? h('button', { title: 'Open as a tab', onclick: () => { api.close(true); opts.dock(); } }, '❐') : null, h('button', { title: 'Close', onclick: () => api.close() }, '×')), body);
+      h('div', { class: 'fh' }, title, opts.minimize ? h('button', { class: 'fmin', title: 'Minimize', onclick: () => api.toggleMin() }, '–') : null, opts.dock ? h('button', { title: 'Open as a tab', onclick: () => { api.close(true); opts.dock(); } }, '❐') : null, h('button', { title: 'Close', onclick: () => api.close() }, '×')), body);
     if (opts.body) body.appendChild(opts.body);
     document.body.appendChild(el);
     const head = el.querySelector('.fh');
+    head.addEventListener('dblclick', (e) => { if (opts.minimize && e.target.tagName !== 'BUTTON') api.toggleMin(); });
     head.addEventListener('mousedown', (e) => {
       if (e.target.tagName === 'BUTTON') return; api.focus();
       const r = el.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
@@ -31,6 +32,12 @@
     const api = {
       el, body, setTitle: (t) => title.textContent = t,
       focus: () => { el.style.zIndex = ++zTop; },
+      // minimize: only the title bar stays (what the panel shows on the map stays on); click – / the title bar to restore
+      minimized: false,
+      toggleMin: () => { if (api.minimized) return api.restore(); api._h = el.style.height; api._w = el.style.width; api.minimized = true; el.classList.add('min'); el.style.height = ''; el.style.width = Math.min(360, el.getBoundingClientRect().width) + 'px';
+        const b = el.querySelector('.fmin'); if (b) { b.textContent = '▢'; b.title = 'Restore'; } if (opts.onMinimize) opts.onMinimize(true); },
+      restore: () => { if (!api.minimized) return; api.minimized = false; el.classList.remove('min'); el.style.height = api._h; el.style.width = api._w;
+        const b = el.querySelector('.fmin'); if (b) { b.textContent = '–'; b.title = 'Minimize'; } if (opts.onMinimize) opts.onMinimize(false); },
       close: (silent) => { ro.disconnect(); el.remove(); if (opts.id) panels.delete(opts.id); if (opts.onClose) opts.onClose(silent); },
     };
     if (opts.id) panels.set(opts.id, api);

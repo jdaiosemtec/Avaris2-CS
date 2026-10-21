@@ -244,6 +244,7 @@ table.grid td.rowh { background: #f4f6f8; color: var(--muted); text-align: right
 .fpanel .fh button:hover { color: var(--accent); }
 .fpanel .fb { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .fpanel.focus { border-color: var(--accent); }
+.fpanel.min { resize: none; min-height: 0; } .fpanel.min .fb { display: none; } .fpanel.min .fh { border-bottom: 0; }
 .pickfield { display: flex; gap: 4px; align-items: center; }
 .pickfield input { flex: 1; }
 .pickfield input.armed { border-color: #ff6d00 !important; box-shadow: 0 0 0 2px rgba(255,109,0,.25); }
