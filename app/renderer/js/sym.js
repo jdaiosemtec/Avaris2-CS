@@ -217,7 +217,7 @@
     if (open.base) {
       const src = AV.BASEMAPS[bm.src] || AV.BASEMAPS.otm;
       const r = row(1, [sp(), chk(bm.on, v => { bm.on = v; app.savePrefs(); }), h('span', { class: 'symicon bm', onclick: (e) => { e.stopPropagation(); app.symPane.open({ basemap: true }); }, title: 'Basemap settings' }), h('span', { class: 'lname' }, src.name)],
-        { dbl: () => app.symPane.open({ basemap: true }), menu: () => Object.keys(AV.BASEMAPS).map(k => ({ label: (k === bm.src ? '● ' : '   ') + AV.BASEMAPS[k].name, fn: () => { bm.src = k; bm.on = true; app.savePrefs(); map.redraw(); this.refreshLayers(); } })).concat(['-', { label: 'Coordinate System...', fn: () => AV.chooseCRS(app) }]) });
+        { dbl: () => app.symPane.open({ basemap: true }), menu: () => Object.keys(AV.BASEMAPS).map(k => ({ label: (k === bm.src ? '● ' : '   ') + AV.BASEMAPS[k].name, fn: () => { bm.src = k; bm.on = true; app.savePrefs(); map.redraw(); this.refreshLayers(); } })).concat(['-', { label: 'Coordinate System...', fn: () => AV.chooseCRS(app) }, { label: 'Download for Offline Use...', fn: () => AV.downloadTiles(app) }]) });
       if (!app.crs) row(2, [h('span', { class: 'lwarn', onclick: () => AV.chooseCRS(app) }, '⚠ No coordinate system — click to set one')]);
     }
   };

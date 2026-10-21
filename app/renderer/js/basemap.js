@@ -76,6 +76,33 @@
     if (cache.size > MAXC) { const old = [...cache.entries()].sort((a, b) => a[1].t - b[1].t).slice(0, cache.size - MAXC); for (const [k] of old) cache.delete(k); }
     return e;
   }
+  // download the basemap tiles of the model area (plus a margin) into the tile cache, for offline use
+  AV.downloadTiles = async function (app) {
+    const bm = AV.basemapState(app), src = AV.BASEMAPS[bm.src], S = app.crs;
+    if (!S || !app.model) { AV.alert('Set the map coordinate system first.'); return; }
+    if (!(window.host && window.host.tileCache)) { AV.alert('The tile cache is not available.'); return; }
+    const b = app.model.bounds(false); if (!b) { AV.alert('The model has no objects.'); return; }
+    const mx = (b.x2 - b.x1) * 0.15, my = (b.y2 - b.y1) * 0.15; const ll = [];
+    for (const x of [b.x1 - mx, (b.x1 + b.x2) / 2, b.x2 + mx]) for (const y of [b.y1 - my, (b.y1 + b.y2) / 2, b.y2 + my]) { try { const g = AV.Proj.toGeo(S, x, y); if (isFinite(g[0]) && isFinite(g[1])) ll.push(g); } catch (e) { } }
+    if (ll.length < 4) { AV.alert('Could not convert the model area to longitude / latitude.'); return; }
+    const lo1 = Math.min(...ll.map(p => p[0])), lo2 = Math.max(...ll.map(p => p[0])), la1 = Math.min(...ll.map(p => p[1])), la2 = Math.max(...ll.map(p => p[1]));
+    const list = (zmax) => { const out = []; for (let z = 8; z <= zmax; z++) { const n = Math.pow(2, z); const x1 = Math.max(0, Math.floor(lon2x(lo1, z))), x2 = Math.min(n - 1, Math.floor(lon2x(lo2, z))), y1 = Math.max(0, Math.floor(lat2y(la2, z))), y2 = Math.min(n - 1, Math.floor(lat2y(la1, z)));
+      for (let x = x1; x <= x2; x++) for (let y = y1; y <= y2; y++) out.push([z, x, y]); } return out; };
+    const zs = []; for (let z = 12; z <= src.max; z++) zs.push([String(z), 'up to zoom ' + z + ' (' + list(z).length.toLocaleString() + ' tiles)']);
+    const r = await AV.formDialog('Download Basemap for Offline Use', [{ k: 'z', l: 'Detail', t: 'choice', o: zs, d: String(Math.min(16, src.max)) },
+      { t: 'note', l: src.name + ' tiles covering the model area are saved on this computer, so the basemap also works without internet. Please download only what you need: the tile servers are run by volunteers.' }], { z: String(Math.min(16, src.max)) });
+    if (!r) return;
+    const tiles = list(+r.z); if (tiles.length > 20000) { AV.alert('Too many tiles (' + tiles.length + '). Choose a lower detail level.'); return; }
+    const web = (z, x, y) => src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', src.sub ? src.sub[(x + y) % src.sub.length] : '');
+    let done = 0, fail = 0, stop = false; const bar = h('div'); const txt = h('div', { style: { marginTop: '6px', color: 'var(--muted)' } }, '0 / ' + tiles.length);
+    const dlg = AV.modal({ title: 'Downloading basemap tiles', width: 420, body: h('div', null, h('div', { class: 'progress' }, bar), txt), buttons: [{ label: 'Stop', danger: true, onClick: () => { stop = true; return false; } }], onClose: () => { stop = true; } });
+    let i = 0; const worker = async () => { while (!stop && i < tiles.length) { const [z, x, y] = tiles[i++];
+      try { const res = await fetch('avtile://t/' + bm.src + '/' + z + '/' + x + '/' + y + '.png?u=' + encodeURIComponent(web(z, x, y))); if (!res.ok) fail++; } catch (e) { fail++; }
+      done++; if (done % 10 === 0 || done === tiles.length) { bar.style.width = (100 * done / tiles.length).toFixed(1) + '%'; txt.textContent = done + ' / ' + tiles.length + (fail ? ' (' + fail + ' failed)' : ''); } } };
+    await Promise.all([worker(), worker(), worker()]);
+    dlg.close(); app.map.redraw();
+    AV.toast((stop ? 'Stopped: ' : 'Basemap downloaded: ') + (done - fail) + ' tiles saved' + (fail ? ', ' + fail + ' failed (offline?)' : '') + '.', !!fail);
+  };
   AV.MapView.prototype.drawBasemap = function () {
     const app = this.app, bm = AV.basemapState(app); if (!bm.on || !app.crs) return;
     const S = app.crs, src = AV.BASEMAPS[bm.src]; const ctx = this.ctx;
@@ -93,7 +120,9 @@
     let x1 = Math.floor(lon2x(lo1, z)), x2 = Math.floor(lon2x(lo2, z)), y1 = Math.floor(lat2y(la2, z)), y2 = Math.floor(lat2y(la1, z));
     x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(n - 1, x2); y2 = Math.min(n - 1, y2);
     if ((x2 - x1 + 1) * (y2 - y1 + 1) > 150) return;
-    const url = (z, x, y) => src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', src.sub ? src.sub[(x + y) % src.sub.length] : '');
+    // tiles go through the avtile:// protocol of the main process, which keeps a disk cache (offline use, fewer downloads)
+    const web = (z, x, y) => src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', src.sub ? src.sub[(x + y) % src.sub.length] : '');
+    const url = (z, x, y) => window.host && window.host.tileCache ? 'avtile://t/' + bm.src + '/' + z + '/' + x + '/' + y + '.png?u=' + encodeURIComponent(web(z, x, y)) : web(z, x, y);
     const redraw = () => { this.redrawBackground(); };   // a loaded tile only changes the background, not the network
     ctx.save(); ctx.globalAlpha = bm.opacity; ctx.imageSmoothingQuality = 'high';
     const d = this.dpr || 1;

@@ -1,6 +1,6 @@
 // Avaris2 CS - Electron main process
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -66,7 +66,29 @@ function createWindow() {
   if (fileArg) win.webContents.once('did-finish-load', () => win.webContents.send('app:open-file', path.resolve(fileArg)));
 }
 
-app.whenReady().then(createWindow);
+// basemap tiles: avtile://t/<source>/<z>/<x>/<y>.png?u=<tile url>, served from <userData>/tiles when cached (refreshed after
+// 30 days when online), otherwise downloaded once and saved; a cached tile is used when the download fails (offline)
+try { protocol.registerSchemesAsPrivileged([{ scheme: 'avtile', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]); } catch (e) { }
+function tileHandler() {
+  protocol.handle('avtile', async (req) => {
+    const u = new URL(req.url); const parts = u.pathname.split('/').filter(Boolean); const web = u.searchParams.get('u') || '';
+    const ok = parts.length === 4 && parts.every(p => /^[\w.-]+$/.test(p)) && /^https:\/\//.test(web);
+    if (!ok) return new Response('bad tile', { status: 400 });
+    const file = path.join(app.getPath('userData'), 'tiles', ...parts);
+    let st = null; try { st = fs.statSync(file); } catch (e) { }
+    const fresh = st && (Date.now() - st.mtimeMs < 30 * 86400e3);
+    const send = (buf) => new Response(buf, { headers: { 'content-type': 'image/png', 'access-control-allow-origin': '*' } });
+    if (fresh) return send(fs.readFileSync(file));
+    try {
+      const r = await net.fetch(web, { headers: { 'User-Agent': 'Avaris2CS/' + app.getVersion() + ' (osemtec.com)' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const buf = Buffer.from(await r.arrayBuffer());
+      try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, buf); } catch (e) { }
+      return send(buf);
+    } catch (e) { if (st) return send(fs.readFileSync(file)); return new Response('offline', { status: 504 }); }
+  });
+}
+app.whenReady().then(() => { try { tileHandler(); } catch (e) { } createWindow(); });
 app.on('window-all-closed', () => {
   for (const p of engineProcs.values()) try { p.kill(); } catch (e) {}
   app.quit();

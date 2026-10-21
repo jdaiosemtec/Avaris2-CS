@@ -2,6 +2,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('host', {
+  tileCache: true,
   openDialog: (opts) => ipcRenderer.invoke('dlg:open', opts),
   saveDialog: (opts) => ipcRenderer.invoke('dlg:save', opts),
   message: (opts) => ipcRenderer.invoke('dlg:message', opts),
