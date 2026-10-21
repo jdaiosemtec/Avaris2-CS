@@ -28,6 +28,7 @@
       this.buildLayout();
       this.theme = new AV.Theme(this);
       this.map = new AV.MapView(AV.$('#mapWrap'), this);
+      this.corner = new AV.MapCorner(this, AV.$('#mapWrap'));
       this.panels = new AV.Panels(this);
       this.sim = new AV.Sim(this);
       this.tools = new AV.Tools(this);

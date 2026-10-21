@@ -232,6 +232,7 @@
       } else this.blitBase();
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       if (this.model) this.drawOverlay();
+      if (this.app.corner) this.app.corner.update();
     }
     blitBase() { const ctx = this.ctx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.base, 0, 0); }
     blitTransformed() {

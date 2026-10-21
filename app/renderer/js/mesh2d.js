@@ -262,9 +262,9 @@
     const vb = map.visibleBox(); const sc = map.scale; const cells = mesh.cells; const big = cells.length > 60000;
     const groups = new Map(); const outline = new Path2D(); let nOut = 0;
     for (let k = 0; k < cells.length; k++) { const c = cells[k], hs = c.s / 2; if (c.x + hs < vb.x1 || c.x - hs > vb.x2 || c.y + hs < vb.y1 || c.y - hs > vb.y2) continue;
-      const [x, y] = map.toScreen(c.x - hs, c.y + hs); const w = c.s * sc; const col = AV.meshColor(app, k, S);
+      const [x, y] = map.toScreen(c.x - hs, c.y + hs); const w = c.s * sc; const col = app.themeHidden ? null : AV.meshColor(app, k, S);
       if (col) { let p = groups.get(col); if (!p) groups.set(col, p = new Path2D()); p.rect(x, y, w, w); }
-      if (S.outline && w > 4 && !big) { outline.rect(x, y, w, w); nOut++; } }
+      if ((S.outline || app.themeHidden) && w > 4 && !big) { outline.rect(x, y, w, w); nOut++; } }
     ctx.save(); ctx.globalAlpha = S.opacity; for (const [col, p] of groups) { ctx.fillStyle = col; ctx.fill(p); } ctx.globalAlpha = 1;
     if (nOut) { ctx.strokeStyle = 'rgba(80,96,110,.35)'; ctx.lineWidth = 0.6; ctx.stroke(outline); }
     ctx.restore();
@@ -280,6 +280,7 @@
   };
   // legend for result fields (bottom-left of the map)
   AV.drawMeshLegend = function (map, ctx) {
+    if (map.app.themeHidden) return;
     const app = map.app; if (!app.mesh2d || !app.mesh2d.cells.length) return; const S = AV.meshStyle(app); if (!S.visible) return;
     if (S.field !== 'elev' && !app.meshResults) return;
     const u = S.field === 'tpond' || S.field === 'trecede' ? 'hr' : (AV.meshSI(app) ? 'm' : 'ft');

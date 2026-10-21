@@ -24,8 +24,8 @@
     async load() { this.stats = await window.host.outStatsAll(this.handle); await this.setPeriod(this.period); }
     async setPeriod(p) {
       this.period = Math.max(0, Math.min(this.meta.nPeriods - 1, p));
-      const [s, n, l] = await Promise.all(['subcatch', 'node', 'link'].map(t => window.host.outSnapshotAll(this.handle, this.period, t)));
-      this.snap = { subcatch: s, node: n, link: l };
+      const [s, n, l, sy] = await Promise.all(['subcatch', 'node', 'link', 'system'].map(t => window.host.outSnapshotAll(this.handle, this.period, t)));
+      this.snap = { subcatch: s, node: n, link: l, system: sy };
     }
     // results index of an object; an object whose type changed since the run (e.g. a conduit converted to a pump)
     // has no results until the model is run again, so it is drawn with its own symbology instead of stale values
@@ -554,31 +554,7 @@
       const rp = path || (this.results && this.results.rpt) || (this.lastRun && this.lastRun.rpt) || (this.app.filePath ? this.app.filePath.replace(/\.inp$/i, '.rpt') : null);
       if (!rp || !await window.host.exists(rp)) { AV.alert('No report file found. Run the simulation first.'); return; }
       const text = (await window.host.readText(rp)).replace(/^\s*OSEMCM HYDRAULIC ENGINE[^\n]*\n[^\n]*EPA SWMM[^\n]*\n\s*-{10,}\s*\n/, '');
-      const toc = h('div', { class: 'toc' }); const pre = h('pre');
-      const lines = text.split('\n');
-      const heads = [];
-      for (let i = 1; i < lines.length - 1; i++) if (/^\s*\*{5,}\s*$/.test(lines[i - 1]) && lines[i].trim() && !/^\s*\*/.test(lines[i]) && /^\s*\*{5,}/.test(lines[i + 1])) heads.push([i, lines[i].trim()]);
-      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-      let html = '';
-      const headSet = new Map(heads.map(([i, t], k) => [i, k]));
-      lines.forEach((l, i) => {
-        let e = esc(l);
-        if (/WARNING \d+/.test(l)) e = '<span class="warn">' + e + '</span>'; else if (/ERROR \d+/.test(l)) e = '<span class="err">' + e + '</span>';
-        if (headSet.has(i)) e = '<span id="rh' + headSet.get(i) + '" style="font-weight:700;color:#0d47a1">' + e + '</span>';
-        html += e + '\n';
-      });
-      pre.innerHTML = html;
-      heads.forEach(([i, t], k) => toc.appendChild(h('div', { class: /Nonconverg|Error|Warning|Continuity|Flooding|Surcharge/i.test(t) ? 'hl' : '', title: t, onclick: () => { const el = AV.$('#rh' + k, pre); if (el) pre.scrollTop = el.offsetTop - 8; } }, t)));
-      const find = h('input', { type: 'text', placeholder: 'Find in report (Enter)', style: { width: '240px' } });
-      let lastIdx = 0;
-      find.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' || !find.value) return;
-        const q = find.value.toLowerCase(); let i = text.toLowerCase().indexOf(q, lastIdx + 1); if (i < 0) i = text.toLowerCase().indexOf(q); if (i < 0) { AV.toast('Not found'); return; }
-        lastIdx = i; const line = text.slice(0, i).split('\n').length - 1; pre.scrollTop = line * 17.4 - 40;
-      });
-      const view = h('div', null, h('div', { class: 'grid-tools' }, find, h('span', { style: { color: 'var(--muted)' } }, rp), h('span', { style: { flex: 1 } }), h('button', { class: 'btn small', onclick: () => window.host.showItem(rp) }, 'Show in Folder')), h('div', { class: 'report' }, toc, pre));
-      this.app.closeView('report');
-      this.app.addView('report', 'Status Report', view);
+      return AV.openReport(this.app, rp, text);
     }
 
     // =============================================================== nonconvergence diagnostics

@@ -3,6 +3,8 @@
 //   numbers, 'strings', ( ), + - * / % ^, = == != <> > >= < <=, like ('J_5%'), and or not (&& || !)
 //   functions: abs sqrt min max round floor ceil log log10 exp pow len upper lower contains startswith endswith
 //              isnull iif(cond, a, b) num str
+//   time functions (results, minutes; see AV.Temporal): dur(c) run(c) win(c, minutes)  -> up to the current time step
+//              totdur(c) maxrun(c) maxwin(c, minutes) first(c) peak(x)            -> whole simulation
 'use strict';
 (function (AV) {
   const h = AV.h;
@@ -98,7 +100,12 @@
       add('fullFlow', 'Full-pipe flow, Manning (computed)', o => AV.fullFlow(m, o), 'Computed');
     }
     if (kind === 'sub') add('polyArea', 'Polygon area (computed)', o => app.tools.areaFromPoly(o.poly), 'Computed');
+    if (kind === 'node') {
+      add('crownElev', 'Crown of the highest connected conduit (computed)', o => AV.nodeCrown(m, o), 'Computed');
+      add('maxVolume', 'Storage volume at full depth (computed)', o => o.type === 'STORAGE' ? AV.storageVolume(m, o) : null, 'Computed');
+    }
     // results
+    add('sysRain', 'System rainfall at current time step (result)', () => R && R.snap && R.snap.system ? R.snap.system[1] : null, 'Results');
     const RV = AV.RESULT_VARS || {};
     const rk = kind === 'sub' ? 'subcatch' : kind;
     const short = { 'Head (HGL)': 'Hgl', 'Lateral Inflow': 'LatInflow', 'Total Inflow': 'TotInflow', 'Velocity': 'Vel' };
@@ -146,15 +153,21 @@
       for (const f of nf) out.push({ n: 'out_' + f.n, l: 'Outlet Node: ' + f.l.replace(/ \((result|computed|junction)\)$/, ''), g: 'Outlet Node', vt: 'out', al: f.al.map(a => 'out_' + a), get: (o) => { const nd = m.nodes.get(o.p.outlet); return nd ? f.get(nd) : null; } });
     }
     for (const f of out) if (f.d === undefined) f.d = AV.fieldDesc(app, f);
-    ck[key] = out; return out;
+    out.kind = kind; ck[key] = out; return out;
   };
-  // Manning full-pipe capacity for circular / rectangular closed conduits (null for other shapes)
+  // Manning full-section capacity (circular, force main, rectangular, trapezoidal, triangular, ellipse, modified basket handle; null for other shapes)
   AV.fullFlow = function (m, l) {
     if (l.type !== 'CONDUIT') return null; const p = l.p; const D = parseFloat(p.g1), B = parseFloat(p.g2), n = parseFloat(p.rough), L = parseFloat(p.length);
     const s = AV.conduitSlope(m, l); if (!(D > 0) || !(n > 0) || s === null) return null; const S = Math.max(Math.abs(s), 1e-5);
     let A, P; const sh = String(p.shape || '').toUpperCase();
     if (sh === 'CIRCULAR' || sh === 'FORCE_MAIN') { A = Math.PI * D * D / 4; P = Math.PI * D; }
-    else if (sh === 'RECT_CLOSED' && B > 0) { A = D * B; P = 2 * (D + B); } else return null;
+    else if (sh === 'RECT_CLOSED' && B > 0) { A = D * B; P = 2 * (D + B); }
+    else if (sh === 'RECT_OPEN' && B > 0) { A = D * B; P = B + 2 * D; }
+    else if (sh === 'TRAPEZOIDAL' && B >= 0) { const z1 = parseFloat(p.g3) || 0, z2 = parseFloat(p.g4) || 0; A = D * (B + D * (z1 + z2) / 2); P = B + D * (Math.sqrt(1 + z1 * z1) + Math.sqrt(1 + z2 * z2)); }
+    else if (sh === 'TRIANGULAR' && B > 0) { A = D * B / 2; P = 2 * Math.sqrt(D * D + B * B / 4); }
+    else if ((sh === 'HORIZ_ELLIPSE' || sh === 'VERT_ELLIPSE') && B > 0) { A = Math.PI * D * B / 4; const a2 = D / 2, b2 = B / 2; P = Math.PI * (3 * (a2 + b2) - Math.sqrt((3 * a2 + b2) * (a2 + 3 * b2))); }
+    else if (sh === 'MODBASKETHANDLE' && B > 0) { A = B * (D - B / 2) + Math.PI * B * B / 8; P = B + 2 * (D - B / 2) + Math.PI * B / 2; }
+    else return null;
     const k = m.isSI ? 1.0 : 1.486; const q = k / n * A * Math.pow(A / P, 2 / 3) * Math.sqrt(S);
     const fu = String(m.flowUnits || 'CFS').toUpperCase(); const conv = { CFS: 1, GPM: 448.831, MGD: 0.646317, CMS: 1, LPS: 1000, MLD: 86.4 }[fu] || 1;
     return q * conv;
@@ -169,6 +182,9 @@
     iif: (c, a, b) => (c ? a : b), num: (a) => { const x = parseFloat(a); return isFinite(x) ? x : null; }, str: (a) => a === null ? '' : String(a),
   };
   const LAZY = new Set(['iif']);
+  // time functions (minutes): evaluated over all reported time steps of the loaded results (see AV.Temporal)
+  const TEMPORAL = new Set(['dur', 'run', 'win', 'totdur', 'maxrun', 'maxwin', 'first', 'peak']);
+  AV.TEMPORAL_FUNCS = TEMPORAL;
   function tokenize(src) {
     const t = []; let i = 0;
     while (i < src.length) {
@@ -197,7 +213,7 @@
 
   // compile(src, fields) -> { fn(o), used: [field names] }
   AV.compileExpr = function (src, fields) {
-    const toks = tokenize(String(src || '')); let i = 0; const used = new Set();
+    const toks = tokenize(String(src || '')); let i = 0; const used = new Set(); const temporals = [];
     const F = new Map(); const norm = (x) => String(x).toLowerCase().replace(/\s+/g, ' ').replace(/\.$/, '').trim();
     for (const f of fields) { for (const a of f.al || []) F.set(a.toLowerCase(), f); }
     for (const f of fields) { F.set('[l]' + norm(f.l), f); F.set('[l]' + norm(f.l.replace(/ \((result|computed)\)$/, '')), f); }
@@ -236,6 +252,18 @@
       if (tk.k === 'id') {
         const w = tk.v.toLowerCase();
         if (!tk.br && w === 'true') return () => true; if (w === 'false') return () => false; if (w === 'null') return () => null;
+        if (!tk.br && isOp('(') && TEMPORAL.has(w)) {
+          next(); const before = temporals.length; const a0 = peek(); const args = [];
+          if (!isOp(')')) { args.push(parseOr()); while (isOp(',')) { next(); args.push(parseOr()); } }
+          const close = peek(); if (!isOp(')')) err('Missing ) after function arguments', peek()); next();
+          if (!args.length) err(w + '() needs a condition', tk);
+          if (w === 'win' && args.length < 2) err('win(condition, minutes) needs the window length in minutes', tk);
+          const children = temporals.slice(before);
+          const node = { fn: w, cond: args[0], W: args[1] ? toNum(args[1](null)) : null, kind: fields.kind || 'node', depth: 1 + children.reduce((d, c) => Math.max(d, c.depth), -1), children,
+            key: w + '(' + String(src).slice(a0 ? a0.p : 0, close ? close.p : String(src).length).trim() + ')' };
+          temporals.push(node);
+          return (o) => AV.Temporal.value(node, o);
+        }
         if (!tk.br && isOp('(')) {
           const fn = FUNCS[w]; if (!fn) err('Unknown function "' + tk.v + '"', tk);
           next(); const args = [];
@@ -252,7 +280,7 @@
     };
     if (!toks.length) throw new Error('The clause is empty.');
     const fn = parseOr(); if (i < toks.length) err('Unexpected "' + toks[i].v + '"', toks[i]);
-    return { fn: (o) => { try { return fn(o); } catch (e) { return null; } }, used: [...used] };
+    return { fn: (o) => { try { return fn(o); } catch (e) { return null; } }, used: [...used], temporals };
   };
 
   const KIND_OBJS = (app, kind) => { const m = app.model; return [...(kind === 'node' ? m.nodes.values() : kind === 'link' ? m.links.values() : m.subcatchments.values())]; };
@@ -290,7 +318,7 @@
     const sampleOf = (f) => { const o = KIND_OBJS(app, kind).slice(0, 1)[0]; if (!o) return ''; const v = f.get(o); return v === null || v === undefined || v === '' ? '' : '   e.g. ' + o.id + ' = ' + (typeof v === 'number' ? AV.fmt(v) : String(v).slice(0, 40)); };
     filter.addEventListener('input', fill); vtSel.addEventListener('change', fill); kindSel.addEventListener('change', () => { kind = kindSel.value; fillVt(); fill(); msg.textContent = ''; });
     const opBtns = ['=', '>', '>=', '<', '<=', '!=', 'and', 'or', 'not', 'like', '+', '-', '*', '/', '(', ')'].map(o => h('button', { class: 'btn small ceop', onclick: () => insert(o) }, o));
-    const fnSel = h('select', { class: 'cefn', onchange: () => { if (fnSel.value) { insert(fnSel.value); fnSel.value = ''; } } }, [h('option', { value: '' }, 'Functions…')].concat(['abs()', 'sqrt()', 'min( , )', 'max( , )', 'round( , 2)', 'log10()', 'len()', 'upper()', 'contains( , \'text\')', 'startswith( , \'text\')', 'isnull()', 'iif( , , )'].map(f => h('option', { value: f }, f))));
+    const fnSel = h('select', { class: 'cefn', onchange: () => { if (fnSel.value) { insert(fnSel.value); fnSel.value = ''; } } }, [h('option', { value: '' }, 'Functions…')].concat(['abs()', 'sqrt()', 'min( , )', 'max( , )', 'round( , 2)', 'log10()', 'len()', 'upper()', 'contains( , \'text\')', 'startswith( , \'text\')', 'isnull()', 'iif( , , )', 'dur()', 'run()', 'win( , 60)', 'totdur()', 'maxrun()', 'maxwin( , 60)', 'first()', 'peak()'].map(f => h('option', { value: f }, f))));
     const verify = () => {
       msg.className = 'cemsg';
       try {

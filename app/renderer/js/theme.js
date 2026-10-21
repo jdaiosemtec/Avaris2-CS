@@ -36,13 +36,13 @@
     }
     // custom clauses (Clause Editor): compiled once per layer / text; results fields re-read live values
     compiled(layer, src) {
-      const k = layer + '|' + src; this._cc = this._cc || new Map();
+      const k = layer + '|' + (this.app.results ? this.app.results.handle : '') + '|' + src; this._cc = this._cc || new Map();
       if (this._ccModel !== this.app.model) { this._cc.clear(); this._ccModel = this.app.model; }
       if (!this._cc.has(k)) { try { this._cc.set(k, AV.compileExpr(src, AV.exprFields(this.app, layer))); } catch (e) { this._cc.set(k, null); } }
       return this._cc.get(k);
     }
     // dynamic-result themes (r: fields) are shown in play mode only, all other themes outside play mode only
-    isDynamic(t) { const f = t.field || ''; if (f.startsWith('r:')) return true; if (f.startsWith('x:')) return /\brpt(Depth|Hgl|Volume|LatInflow|TotInflow|Flooding|Flow|Vel|Velocity|Capacity|Surcharge|Rainfall|SnowDepth|Evaporation|Infiltration|Runoff|GWFlow|GWElevation|SoilMoisture)\b/.test(f); return false; }
+    isDynamic(t) { const f = t.field || ''; if (f.startsWith('r:')) return true; if (f.startsWith('x:')) return AV.exprIsDynamic(f.slice(2)); return false; }
     active(t) { return !!t.enabled && (!!this.app.playMode === this.isDynamic(t)); }
     passWhere(layer, t, o) { if (!t.where) return true; const c = this.compiled(layer, t.where); return c ? !!c.fn(o) : true; }
     fieldName(layer, f) { if (f && f.startsWith('x:')) { const ef = AV.exprFields(this.app, layer).find(x => x.n === f.slice(2)); return ef ? ef.l : 'ƒ ' + f.slice(2); } const a = (AV.THEME_ATTRS[layer] || []).find(x => x[0] === f); return a ? a[1] : f; }
@@ -88,6 +88,7 @@
     }
     style(layer, o) {
       const out = { color: null, size: null, hide: false };
+      if (this.app.themeHidden) return out;
       for (const t of this.layers[layer].subs) {
         if (!this.active(t) || !t.ranges.length) continue;
         if (t.where && !this.passWhere(layer, t, o)) continue;
@@ -177,11 +178,12 @@
     }
     updateLegend() {
       const el = AV.$('#legend'); if (!el) return; el.innerHTML = ''; let any = false;
+      if (this.app.themeHidden) { el.style.display = 'none'; return; }
       for (const layer of ['node', 'link', 'sub']) for (const t of this.layers[layer].subs) {
         if (!this.active(t) || !t.legend || !t.ranges.length) continue; any = true;
         el.appendChild(h('div', { class: 'lt' }, LAYER_NAME[layer] + ': ' + t.name));
         t.ranges.slice(0, 14).forEach((r, i) => {
-          const txt = t.kind === 'individual' ? String(r.v) : (i === 0 ? '≤ ' + AV.fmt(+r.v) : AV.fmt(+t.ranges[i - 1].v) + ' – ' + AV.fmt(+r.v));
+          const txt = r.label ? r.label : t.kind === 'individual' ? String(r.v) : (i === 0 ? '≤ ' + AV.fmt(+r.v) : AV.fmt(+t.ranges[i - 1].v) + ' – ' + AV.fmt(+r.v));
           const sw = layer === 'node' && t.useSize ? h('span', { class: 'lc', style: { width: '14px', height: Math.max(4, r.size * 1.4) + 'px', borderRadius: '50%', background: t.useColor ? r.color : '#1e88e5' } })
             : h('span', { class: 'lc', style: { background: t.useColor ? r.color : '#546e7a', height: t.useSize ? Math.max(2, r.size) + 'px' : '8px' } });
           el.appendChild(h('div', { class: 'lr', style: { opacity: r.show === false ? .4 : 1 } }, sw, txt));
@@ -191,7 +193,25 @@
     }
     // ---------- persistence
     toJSON() { return JSON.stringify({ osemcmTheme: 1, layers: this.layers }, null, 1); }
-    fromJSON(txt) { const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 theme file'); for (const k of ['node', 'link', 'sub']) if (j.layers[k]) this.layers[k] = j.layers[k]; this.invalidate(); this.app.map.redraw(); }
+    // mode 'add': the file's themes go on top of the current list (same name = replaced), labels kept; otherwise replace all
+    fromJSON(txt, mode) {
+      const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 theme file'); let n = 0;
+      for (const k of ['node', 'link', 'sub']) { const L = j.layers[k]; if (!L) continue;
+        if (mode === 'add') { const subs = (L.subs || []).map(s => Object.assign({}, s)); n += subs.length; const names = new Set(subs.map(s => s.name)); this.layers[k].subs = subs.concat(this.layers[k].subs.filter(s => !names.has(s.name))); }
+        else { this.layers[k] = L; n += (L.subs || []).length; } }
+      this.invalidate(); this.app.map.redraw(); return n;
+    }
+    async loadFile(after, path) {
+      const p = path || await window.host.openDialog({ filters: [{ name: 'Avaris2 theme', extensions: ['json'] }] }); if (!p) return;
+      let txt; try { txt = await window.host.readText(p); const j = JSON.parse(txt); if (!j.layers) throw new Error('Not an Avaris2 theme file'); } catch (e) { AV.alert(e.message); return; }
+      const has = ['node', 'link', 'sub'].some(k => this.layers[k].subs.length);
+      const mode = !has ? 'replace' : await AV.modal({ title: 'Load Themes', width: 460, body: h('div', { style: { lineHeight: 1.55 } }, h('div', null, 'Load ' + AV.basename(p) + '.'),
+        h('div', null, h('b', null, 'Add'), ': put the loaded themes on top of your current themes (a theme with the same name is updated).'), h('div', null, h('b', null, 'Replace'), ': remove your current themes first.')),
+        buttons: [{ label: 'Cancel', value: null }, { label: 'Replace', value: 'replace' }, { label: 'Add', primary: true, value: 'add' }] }).done;
+      if (!mode) return;
+      try { const n = this.fromJSON(txt, mode); AV.toast(n + ' theme' + (n === 1 ? '' : 's') + ' loaded' + (mode === 'add' ? ' (added on top)' : '') + '.'); } catch (e) { AV.alert(e.message); }
+      if (after) after();
+    }
 
     // ================================================================ Layer Theme Editor dialog
     async dialog(focusLayer) {
@@ -297,7 +317,7 @@
       render();
       const r = await AV.modal({
         title: 'Layer Theme Editor', body, width: 940, enterSubmits: false, buttons: [
-          { label: 'Load...', onClick: async () => { const p = await window.host.openDialog({ filters: [{ name: 'Avaris2 theme', extensions: ['json'] }] }); if (p) { try { this.fromJSON(await window.host.readText(p)); render(); } catch (e) { AV.alert(e.message); } } return false; } },
+          { label: 'Load...', onClick: async () => { await this.loadFile(() => render()); return false; } },
           { label: 'Save...', onClick: async () => { await AV.downloadText(this.toJSON(), 'theme.json', [{ name: 'Avaris2 theme', extensions: ['json'] }]); return false; } },
           { label: 'Cancel', value: 'cancel' }, { label: 'Apply', onClick: () => { render(); return false; } }, { label: 'OK', primary: true, value: 'ok' }]
       }).done;
