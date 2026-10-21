@@ -134,6 +134,8 @@
     F.open = true; app.theme.invalidate(); app.map.redraw(); app.refreshRibbon && app.refreshRibbon();
     const root = P.el ? AV.$('.flp', P.el) : AV.$('.flp');
     const render = F.render = () => {
+      // keep the list scrolled where it was (re-rendered after every change)
+      const old = AV.$('.fllist', root); const st = old ? old.scrollTop : 0;
       root.innerHTML = '';
       const sys = F.sys();
       root.appendChild(h('div', { class: 'fltb' },
@@ -165,6 +167,7 @@
             f.custom ? h('div', { class: 'flact' }, h('a', { onclick: () => conditions(app, f, false) }, 'Edit…'), h('a', { onclick: async () => { if (!await AV.confirm('Delete the flag "' + f.name + '"?', 'Flags', 'Delete')) return; F.S.custom = F.S.custom.filter(x => x !== f); if (F.S.active[layer] === f.id) F.S.active[layer] = null; F.changed(); } }, 'Delete')) : null));
         }
       }
+      list.scrollTop = st; requestAnimationFrame(() => { list.scrollTop = st; });
       root.appendChild(h('div', { class: 'flfoot' }, h('span', null, '▶ level at the current time step (play mode)'), h('span', null, 'Σ worst level over the run'), h('span', null, 'While a flag is shown, the other themes are hidden.')));
     };
     render();

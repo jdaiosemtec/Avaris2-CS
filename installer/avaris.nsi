@@ -6,7 +6,7 @@ ManifestDPIAware true
 
 !define APPNAME "Avaris2"
 !define COMPANY "OSEMTEC"
-!define VERSION "2.0.16"
+!define VERSION "2.0.17"
 !define EXENAME "Avaris2.exe"
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Avaris2"
 
@@ -17,7 +17,7 @@ InstallDirRegKey HKLM "Software\${COMPANY}\${APPNAME}" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "${COMPANY} - ${APPNAME} ${VERSION}"
 
-VIProductVersion "2.0.16.0"
+VIProductVersion "2.0.17.0"
 VIAddVersionKey "ProductName" "${APPNAME}"
 VIAddVersionKey "CompanyName" "${COMPANY}"
 VIAddVersionKey "FileDescription" "${APPNAME} Setup"
