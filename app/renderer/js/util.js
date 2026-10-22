@@ -41,7 +41,7 @@ window.AV = window.AV || {};
     layers: 'M12 3l9 5-9 5-9-5z M3 13l9 5 9-5', find: 'M10 4a6 6 0 110 12 6 6 0 010-12z M15 15l6 6', validate: 'M5 12l5 5 9-10',
     stop: 'M6 6h12v12H6z', rain: 'M8 13a4 4 0 01.5-8 5 5 0 019.5 2 3 3 0 01-1 6z M8 17l-1 3 M12 17l-1 3 M16 17l-1 3',
     user: 'M12 4a4 4 0 110 8 4 4 0 010-8z M4 21c0-4 4-6 8-6s8 2 8 6', history: 'M4 12a8 8 0 108-8 8 8 0 00-6 2.7 M4 4v4h4 M12 8v4l3 2',
-    convert: 'M4 8h13l-3-3 M20 16H7l3 3', measure: 'M3 17L17 3l4 4L7 21z M7 13l2 2 M10 10l2 2 M13 7l2 2',
+    convert: 'M4 8h13l-3-3 M20 16H7l3 3', partition: 'M3 4h8v7H3z M13 4h8v7h-8z M3 13h8v7H3z M13 13h8v7h-8z', regen: 'M20 8a8.5 8.5 0 1 0 1 7 M21 3v5h-5', measure: 'M3 17L17 3l4 4L7 21z M7 13l2 2 M10 10l2 2 M13 7l2 2',
   };
   AV.icon = (name) => {
     const ns = 'http://www.w3.org/2000/svg';

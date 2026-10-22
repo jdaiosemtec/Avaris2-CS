@@ -7,6 +7,7 @@
   // ------------------------------------------------------------------ floating windows (modeless, map stays usable)
   const panels = new Map();
   let zTop = 1500, cascade = 0;
+  AV.closeFloatPanel = (id) => { const p = panels.get(id); if (p) p.close(); };
   AV.floatPanel = function (opts) {
     if (opts.id && panels.has(opts.id)) { const p = panels.get(opts.id); p.restore(); p.focus(); return p; }
     const W = opts.w || 560, H = opts.h || 420;

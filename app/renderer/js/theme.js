@@ -93,6 +93,7 @@
     // while the map draws, each object's style is computed once per frame (colour, size and visibility all read it)
     // and a layer without any active theme returns at once
     style(layer, o) {
+      if (this.app.partView && this.app.partView.P) { const ps = AV.partStyle(this.app, layer, o); return ps || EMPTY_STYLE; }
       if (this.app.themeHidden) return EMPTY_STYLE;
       const fr = AV._drawing ? AV.frameId : 0;
       if (fr) {
@@ -194,6 +195,7 @@
     }
     updateLegend() {
       const el = AV.$('#legend'); if (!el) return; el.innerHTML = ''; let any = false;
+      if (this.app.partView && this.app.partView.P) { el.appendChild(AV.partLegend(this.app)); el.style.display = ''; return; }
       if (this.app.themeHidden) { el.style.display = 'none'; return; }
       for (const layer of ['node', 'link', 'sub']) for (const t of this.subsOf(layer)) {
         if (t.flag && !this.active(t)) { any = true; el.appendChild(h('div', { class: 'lt', style: { color: 'var(--muted)', fontWeight: 400 } }, LAYER_NAME[layer] + ': ' + t.name + (this.app.playMode ? ' - Σ shown outside play mode' : ' - ▶ shown while playing'))); continue; }

@@ -333,6 +333,7 @@
 
     // ---------------------------------------------------------------- model / file
     setModel(m, path) {
+      if (this.partView) { AV.closeFloatPanel('partition'); this.partView = null; }
       if (this.flags) { this.flags.reset(); if (this.flags.render) setTimeout(() => this.flags.render && this.flags.render(), 0); }
       this.crs = null; this.crsWKT = null; this.crsName = '';
       this.model = m; this.filePath = path; this.selection.clear(); this.undoStack = []; this.redoStack = [];

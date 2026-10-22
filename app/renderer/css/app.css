@@ -894,3 +894,23 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .notices { max-height: 62vh; overflow: auto; margin: 0; padding: 10px 12px; background: #f6f8fa; border: 1px solid var(--border); border-radius: 4px; font: 12px/1.45 Consolas, 'Cascadia Mono', monospace; white-space: pre-wrap; }
 .lichead { font-weight: 600; color: var(--accent3, #1565c0); margin-top: 4px; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
 .licdlg .form { grid-template-columns: 150px 1fr; }
+
+/* ---------- model partition panel */
+.partp .psec { font-weight: 600; color: var(--accent3); margin: 12px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+.partp .psec:first-child { margin-top: 2px; }
+.partp .pn { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; align-items: center; justify-content: center; }
+.partp .psec2 { font-weight: 600; margin: 10px 0 4px; }
+.partp .hint { color: var(--muted); font-size: 11.5px; }
+.partp details summary { cursor: pointer; color: var(--accent); margin-top: 6px; }
+.pchips { display: flex; gap: 6px; flex-wrap: wrap; }
+.pchip { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; min-width: 74px; }
+.pchip b { display: block; font-size: 15px; } .pchip span { color: var(--muted); font-size: 11px; }
+.ptwrap { max-height: 250px; overflow: auto; border: 1px solid var(--border); margin-top: 8px; }
+.ptbl { border-collapse: collapse; width: 100%; } .ptbl th, .ptbl td { padding: 3px 6px; border-bottom: 1px solid #edf0f3; text-align: left; white-space: nowrap; }
+.ptbl th { background: #f7f9fb; position: sticky; top: 0; font-weight: 600; font-size: 11.5px; } .ptbl td.num { text-align: right; }
+.ptbl td.ellip { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.ptbl tr.p { cursor: pointer; } .ptbl tr.p:hover { background: #f3f8fe; } .ptbl tr.p.sel { background: #e3effc; }
+.ptbl tr.er td { color: var(--danger); } .ptbl tr.wn td { color: var(--warn); }
+.ptbl .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: middle; }
+.pbar { display: inline-block; width: 64px; height: 6px; background: #e3e8ee; border-radius: 3px; overflow: hidden; vertical-align: middle; } .pbar i { display: block; height: 100%; }
+.pchecks div { padding: 2px 0; } .pchecks .ok { color: var(--ok); } .pchecks .wn { color: var(--warn); } .pchecks .er { color: var(--danger); }

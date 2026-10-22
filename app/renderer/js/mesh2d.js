@@ -258,7 +258,7 @@
     return c;
   };
   AV.drawMesh = function (map, ctx) {
-    const app = map.app, mesh = app.mesh2d; if (!mesh || !mesh.cells.length) return; const S = AV.meshStyle(app); if (!S.visible) return;
+    const app = map.app, mesh = app.mesh2d; if (!mesh || !mesh.cells.length || (app.partView && app.partView.P)) return; const S = AV.meshStyle(app); if (!S.visible) return;
     const vb = map.visibleBox(); const sc = map.scale; const cells = mesh.cells; const big = cells.length > 60000;
     const groups = new Map(); const outline = new Path2D(); let nOut = 0;
     for (let k = 0; k < cells.length; k++) { const c = cells[k], hs = c.s / 2; if (c.x + hs < vb.x1 || c.x - hs > vb.x2 || c.y + hs < vb.y1 || c.y - hs > vb.y2) continue;
@@ -281,7 +281,7 @@
   // legend for result fields (bottom-left of the map)
   AV.drawMeshLegend = function (map, ctx) {
     if (map.app.themeHidden) return;
-    const app = map.app; if (!app.mesh2d || !app.mesh2d.cells.length) return; const S = AV.meshStyle(app); if (!S.visible) return;
+    const app = map.app; if (!app.mesh2d || !app.mesh2d.cells.length || (app.partView && app.partView.P)) return; const S = AV.meshStyle(app); if (!S.visible) return;
     if (S.field !== 'elev' && !app.meshResults) return;
     const u = S.field === 'tpond' || S.field === 'trecede' ? 'hr' : (AV.meshSI(app) ? 'm' : 'ft');
     let rows; if (S.breaks) rows = S.breaks.map((b, i) => [S.colors[i], i < S.breaks.length - 1 ? AV.fmt(b) + ' – ' + AV.fmt(S.breaks[i + 1]) : '> ' + AV.fmt(b)]);

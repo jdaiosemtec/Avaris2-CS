@@ -139,6 +139,8 @@ Avaris2CS.exe (Electron)
 | `export.js` | 186 | Export Wizard：网络对象连同属性和结果导出为 Shapefile / GDB / CSV。 |
 | `mesh2d.js` | 346 | **2D 地表淹没模块**：在边界多边形内生成方格网（按 DEM 取高程），2D 网格写入 .inp（`AV.mesh2DToINP`），导入 Avaris DS 的 `.ini [2D]` 设置，2D 结果（水深、最大水深、积水时长、退水时间）计算、绘制和图例。 |
 | `history.js` | 485 | 用户登录和角色（Administrator 管理员、Modeler 建模员、Viewer 只读），**修改记录**（谁在什么时候改了哪个对象的哪个变量，旧值和新值），保存在 `<模型>.osemhist.json`。 |
+| `partition.js` | **模型分区（算法与文件）**：`AV.partAnalyse`（基准结果：每根管有流量时长、反向流时长、峰值流量；1D 溢流点或 2D 积水区）、`AV.partGlue`（不能切的管：反向流、泵/孔口/堰/出口、分流井、积水区）、`AV.partCompute`（块→汇水树→自下而上切分→小区合并→搜索目标大小，精确得到指定分区数）、`AV.partRecut`、`AV.partChecks`、`AV.partBuild`（子模型 .inp：切口上游端点在上游分区变成 outfall（TIMESERIES 水位或 FIXED），下游分区的节点加 INFLOWS 入流；控制规则按对象过滤）、`AV.partBoundary`（基准结果的切口流量和水位序列）、`AV.partDefinition`（`<模型>.partition.json`：分配、耦合关系、层级、对象签名、文件哈希）、`AV.partSurface`（DEM：管网烧入 + 优先淹没法（等价于填洼后的 D8），在 2D 边界内，按分区追踪成多边形）、`AV.partWriteSurface`。 |
+| `partpanel.js` | 分区面板（Tools ▸ Partition Model / Regenerate）：设置、结果表、手动移动支线、检查、生成；Regenerate 读取 partition.json，按连通关系分配新节点，列出改动并只重写变化的子模型。地图显示通过 `theme.style` 和 `map.drawOverlay` 的钩子（`app.partView`）。 |
 | `licence.js` | 230 | **许可证**：<br>• 版本分 1D / 1D-2D，期限 30 天、1 年或 N 年，许可证绑定机器码；<br>• 没有有效许可证时（未激活、过期、换了电脑、系统时间被回调）进入只读模式：`AV.licenceGate`，由 `canModify`、`save`、`sim.run` 和方案批量运行调用；<br>• Help ▸ Register 对话框：生成激活申请（发邮件 / 复制 / 保存 .avreq）、导入许可证（粘贴或 .avlic 文件）、释放本机；<br>• 申请只含 osemtec.com 账号、邮箱和机器码；发送方式：Gmail / Outlook.com / Microsoft 365 网页邮箱（`AV.mailUrl`，浏览器里已登录即可一键发送）、本机邮件程序、复制、保存；如果 `main.js` 里填了 `LIC_FORM_KEY`（Web3Forms），还会出现 *Send Request to OSEMTEC*，直接发到 info@osemtec.com。<br>• 软件里不再有签发功能，签发只在 Licence Manager 里做。 |
 | `clip.js` | 95 | 复制粘贴对象（连同它们用到的曲线、时间序列等），可以跨模型、跨窗口。 |
 
@@ -350,3 +352,16 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 
 **第二阶段**
 服务器用同一私钥、同一格式自动签发，替代"邮件 + 人工"这一步。已发出的许可证继续有效。
+
+
+## 10. 模型分区（Tools ▸ Partition Model，2.3.0 起）
+
+用途：把大模型切成若干子模型，供耦合并行引擎计算（阶段 3）。原则来自 OSEMTEC 的分区方法和专利《A coupled parallel simulation technology…》。
+
+- **输入**：分区数；当前加载的结果作为基准（流向、反向流、溢流/2D 积水）。没有结果时按管道定义方向，不检查反向流。
+- **不能切**：反向流管（有流量 ≥ N 分钟且反向 ≥ W%，与 Flag 规则一致）、以反向为主的管、泵/孔口/堰/出口、分流井的出流管、同一个积水区内的检查井（2D：相连的积水网格；1D：溢流 ≥ X 分钟且距离 ≤ D 的节点）。
+- **切口处理**：管道留在上游分区，下游端点在上游子模型里变成 outfall（有基准结果时用 TIMESERIES 水位，否则 FIXED）；下游子模型里该节点加入流（`CPL_Q_<节点>` 时间序列）。耦合引擎运行时会直接设置这两个值。
+- **文件**：`<文件夹>/<模型>_Pnn.inp`（+ .prj）、`<模型>.partition.json`（模型旁边也存一份），可选 `<模型>_Pnn_2d_boundary.shp` 和 `<模型>_partitions.shp`（DEM 分区面）。
+- **Regenerate**：老节点保持原分区，新节点沿下游（否则上游、否则最近）归入分区；列出变化的对象和要重写的文件；检测子模型是否被直接改过（文件哈希）。分区面不重新计算（重新分区时才算）。
+- **验证（Riverside 示例，12 区）**：子模型单独运行（带基准边界）时，排口峰值流量和总水量与大模型相差 < 1%；节点最高水位中位数差 0，95% 分位 0.10 m。切口上游的 outfall 在退水段可能偏高（SWMM 的 outfall 水深取设定水位和临界/正常水深中的较大值），耦合引擎直接设置节点水头即可消除。
+- **性能**：8.9 万节点的模型分 40 区约 1.7 s，写出子模型约 1.3 s。

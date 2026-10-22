@@ -544,6 +544,7 @@
       if (this.app.mesh2d) { const sel = new Set(this.app.meshSelSet || []); if (this.app.meshSel >= 0 && this.app.mesh2d.cells[this.app.meshSel]) sel.add(this.app.mesh2d.cells[this.app.meshSel]);
         if (sel.size) { ctx.save(); ctx.strokeStyle = SC.sub; ctx.lineWidth = 2.5; for (const c of sel) { if (c.x + c.s < vb.x1 || c.x - c.s > vb.x2 || c.y + c.s < vb.y1 || c.y - c.s > vb.y2) continue; const [x, y] = this.toScreen(c.x - c.s / 2, c.y + c.s / 2); ctx.strokeRect(x, y, c.s * S, c.s * S); } ctx.restore(); } }
       if (this.app.mesh2d) AV.drawMeshLegend(this, ctx);
+      if (this.app.partView && this.app.partView.P) AV.partOverlay(this, ctx);
       this.drawTemp();
       this.drawScaleBar();
       if (this.basemapAttr) { ctx.save(); ctx.font = '10px Segoe UI'; const tw = ctx.measureText(this.basemapAttr).width; ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillRect(this.w - tw - 10, this.hgt - 15, tw + 10, 15); ctx.fillStyle = '#455a64'; ctx.textBaseline = 'middle'; ctx.fillText(this.basemapAttr, this.w - tw - 5, this.hgt - 7.5); ctx.restore(); }
