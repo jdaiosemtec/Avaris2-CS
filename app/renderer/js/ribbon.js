@@ -16,6 +16,7 @@
             { id: 'close', label: 'Close', img: 'close', fn: () => this.closeProject() }] },
           { name: 'Scenario', items: [{ id: 'scen', label: 'Scenarios', img: 'scenarios', fn: () => F().scenarios() }] },
           { name: 'Import', items: [{ id: 'import', label: 'Import', img: 'import', fn: () => this.showRightTab('catalog'), tip: 'Open the Catalog: browse and drag GIS data (SHP, GeoJSON, KML, CSV, DXF, GeoTIFF, GDB, .out results ...) onto the map' }] },
+          { name: 'Print', items: [{ id: 'layout', label: 'Print Layout', img: 'print', fn: () => AV.openLayout(this), tip: 'Print layout: map, title block, legend, scale bar and north arrow on a page; print or save as PDF / PNG' }] },
           { name: 'Export', items: [{ id: 'export', label: 'Export', img: 'export', fn: () => this.showRightTab('export'), tip: 'Export Wizard: network objects and results to Shapefile, File Geodatabase or CSV' }] },
           { name: 'User', items: [{ small: [{ id: 'usw', label: 'Switch User', svg: 'user', fn: () => this.auth.loginDialog(false) }, { id: 'umg', label: 'Manage Users', svg: 'user', fn: () => this.auth.manageUsers(), enabled: () => this.auth && this.auth.isAdmin }, { id: 'uhist', label: 'Change History', svg: 'history', fn: () => this.hist.openWindow() }] }] },
           { name: 'Settings', items: [{ id: 'default', label: 'Default', img: 'default', fn: () => this.defaultSettings(), tip: 'Default settings: overlapping-object selection, rainfall plot, selection colours' }] },
@@ -71,6 +72,9 @@
               { id: 'derive', label: 'Derive Elevations', img: 'derive', fn: () => T().deriveElevation() },
               { id: 'ori', label: 'Orifice to Conduit', svg: 'convert', fn: () => T().orificeToConduit() },
               { id: 'measure', label: 'Measure', img: 'ruler', mode: 'measure' }] }] },
+          { name: 'Model Data', items: [
+            { id: 'infer', label: 'Infer & Clean', img: 'infer', fn: () => AV.openInference(this), tip: 'Data inference and cleaning: fill missing inverts, diameters, lengths, depths; find adverse slopes, duplicates, orphans …' },
+            { id: 'dwf', label: 'Dry\u00a0Weather Flow', img: 'dwf', fn: () => AV.openDWF(this), tip: 'Generate the dry weather (foul) flow of the nodes from subcatchments or a point layer, with diurnal patterns' }] },
           { name: 'Partition', items: [{ id: 'part', label: 'Partition Model', img: 'partition', fn: () => AV.openPartition(this, 'part'), active: () => !!this.partView, tip: 'Split the model into sub-models for coupled parallel simulation (one direction of flow per partition, as few cut points as possible); the panel also regenerates the sub-models after the master model changed' }] },
           { name: 'Rainfall', items: [{ id: 'gen', label: 'Design Storm', img: 'hyetograph', fn: () => AV.hyetographDialog(this), tip: 'Design storm / hyetograph generator (Chicago, SCS, triangular, uniform, custom pattern)' }] },
           { name: 'Spatial Reference', items: [{ small: [{ id: 'rr', label: 'Reproject Raster', img: 'reprojraster', fn: () => F().reprojectRaster() }, { id: 'csr', label: 'Convert Coordinates', img: 'convertsr', fn: () => F().convertSR() }] }] },
@@ -89,6 +93,7 @@
             { id: 'play', label: 'Play', img: 'play', fn: () => S().togglePlaybar(), active: () => !!this.playMode, tip: 'Play mode: animate the results over time (click again to leave play mode)' },
             { id: 'profile', label: 'Profile', img: 'profile', fn: () => F().profileTool() },
             { id: 'plot', label: 'Plot', img: 'plot', fn: () => F().graphTool() },
+            { id: 'csostat', label: 'CSO Statistics', img: 'cso', fn: () => AV.openCSO(this), tip: 'Spill events, volumes and durations of the overflow points (outfalls, weirs …) of the loaded results' },
             { id: 'comparison', label: 'Comparison', img: 'summary', fn: () => this.toggleComparison(), active: () => this.views && this.views.has('cmp'), tip: 'Open / close the Scenario Comparison window' },
             { small: [
               { id: 'report', label: 'Report', img: 'report', fn: () => S().showReport() },

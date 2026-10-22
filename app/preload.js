@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('host', {
   noticesText: () => ipcRenderer.invoke('app:noticesText'),
   openDialog: (opts) => ipcRenderer.invoke('dlg:open', opts),
   saveDialog: (opts) => ipcRenderer.invoke('dlg:save', opts),
+  readDataURL: (p) => ipcRenderer.invoke('fs:readDataURL', p),
+  layoutOutput: (job) => ipcRenderer.invoke('layout:output', job),
   message: (opts) => ipcRenderer.invoke('dlg:message', opts),
   readText: (p) => ipcRenderer.invoke('fs:readText', p),
   writeText: (p, t, enc) => ipcRenderer.invoke('fs:writeText', p, t, enc),

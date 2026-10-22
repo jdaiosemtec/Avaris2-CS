@@ -65,6 +65,7 @@
   const y2lat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z); return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); };
   const cache = new Map(); // url -> {img, ok, t}
   const MAXC = 600;
+  AV.basemapPending = () => { let n = 0; for (const e of cache.values()) if (!e.ok && !e.err) n++; return n; };
   function tile(url, onload) {
     let e = cache.get(url);
     if (e) { e.t = performance.now(); return e; }

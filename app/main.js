@@ -100,6 +100,32 @@ ipcMain.handle('dlg:open', async (e, opts) => {
   if (r.canceled) return null;
   return opts.multi ? r.filePaths : r.filePaths[0];
 });
+// image as a data URL (logo of the print layout)
+ipcMain.handle('fs:readDataURL', async (e, p) => { const ext = path.extname(p).slice(1).toLowerCase(); const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif' }[ext] || 'application/octet-stream'; return 'data:' + mime + ';base64,' + fs.readFileSync(p).toString('base64'); });
+// print layout: the page (HTML) is loaded in a hidden window and printed, saved as PDF or captured as PNG
+ipcMain.handle('layout:output', async (e, job) => {
+  const tmp = path.join(os.tmpdir(), 'avaris_layout_' + process.pid + '_' + Date.now() + '.html'); fs.writeFileSync(tmp, job.html, 'utf8');
+  const pxW = Math.round(job.widthMM / 25.4 * 96), pxH = Math.round(job.heightMM / 25.4 * 96); let w = null;
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  try {
+    if (job.kind === 'png') {
+      let zoom = (job.dpi || 150) / 96; const mx = 8000; if (Math.max(pxW, pxH) * zoom > mx) zoom = mx / Math.max(pxW, pxH);
+      const W = Math.round(pxW * zoom), H = Math.round(pxH * zoom);
+      w = new BrowserWindow({ show: false, width: W, height: H, useContentSize: true, webPreferences: { offscreen: true, sandbox: true } });
+      await w.loadFile(tmp); w.webContents.setZoomFactor(zoom); await wait(900);
+      const img = await w.webContents.capturePage({ x: 0, y: 0, width: W, height: H });
+      fs.writeFileSync(job.file, img.toPNG()); return { ok: true, width: W, height: H };
+    }
+    w = new BrowserWindow({ show: false, width: pxW, height: pxH, webPreferences: { sandbox: true } });
+    await w.loadFile(tmp); await wait(400);
+    if (job.kind === 'pdf') {
+      const buf = await w.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, pageSize: { width: job.widthMM / 25.4, height: job.heightMM / 25.4 }, margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      fs.writeFileSync(job.file, buf); return { ok: true };
+    }
+    return await new Promise((resolve) => w.webContents.print({ silent: false, printBackground: true, pageSize: { width: Math.round(job.widthMM * 1000), height: Math.round(job.heightMM * 1000) }, margins: { marginType: 'none' } }, (ok, reason) => resolve(ok || reason === 'cancelled' ? { ok: true } : { error: reason || 'printing failed' })));
+  } catch (err) { return { error: err.message }; }
+  finally { try { if (w) w.destroy(); } catch (err) { } try { fs.unlinkSync(tmp); } catch (err) { } }
+});
 ipcMain.handle('dlg:save', async (e, opts) => {
   const r = await dialog.showSaveDialog(win, { filters: opts.filters || [], title: opts.title, defaultPath: opts.defaultPath });
   return r.canceled ? null : r.filePath;
