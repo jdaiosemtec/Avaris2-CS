@@ -71,8 +71,7 @@
               { id: 'derive', label: 'Derive Elevations', img: 'derive', fn: () => T().deriveElevation() },
               { id: 'ori', label: 'Orifice to Conduit', svg: 'convert', fn: () => T().orificeToConduit() },
               { id: 'measure', label: 'Measure', img: 'ruler', mode: 'measure' }] }] },
-          { name: 'Partition', items: [{ id: 'part', label: 'Partition Model', svg: 'partition', fn: () => AV.openPartition(this, 'part'), active: () => !!this.partView, tip: 'Split the model into sub-models for coupled parallel simulation (one direction of flow per partition, as few cut points as possible)' },
-            { id: 'regen', label: 'Regenerate', svg: 'regen', fn: () => AV.openPartition(this, 'regen'), tip: 'Re-create the sub-models from the current master model with the saved partition definition, with a difference report' }] },
+          { name: 'Partition', items: [{ id: 'part', label: 'Partition Model', img: 'partition', fn: () => AV.openPartition(this, 'part'), active: () => !!this.partView, tip: 'Split the model into sub-models for coupled parallel simulation (one direction of flow per partition, as few cut points as possible); the panel also regenerates the sub-models after the master model changed' }] },
           { name: 'Rainfall', items: [{ id: 'gen', label: 'Design Storm', img: 'hyetograph', fn: () => AV.hyetographDialog(this), tip: 'Design storm / hyetograph generator (Chicago, SCS, triangular, uniform, custom pattern)' }] },
           { name: 'Spatial Reference', items: [{ small: [{ id: 'rr', label: 'Reproject Raster', img: 'reprojraster', fn: () => F().reprojectRaster() }, { id: 'csr', label: 'Convert Coordinates', img: 'convertsr', fn: () => F().convertSR() }] }] },
           { name: 'Utilities', items: [

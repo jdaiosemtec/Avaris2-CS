@@ -91,7 +91,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 #legend .lt { font-weight: 600; margin-bottom: 4px; }
 #legend .lr { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
 #legend .lc { width: 22px; height: 8px; border-radius: 2px; }
-#mapHint { position: absolute; left: 10px; top: 10px; background: rgba(35,48,64,.88); color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 12px; display: none; pointer-events: none; }
+#mapHint { position: absolute; left: 50%; transform: translateX(-50%); top: 10px; max-width: 80%; text-align: center; background: rgba(35,48,64,.88); color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 12px; display: none; pointer-events: none; }
 #tooltip { position: fixed; background: rgba(35,48,64,.94); color: #fff; padding: 4px 8px; border-radius: 3px; font-size: 11.5px; pointer-events: none; z-index: 3000; display: none; white-space: pre; }
 #playbar { display: none; align-items: center; gap: 8px; padding: 5px 10px; border-top: 1px solid var(--border); background: var(--panel2); flex: none; }
 #playbar.show { display: flex; }
@@ -914,3 +914,7 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .ptbl .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: middle; }
 .pbar { display: inline-block; width: 64px; height: 6px; background: #e3e8ee; border-radius: 3px; overflow: hidden; vertical-align: middle; } .pbar i { display: block; height: 100%; }
 .pchecks div { padding: 2px 0; } .pchecks .ok { color: var(--ok); } .pchecks .wn { color: var(--warn); } .pchecks .er { color: var(--danger); }
+.padv { display: grid; grid-template-columns: 160px 1fr; gap: 2px 10px; align-items: center; margin-top: 6px; }
+.padv .al { color: #3c4a59; padding-top: 6px; } .padv .ac { padding-top: 6px; display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; white-space: nowrap; }
+.padv .ac input[type=number] { border: 1px solid var(--border2); border-radius: 3px; padding: 2px 4px; flex: none; }
+.padv .ah { grid-column: 2; color: var(--muted); font-size: 11.5px; line-height: 1.35; }

@@ -99,12 +99,12 @@
     for (const [id, pct] of [...G0.rev].sort((a, b) => b[1] - a[1])) { const l = m.links.get(id); if (ix.has(l.from) && ix.has(l.to) && !un(ix.get(l.from), ix.get(l.to), cap)) splitRev.add(id); }
     const pondOf = G0.pondOf; (S.keepPonds === false ? [] : A.ponds).map((g, k) => [g.filter(id => ix.has(id)), k]).sort((a, b) => a[0].length - b[0].length).forEach(([a, k]) => {
       // members joined nearest first, so that a split ponding area keeps compact pieces
-      if (a.length < 2) return; if (a.length > cap) { splitPond.add(k); return; } // larger than a partition: no use as a constraint
+      if (a.length < 2) return;
       const pts = a.map(id => m.nodes.get(id));
-      if (a.length > 3000) { const o = [...pts.keys()].sort((i, j) => (pts[i].x + pts[i].y) - (pts[j].x + pts[j].y)); for (let t = 1; t < o.length; t++) if (!un(ix.get(a[o[t - 1]]), ix.get(a[o[t]]), cap)) splitPond.add(k); return; }
+      if (a.length > 3000) { const o = [...pts.keys()].sort((i, j) => (pts[i].x + pts[i].y) - (pts[j].x + pts[j].y)); for (let t = 1; t < o.length; t++) un(ix.get(a[o[t - 1]]), ix.get(a[o[t]])); return; }
       const done = [0]; const left = new Set(pts.keys()); left.delete(0);
       while (left.size) { let bi = -1, bj = -1, bd = Infinity; for (const j of left) { const q = pts[j]; for (const i of done.slice(-30)) { const d = (pts[i].x - q.x) ** 2 + (pts[i].y - q.y) ** 2; if (d < bd) { bd = d; bi = i; bj = j; } } }
-        left.delete(bj); done.push(bj); if (!un(ix.get(a[bi]), ix.get(a[bj]), cap)) splitPond.add(k); } });
+        left.delete(bj); done.push(bj); un(ix.get(a[bi]), ix.get(a[bj])); } });
     // blocks
     const blk = new Int32Array(ids.length); const B = []; const bix = new Map();
     for (let i = 0; i < ids.length; i++) { const r = f(i); let b = bix.get(r); if (b === undefined) { b = B.length; bix.set(r, b); B.push({ w: 0, nodes: [], down: -1, dl: null, ups: [] }); } blk[i] = b; B[b].w++; B[b].nodes.push(i); }
@@ -188,7 +188,8 @@
     out.push(bad.length ? { t: 'er', s: bad.length + ' cut(s) on links that must never be cut: ' + bad.slice(0, 5).map(c => c.link.id + ' (' + P.why.get(c.link.id) + ')').join(', ') } : { t: 'ok', s: 'No cut on pumps, orifices, weirs, outlets or flow dividers' });
     out.push(rv.length ? { t: 'wn', s: rv.length + ' cut(s) on pipes with oscillating flow: ' + rv.slice(0, 6).map(c => c.link.id + ' (' + P.why.get(c.link.id).replace('oscillating flow ', '') + ' reverse)').join(', ') + (rv.length > 6 ? ' …' : '') + '. ' + nRev + ' of ' + app.model.links.size + ' links have oscillating flow in the base results and form groups larger than one partition, so some had to be cut (the least oscillating ones).' } : { t: 'ok', s: 'No cut on pipes with oscillating flow' + (nRev ? ' (' + nRev + ' kept whole)' : '') });
     const pondCut = new Set(badP.map(c => P.pondOf.get(c.up)));
-    if (S.keepPonds === false) out.push({ t: 'ok', s: 'Ponding areas are not used as a constraint (option off)' }); else out.push(badP.length ? { t: 'wn', s: badP.length + ' cut(s) through ' + pondCut.size + ' ponding area(s) larger than one partition (' + [...pondCut].slice(0, 3).map(k => A.ponds[k].length + ' manholes').join(', ') + '). The base results show ponding over a large part of the model; check them or raise the ponding depth.' } : { t: 'ok', s: A.ponds.length ? 'No cut through any of the ' + A.ponds.length + ' ponding areas (' + A.pondSource + ')' : 'No ponding areas in the base results' });
+    if (S.keepPonds === false) out.push({ t: 'ok', s: 'Ponding areas are not used as a constraint (option off)' }); else out.push(badP.length ? { t: 'wn', s: badP.length + ' cut(s) through ' + pondCut.size + ' ponding area(s) (added by hand)' } : { t: 'ok', s: A.ponds.length ? 'No cut through any of the ' + A.ponds.length + ' ponding areas (' + A.pondSource + ')' : 'No ponding areas in the base results' });
+    if (S.keepPonds !== false && A.ponds.length) { const big = Math.max(...A.ponds.map(g => g.length)); if (big > app.model.nodes.size / Math.max(2, st.length)) out.push({ t: 'wn', s: 'The largest ponding area holds ' + big + ' manholes (more than one partition): it is kept in one partition, so the partitions cannot be balanced. Check the base results, raise the 2D ponding depth or untick "Keep ponding areas whole".' }); }
     const empty = st.filter(s => !s.outfalls.length && !s.cout); out.push(empty.length ? { t: 'er', s: empty.map(s => PID(s.i)).join(', ') + ': no outfall and no cut point' } : { t: 'ok', s: 'Every partition drains to an outfall or a cut point' });
     const dev = Math.max(...st.map(s => Math.abs(s.nodes - avg) / avg)) * 100;
     out.push(dev > S.tol ? { t: 'wn', s: 'Largest deviation from the average size: ' + dev.toFixed(0) + ' % (tolerance ' + S.tol + ' %) – move branches if needed' } : { t: 'ok', s: 'Partition sizes within ' + dev.toFixed(0) + ' % of the average' });
@@ -295,7 +296,7 @@
   AV.partStyle = function (app, layer, o) {
     const V = app.partView; if (!V || !V.P) return null; const P = V.P;
     if (layer === 'node') { const p = P.owner.get(o.id); if (p === undefined) return null; return { color: V.sel === null || V.sel === p ? COL(p) : '#cfd8dc', size: 3, hide: false }; }
-    if (layer === 'link') { if (P.why.has(o.id) && V.showNo) return { color: '#8e24aa', size: 2.4, hide: false }; const pa = P.owner.get(o.from), pb = P.owner.get(o.to); if (pa === undefined) return null;
+    if (layer === 'link') { const pa = P.owner.get(o.from), pb = P.owner.get(o.to); if (pa === undefined) return null;
       return { color: pa !== pb ? '#37474f' : (V.sel === null || V.sel === pa ? COL(pa) : '#cfd8dc'), size: pa !== pb ? 3 : 1.8, hide: false }; }
     if (layer === 'sub') { const p = P.subOwner && P.subOwner.get(o.id); if (p === undefined) return null; return { color: COLA(p, V.sel === null || V.sel === p ? 0.30 : 0.07), size: null, hide: false }; }
     return null;
@@ -303,6 +304,11 @@
   AV.partOverlay = function (map, ctx) {
     const app = map.app, V = app.partView; if (!V || !V.P) return; const P = V.P, m = app.model; ctx.save();
     if (V.showNo && V.A && V.S.keepPonds !== false) for (const [k, g] of V.A.ponds.entries()) { if (P.splitPond && P.splitPond.has(k)) continue; for (const id of g) { const n = m.nodes.get(id); if (!n) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }
+    if (V.showNo) { ctx.save(); ctx.strokeStyle = 'rgba(142,36,170,.9)'; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]); const vb = map.visibleBox();
+      for (const id of P.why.keys()) { const l = m.links.get(id); if (!l) continue; const a = m.nodes.get(l.from), b = m.nodes.get(l.to); if (!a || !b) continue;
+        if (Math.max(a.x, b.x) < vb.x1 || Math.min(a.x, b.x) > vb.x2 || Math.max(a.y, b.y) < vb.y1 || Math.min(a.y, b.y) > vb.y2) continue;
+        ctx.beginPath(); const p0 = map.toScreen(a.x, a.y); ctx.moveTo(p0[0], p0[1]); for (const v of l.verts) { const q = map.toScreen(v[0], v[1]); ctx.lineTo(q[0], q[1]); } const p1 = map.toScreen(b.x, b.y); ctx.lineTo(p1[0], p1[1]); ctx.stroke(); }
+      ctx.restore(); }
     if (V.showCut) for (const c of P.cuts) { const a = m.nodes.get(c.link.from), b = m.nodes.get(c.link.to); const pts = [map.toScreen(a.x, a.y)].concat(c.link.verts.map(v => map.toScreen(v[0], v[1]))).concat([map.toScreen(b.x, b.y)]); const k = Math.floor(pts.length / 2);
       const X = pts.length % 2 ? pts[k][0] : (pts[k - 1][0] + pts[k][0]) / 2, Y = pts.length % 2 ? pts[k][1] : (pts[k - 1][1] + pts[k][1]) / 2;
       const bad = P.why.has(c.link.id); ctx.beginPath(); ctx.arc(X, Y, 7, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = bad ? '#ff6d00' : '#d32f2f'; ctx.lineWidth = 2; ctx.stroke();
@@ -314,8 +320,8 @@
   AV.partLegend = function (app) {
     const V = app.partView; if (!V || !V.P) return null;
     return h('div', null, h('div', { class: 'lt' }, 'Model partition: ' + V.P.count + ' partitions'),
-      h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '3px solid #37474f', verticalAlign: 'middle', marginRight: '6px' } }), 'Coupling link (cut point ⊗)'),
-      V.showNo ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '2.4px solid #8e24aa', verticalAlign: 'middle', marginRight: '6px' } }), 'Not cut (oscillating flow, pump, weir …)') : null,
+      h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '3px solid #37474f', verticalAlign: 'middle', marginRight: '6px' } }), 'Coupling link (cut point ⊗)'), h('div', { class: 'lr', style: { color: '#555' } }, 'Areas: subcatchments in the colour of the partition their outlet drains to'),
+      V.showNo ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '2px dashed #8e24aa', verticalAlign: 'middle', marginRight: '6px' } }), 'Not cut (oscillating flow, pump, weir …)') : null,
       V.showNo && V.A && V.A.ponds.length && V.S.keepPonds !== false ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', border: '1.5px dashed #1e88e5', verticalAlign: 'middle', marginRight: '9px' } }), 'Ponding area – kept together') : null);
   };
 

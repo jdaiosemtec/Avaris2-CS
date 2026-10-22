@@ -15,7 +15,7 @@
     const C = await getCores();
     const V = app.partView || (app.partView = { P: null, A: null, sel: null, showCut: true, showNo: true, tab: 'part', S: prefsOf(app) });
     if (tab) V.tab = tab;
-    const P0 = AV.floatPanel({ id: 'partition', title: 'Model Partition', minimize: true, w: 500, h: Math.min(780, window.innerHeight - 150), body: h('div', { class: 'flp' }),
+    const P0 = AV.floatPanel({ id: 'partition', title: 'Model Partition', minimize: true, w: 530, h: Math.min(780, window.innerHeight - 150), body: h('div', { class: 'flp' }),
       onClose: () => { app.partView = null; endPick(); app.theme.invalidate(); app.map.redraw(); } });
     const root = P0.el ? AV.$('.flp', P0.el) : AV.$('.flp');
     const redrawMap = () => { app.theme.invalidate(); app.map.redraw(); };
@@ -34,17 +34,19 @@
       body.appendChild(h('div', { class: 'form' },
         h('label', null, 'Number of partitions'), h('span', null, num('n', 64, { min: 2, max: 400 }), h('span', { class: 'hint' }, '  this computer: ' + C + ' cores → at most ' + mx + ' in parallel')),
         h('label', null, 'Base results'), h('span', { class: R ? '' : 'hint' }, R ? AV.basename(R.meta.file || '') + ' (' + R.meta.nPeriods + ' steps)' : 'none – run a simulation or open results (Database) first')));
-      body.appendChild(h('details', { open: !!V.adv, ontoggle: (e) => { V.adv = e.target.open; } }, h('summary', null, 'Advanced'), h('div', { class: 'form', style: { marginTop: '6px' } },
-        h('label', null, 'Do not cut oscillating flow'), h('span', null, 'flow ≥ ', num('revMin', 56), ' min and reverse ', num('revPct', 48), ' % – ', num('revMax', 48), ' % of that time'),
-        h('label', null, 'Keep ponding areas whole'), h('label', { style: { color: 'inherit' } }, h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } }), ' manholes of one ponding area stay in one partition'),
-        h('label', null, '2D ponding area'), h('span', null, 'cells deeper than ', num('pondDepth', 56, { step: 0.05 }), ' ' + (app.model.isSI ? 'm' : 'ft') + '  (0 = flood depth of the 2D options, else ' + (app.model.isSI ? '0.3 m' : '1 ft') + ')'),
-        h('label', null, '1D ponding area'), h('span', null, 'manholes flooded ≥ ', num('pondMin', 56), ' min, closer than ', num('pondDist', 64), ' map units to each other (0 = 50 m / 150 ft)'),
-        h('label', null, 'Size tolerance'), h('span', null, '± ', num('tol', 52), ' % of the average (nodes)'),
-        h('label', null, 'Coupling time step'), h('span', null, num('ctrl', 60), ' s  (for the coupled run: partitions exchange flows and water levels at this interval; integer multiple of the routing steps)'),
-        h('div', { class: 'note' }, 'Oscillating flow: the flow changes direction (reverse between the two percentages of the time with flow). A pipe that flows backwards nearly all the time is one-directional: it may be cut and is written turned round. Ponding areas: with 1D-2D results the connected 2D cells deeper than the given depth, with 1D results the flooded manholes close to each other. Pumps, orifices, weirs, outlets and the links of flow dividers are never cut. Oscillating pipes and ponding areas are kept whole as long as they fit in one partition; larger groups are cut where the flow oscillates least, and the checks list it.'))));
+      const unit = app.model.isSI ? 'm' : 'ft'; const opt = (label, ctl, hint) => [h('div', { class: 'al' }, label), h('div', { class: 'ac' }, ctl), hint ? h('div', { class: 'ah' }, hint) : null];
+      const keep = h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } });
+      body.appendChild(h('details', { open: !!V.adv, ontoggle: (e) => { V.adv = e.target.open; } }, h('summary', null, 'Advanced'), h('div', { class: 'padv' },
+        opt('Oscillating flow (not cut)', ['flow ≥', num('revMin', 46), 'min, reverse', num('revPct', 40), '–', num('revMax', 40), '%'], 'Share of the time with flow in reverse. Above the upper value the pipe simply flows backwards: it may be cut.'),
+        opt('Keep ponding areas whole', [keep, 'manholes of one area stay together']),
+        opt('2D ponding depth', ['cells ≥', num('pondDepth', 46, { step: 0.05 }), unit], '0 = flood depth of the 2D options, else ' + (app.model.isSI ? '0.3 m' : '1 ft') + '.'),
+        opt('1D ponding (no 2D results)', ['flooded ≥', num('pondMin', 46), 'min, within', num('pondDist', 52)], 'Flooded manholes closer than this distance (map units) to each other form one ponding area. 0 = ' + (app.model.isSI ? '50 m' : '150 ft') + '.'),
+        opt('Size tolerance', ['±', num('tol', 46), '% of the average size']),
+        opt('Coupling time step', [num('ctrl', 46), 's'], 'Used by the coupled run (partitions exchange flows and water levels at this interval), not by the partitioning.'),
+        h('div', { class: 'ah', style: { gridColumn: '1 / -1', marginTop: '4px' } }, 'Pumps, orifices, weirs, outlets and the links of flow dividers are never cut.'))));
       const status = h('span', { class: 'hint' });
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '10px 0 2px' } }, B(V.P ? 'Partition Again' : 'Partition', () => go(status), true, busy), V.P && V.sel !== null ? B('Show All', () => { V.sel = null; render(); redrawMap(); }) : null, status));
-      if (!V.P) { body.appendChild(h('div', { class: 'note', style: { marginTop: '8px' } }, 'Every partition drains in one direction (flow directions of the base results); pipes with reverse flow and 2D ponding areas are never cut; the cut points are placed so that the partitions have about the same size with as few cuts as possible.')); return; }
+      if (!V.P) { body.appendChild(h('div', { class: 'note', style: { marginTop: '8px' } }, 'Every partition drains in one direction (flow directions of the base results); pipes with oscillating flow, pumps, weirs … and ponding areas are not cut; the cut points are placed so that the partitions have about the same size with as few cuts as possible.')); return; }
       const P = V.P, st = P.stats; const mxN = Math.max(...st.map(s => s.nodes)), mnN = Math.min(...st.map(s => s.nodes));
       body.appendChild(sec(2, 'Result'));
       body.appendChild(h('div', { class: 'pchips' }, [[P.count, 'partitions'], [P.cuts.length, 'cut points'], [mnN + '–' + mxN, 'nodes per partition'], [[...P.why.values()].filter(v => v.startsWith('oscillating')).length, 'oscillating pipes'], [P.hard ? P.hard.size : 0, 'never cut (pumps …)'], [V.A.ponds.length, 'ponding areas']].map(([v, l]) => h('div', { class: 'pchip' }, h('b', null, String(v)), h('span', null, l)))));
@@ -56,8 +58,11 @@
       body.appendChild(h('div', { class: 'ptwrap' }, tb));
       body.appendChild(h('div', { class: 'hint' }, 'In / Out = couplings from upstream / to downstream partitions. Click a row to highlight, double-click to zoom.'));
       body.appendChild(sec(3, 'Adjust'));
-      body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } }, B(V.picking ? 'Stop Moving' : 'Move Branch…', () => V.picking ? endPick() : startPick(), V.picking),
-        h('span', { class: 'hint' }, 'click a node: it and its upstream branch go to another partition' + (P.manual ? ' · ' + P.manual + ' manual change(s)' : ''))));
+      body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+        B(V.picking === 'remove' ? 'Finish' : 'Remove Cut…', () => V.picking === 'remove' ? endPick() : startPick('remove'), V.picking === 'remove'),
+        B(V.picking === 'add' ? 'Finish' : 'Add Cut…', () => V.picking === 'add' ? endPick() : startPick('add'), V.picking === 'add'),
+        P.manual ? h('span', { class: 'hint' }, P.manual + ' manual change(s)') : null));
+      body.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, 'Remove Cut: click a cut point (⊗) – the two partitions it joins become one. Add Cut: click a conduit – its upstream branch becomes a new partition (warning for oscillating flow, ponding areas and very small partitions; pumps, weirs … cannot be cut).'));
       body.appendChild(sec(4, 'Checks'));
       const chk = AV.partChecks(app, P, V.A, V.S, C); V.errors = chk.filter(c => c.t === 'er').length;
       body.appendChild(h('div', { class: 'pchecks' }, chk.map(c => h('div', { class: c.t }, (c.t === 'ok' ? '✓ ' : c.t === 'er' ? '✗ ' : '⚠ ') + c.s))));
@@ -86,20 +91,35 @@
       busy = false; render(); redrawMap();
     }
     // ---- manual change: a node and its upstream branch (inside its partition) move to another partition
-    function startPick() { V.picking = true; render();
-      app.feat.startPick({ kinds: ['NODE'], hint: 'Move a branch: click a node (Esc to finish).', onPick: (hit) => { if (hit && hit.kind === 'NODE') moveDialog(hit); }, onEnd: () => { V.picking = false; if (app.partView) render(); } }); }
-    function endPick() { if (V.picking) { V.picking = false; app.setTool && app.setTool('select'); } }
+    function startPick(mode) { endPick(); V.picking = mode; render();
+      const hint = mode === 'remove' ? 'Remove Cut: click a cut point ⊗ – the two partitions become one – Esc to finish' : 'Add Cut: click a conduit – its upstream branch becomes a new partition – Esc to finish';
+      app.feat.startPick({ kinds: ['LINK'], hint, onPick: (hit) => { if (hit && hit.kind === 'LINK') (mode === 'remove' ? removeCut : addCut)(hit); }, onEnd: () => { V.picking = null; if (app.partView) render(); } }); }
+    function endPick() { if (V.picking) { V.picking = null; app.setTool && app.setTool('select'); } }
     const upstream = (id, p) => { const m = app.model; const inn = new Map(); for (const l of m.links.values()) { const x = V.A.links.get(l.id); const back = x && x.f > 0 && x.r / x.f > 0.5; const u = back ? l.to : l.from, d = back ? l.from : l.to; if (!inn.has(d)) inn.set(d, []); inn.get(d).push(u); }
       const out = [id], seen = new Set([id]); const st = [id]; while (st.length) { const x = st.pop(); for (const u of inn.get(x) || []) if (!seen.has(u) && V.P.owner.get(u) === p) { seen.add(u); out.push(u); st.push(u); } } return out; };
-    async function moveDialog(n) {
-      const P = V.P; const p = P.owner.get(n.id); const br = upstream(n.id, p);
-      const sel = h('select', null, P.stats.filter(s => s.i !== p).map(s => h('option', { value: s.i }, PID(s.i) + ' (' + s.nodes + ' nodes)')));
-      const r = await AV.modal({ title: 'Move Branch', body: h('div', { style: { lineHeight: 1.6, width: '380px' } }, h('div', null, h('b', null, n.id), ' is in ' + PID(p) + '. Move it and its ' + (br.length - 1) + ' upstream node(s) to:'), sel),
-        buttons: [{ label: 'Cancel', value: null }, { label: 'Move', primary: true, onClick: () => +sel.value }] }).done;
-      if (r === null || r === undefined) return; for (const id of br) P.owner.set(id, r);
-      // a partition that became empty is removed (numbers close up)
-      const used = [...new Set(P.owner.values())].sort((a, b) => a - b); const ren = new Map(used.map((q, i) => [q, i])); for (const [id, q] of P.owner) P.owner.set(id, ren.get(q));
-      P.manual = (P.manual || 0) + 1; AV.partRecut(app, P, V.A); render(); redrawMap();
+    const renumber = (P) => { const used = [...new Set(P.owner.values())].sort((a, b) => a - b); const ren = new Map(used.map((q, i) => [q, i])); for (const [id, q] of P.owner) P.owner.set(id, ren.get(q)); };
+    const changed = (P, msg) => { renumber(P); P.manual = (P.manual || 0) + 1; AV.partRecut(app, P, V.A); render(); redrawMap(); app.status(msg); };
+    function removeCut(l) {
+      const P = V.P; const c = P.cuts.find(x => x.link === l); if (!c) { AV.toast(l.id + ' is not a cut point. Click a conduit marked ⊗.', true); return; }
+      // the two partitions joined at this conduit become one
+      let n = 0; for (const [id, q] of P.owner) if (q === c.upPart) { P.owner.set(id, c.downPart); n++; }
+      changed(P, 'Cut ' + l.id + ' removed: ' + PID(c.upPart) + ' (' + n + ' nodes) joined ' + PID(c.downPart) + '.');
+    }
+    async function addCut(l) {
+      const P = V.P; const pa = P.owner.get(l.from), pb = P.owner.get(l.to);
+      if (pa !== pb) { AV.toast(l.id + ' is already a cut point.', true); return; }
+      const g = AV.partGlue(app, V.A, V.S); const why = g.why.get(l.id);
+      if (g.hard.has(l.id)) { AV.alert(l.id + ' cannot be cut: ' + why + '. Only conduits that are not links of a flow divider can be cut.', 'Add Cut'); return; }
+      const x = V.A.links.get(l.id); const back = x && x.f > 0 && x.r / x.f > 0.5; const u = back ? l.to : l.from, d = back ? l.from : l.to;
+      const warn = [];
+      if (why) warn.push('it has oscillating flow (' + why.replace('oscillating flow ', '') + ' of the time with flow in reverse): the coupled run exchanges water in both directions at this point');
+      if (V.S.keepPonds !== false && P.pondOf.has(u) && P.pondOf.get(u) === P.pondOf.get(d)) warn.push('it lies in a ponding area: the ponding area would be split between two sub-models');
+      if (x && x.f === 0 && V.A.hasResults) warn.push('it has no flow in the base results');
+      const br = upstream(u, pa); if (br.length >= P.stats[pa].nodes) { AV.toast('Cutting ' + l.id + ' would leave nothing downstream in ' + PID(pa) + '.', true); return; }
+      if (br.length < 3) warn.push('the new partition would have only ' + br.length + ' node(s)');
+      if (warn.length && !await AV.confirm('Cutting ' + l.id + ' is not recommended:\n\n• ' + warn.join('\n• ') + '\n\nCut it anyway?', 'Add Cut', 'Cut Anyway')) return;
+      const np = P.count; for (const id of br) P.owner.set(id, np);
+      changed(P, 'Cut added at ' + l.id + ': ' + br.length + ' node(s) form ' + PID(np) + '.');
     }
     // ---- generate the sub-models and the relationship file
     async function generate(folder, pattern, withBnd, demPath) {
