@@ -306,7 +306,9 @@
       const v = AV.validateQuick(m);
       if (v.length) { if (!await AV.confirm('Possible problems found:\n\n' + v.slice(0, 15).join('\n') + (v.length > 15 ? '\n... (' + v.length + ' total)' : '') + '\n\nRun anyway?', 'Run Simulation', 'Run')) return; }
       // every run is named; its files go to <model>_Results (Database panel)
-      const rn = await AV.askRunName(app); if (!rn) return;
+      const ci = await AV.partitionRunInfo(app);
+      const rn = await AV.askRunName(app, null, { coupled: ci }); if (!rn) return;
+      if (rn.coupled) return this.runCoupled(rn, ci);
       const dir = app.filePath ? AV.resultsDir(app.filePath) : AV.joinPath(app.info.temp, 'osemcm-runs');
       try { await window.host.mkdir(dir); } catch (e) { }
       const base = rn.name;
@@ -357,6 +359,51 @@
       const r = await AV.modal({ title: 'Run Status', width: 460, body: h('div', null, h('div', { style: { color: good ? 'var(--ok)' : 'var(--warn)', fontWeight: 600, marginBottom: '10px' } }, good ? 'Run was successful.' : 'Run completed - continuity errors are high, check the report.'), kv, warnings.length ? h('div', { style: { marginTop: '10px', maxHeight: '140px', overflow: 'auto', fontSize: '11.5px', color: 'var(--warn)' } }, warnings.slice(0, 20).map(w => h('div', null, w))) : null),
         buttons: [{ label: 'Convergence Diagnostics', value: 'conv' }, { label: 'View Report', value: 'rpt' }, { label: 'OK', primary: true, value: 'ok' }] }).done;
       if (r === 'rpt') this.showReport(); else if (r === 'conv') this.convergenceDiagnostics();
+    }
+    // coupled parallel run of the partitioned model (Tools > Partition Model): one engine process per sub-model,
+    // the sub-models exchange flows and levels at the cut points in every iteration; the results are merged into one
+    // run of the master model (Database, Comparison, map and graphs work as for a normal run)
+    async runCoupled(rn, ci) {
+      const m = this.model, app = this.app;
+      const dir = AV.resultsDir(app.filePath); try { await window.host.mkdir(dir); } catch (e) { }
+      const base = rn.name; if (this.results) await this.clearResults(true);
+      let threads = 1; try { const c = await window.host.cpuInfo(); threads = Math.max(1, Math.floor((c.logical || 1) / ci.parts.length)); } catch (e) { }
+      const bar = h('div'); const pct = h('div', { style: { marginTop: '6px', color: 'var(--muted)' } }, 'Starting ' + ci.parts.length + ' sub-models...');
+      const t0 = Date.now();
+      this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 460, body: h('div', null, h('div', { style: { marginBottom: '8px' } }, 'Coupled parallel run: ' + ci.parts.length + ' sub-models, ' + ci.def.couplings.length + ' cut points (' + (m.options.FLOW_ROUTING || 'KINWAVE') + ')'), h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine('main'); return false; } }], enterSubmits: false });
+      this.progEls = { bar, pct, t0 };
+      app.status('Running the coupled parallel simulation...');
+      const job = Object.assign(AV.partitionRunJob(app, ci), { dir, base, threads, id: 'main' });
+      const res = await window.host.runCoupled(job);
+      this.runDlg.close(); this.runDlg = null;
+      const secs = ((Date.now() - t0) / 1000).toFixed(1);
+      if (res.canceled) { app.status('Simulation stopped by user.'); AV.toast('Simulation stopped.'); return; }
+      this.lastRun = res;
+      let rptText = ''; try { rptText = await window.host.readText(res.rpt); } catch (e) { }
+      const warnings = (rptText.match(/WARNING \d+[^\n]*/g) || []);
+      const ok = res.code === 0 && !res.errors.length;
+      { const ts0 = this.parseTimeStepSummary(rptText); await AV.writeRunMeta(AV.dirname(res.out), base, { name: base, desc: rn.desc, date: new Date().toISOString(), model: AV.basename(app.filePath), type: '1D coupled', flowUnits: m.flowUnits,
+        code: ok ? 0 : (res.code || 1), seconds: +secs, engineSeconds: res.seconds, massBal: res.massBal, warnings: warnings.length, notConv: ts0['% of Steps Not Converging'] !== undefined ? +ts0['% of Steps Not Converging'] : undefined,
+        coupled: { subModels: ci.parts.length, cutPoints: ci.def.couplings.length, threads, partsFolder: res.coupled && res.coupled.dir } }); }
+      if (app.db) app.db.render();
+      if (!ok) {
+        app.status('Simulation failed.');
+        await AV.modal({ title: 'Run Status - Errors', width: 640, body: h('div', null, h('div', { style: { color: 'var(--danger)', fontWeight: 600, marginBottom: '8px' } }, 'The coupled run was not successful.'), h('pre', { class: 'mono', style: { whiteSpace: 'pre-wrap', maxHeight: '50vh', overflow: 'auto' } }, (res.errors.length ? res.errors : ['Engine exit code ' + res.code]).slice(0, 40).join('\n'))), buttons: [{ label: 'View Report', onClick: () => this.showReport(res.rpt) }, { label: 'Close', primary: true }] }).done;
+        return;
+      }
+      await this.loadResults(res.out, res.rpt, true);
+      const mb = res.massBal || {}; const ts = this.parseTimeStepSummary(rptText);
+      const kv = h('div', { class: 'kv' }, ['Run mode', 'Coupled parallel, ' + ci.parts.length + ' sub-models', 'Run time', secs + ' s (engine ' + AV.fmt(res.seconds, 1) + ' s)', 'Runoff continuity error', AV.fmt(mb.runoff, 2) + ' %', 'Flow routing continuity error', AV.fmt(mb.flow, 2) + ' %',
+        'Warnings', String(warnings.length)].map(t => h('div', null, t)));
+      if (ts['% of Steps Not Converging'] !== undefined) kv.append(h('div', null, '% of steps not converging'), h('div', null, ts['% of Steps Not Converging']));
+      if (ts['Average Iterations per Step'] !== undefined) kv.append(h('div', null, 'Average iterations per step'), h('div', null, ts['Average Iterations per Step']));
+      const good = Math.abs(mb.flow || 0) < 5 && Math.abs(mb.runoff || 0) < 5;
+      app.status('Coupled simulation complete in ' + secs + ' s.');
+      const r = await AV.modal({ title: 'Run Status', width: 480, body: h('div', null, h('div', { style: { color: good ? 'var(--ok)' : 'var(--warn)', fontWeight: 600, marginBottom: '10px' } }, good ? 'Run was successful.' : 'Run completed - continuity errors are high, check the report.'), kv,
+        h('div', { class: 'note', style: { marginTop: '8px' } }, 'The results of the sub-models were merged into one run of the master model. To check them against the whole model, run the whole model too and open Scenario Comparison.'),
+        warnings.length ? h('div', { style: { marginTop: '10px', maxHeight: '140px', overflow: 'auto', fontSize: '11.5px', color: 'var(--warn)' } }, warnings.slice(0, 20).map(w => h('div', null, w))) : null),
+        buttons: [{ label: 'View Report', value: 'rpt' }, { label: 'OK', primary: true, value: 'ok' }] }).done;
+      if (r === 'rpt') this.showReport();
     }
     onProgress(p, id) {
       if (id && id !== 'main') { if (this.scenProgress) this.scenProgress(id, p); return; }

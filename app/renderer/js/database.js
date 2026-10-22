@@ -23,15 +23,28 @@
     const name = h('input', { type: 'text', value: app._lastRunName && !opts.fresh ? app._lastRunName : stamp(), style: { width: '100%' } });
     const desc = h('input', { type: 'text', value: '', placeholder: '(optional) e.g. 100-yr storm, pumps upgraded', style: { width: '100%' } });
     const list = h('div', { class: 'runpick' }, runs.length ? runs.slice(0, 12).map(r => h('div', { class: 'runpickrow', title: 'Use this name (the run is replaced)', onclick: () => { name.value = r.name; if (r.meta && r.meta.desc) desc.value = r.meta.desc; } }, h('b', null, r.name), ' ', h('span', null, r.meta ? new Date(r.meta.date).toLocaleString() + (r.meta.type ? ' · ' + r.meta.type : '') : ''))) : h('div', { class: 'dbempty' }, 'No simulation results yet.'));
+    // run mode: whole model, or coupled parallel when the model has been partitioned (Tools > Partition Model)
+    const ci = opts.coupled; let modeEl = null; const rWhole = h('input', { type: 'radio', name: 'runmode', checked: true }), rCpl = h('input', { type: 'radio', name: 'runmode' });
+    if (ci) {
+      const ok = !ci.stale && !ci.missing.length; if (ok && app._lastCoupled) { rCpl.checked = true; rWhole.checked = false; } if (!ok) rCpl.disabled = true;
+      modeEl = h('div', { class: 'runmode' },
+        h('label', null, rWhole, ' Whole model'),
+        h('label', { style: { opacity: ok ? 1 : 0.55 } }, rCpl, ' Coupled parallel – ' + ci.parts.length + ' sub-models, ' + ci.def.couplings.length + ' cut points'),
+        ci.stale ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'The model changed after it was partitioned (' + ci.stale + ' change' + (ci.stale === 1 ? '' : 's') + '). Update the sub-models first: Tools ▸ Partition Model ▸ Regenerate.') : null,
+        ci.missing.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'Sub-model file(s) missing: ' + ci.missing.slice(0, 3).join(', ') + '. Generate the sub-models again (Tools ▸ Partition Model).') : null,
+        ok && ci.edited.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, ci.edited.length + ' sub-model file(s) were edited directly after they were generated (' + ci.edited.slice(0, 3).join(', ') + '); the coupled run uses them as they are.') : null,
+        ok && ci.has2D ? h('div', { class: 'note' }, 'The coupled run computes the 1D network; 2D flooding is not coupled yet (use Whole model for 1D-2D).') : null);
+    }
     const body = h('div', { style: { width: '480px', display: 'flex', flexDirection: 'column', gap: '8px' } },
       h('div', { class: 'form' }, h('label', null, 'Simulation name'), name, h('label', null, 'Description'), desc),
+      modeEl ? h('div', null, h('div', { style: { fontWeight: 600, marginBottom: '4px' } }, 'Run'), modeEl) : null,
       app.filePath ? h('div', { class: 'note' }, 'Saved in ' + AV.resultsDir(app.filePath) + '. A new name keeps the earlier results; an existing name replaces them.') : h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'The model is not saved: the results go to a temporary folder. Save the model to keep its results in the Database.'),
       runs.length ? h('div', null, h('div', { style: { fontWeight: 600, marginBottom: '4px' } }, 'Existing results (click to reuse a name)'), list) : null);
     const r = await AV.modal({ title: title || 'Run Simulation', body, buttons: [{ label: 'Cancel', value: null }, { label: opts.ok || 'Run', primary: true, onClick: async () => {
       const n = name.value.trim(); if (!n || !/^[\w\-. ()]+$/.test(n) || /^\.+$/.test(n)) { AV.toast('Use letters, digits, spaces, _ - . ( ) for the name.', true); return false; }
       if (runs.some(x => x.name.toLowerCase() === n.toLowerCase()) && !await AV.confirm('Results named "' + n + '" already exist. Replace them?', 'Run Simulation', 'Replace', 'Cancel')) return false;
-      return { name: n, desc: desc.value.trim() }; } }] }).done;
-    if (r) app._lastRunName = r.name; return r;
+      return { name: n, desc: desc.value.trim(), coupled: !!(ci && rCpl.checked && !rCpl.disabled) }; } }] }).done;
+    if (r) { app._lastRunName = r.name; if (ci) app._lastCoupled = r.coupled; } return r;
   };
   AV.writeRunMeta = async function (dir, name, meta) { try { await window.host.writeText(AV.joinPath(dir, name + '.json'), JSON.stringify(meta, null, 1)); } catch (e) { } };
 

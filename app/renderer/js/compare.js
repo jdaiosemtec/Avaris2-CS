@@ -13,6 +13,7 @@
       let t = res.reportText; if (t === undefined) { try { t = await window.host.readText(res.rpt || res.meta.file.replace(/\.out$/i, '.rpt')); } catch (e) { t = ''; } res.reportText = t; }
       res._tables = AV.parseReportTables(t || ''); res._tmap = {};
     }
+    if (res.runMeta === undefined) { res.runMeta = null; const f = res.outFile || (res.meta && res.meta.file); if (f) { try { res.runMeta = JSON.parse(await window.host.readText(f.replace(/\.f?out$/i, '.json'))); } catch (e) { } } }
     return res;
   }
   const stat = (res, t, id, v, kind) => { const i = res.idx[t].get(id); if (i === undefined) return null; const nv = res.meta.nVars[t]; if (v >= nv) return null; return res.stats[t][kind || 'max'][i * nv + v]; };
@@ -78,6 +79,7 @@
       { k: 'out', l: 'Outfall volume', u: VOL, v: vol('External Outflow'), dir: 0 },
       { k: 'runoff', l: 'Surface runoff', u: si ? 'ha·m' : 'ac·ft', v: g(/Runoff Quantity Continuity[\s\S]*?Surface Runoff \.+\s+(-?[\d.]+)/), dir: -1 },
       { k: 'cerr', l: 'Flow continuity error', u: '%', v: g(/Flow Routing Continuity[\s\S]*?Continuity Error \(%\) \.+\s+(-?[\d.]+)/), dir: 0 },
+      { k: 'time', l: 'Run time', u: 's', v: res.runMeta && res.runMeta.seconds !== undefined ? res.runMeta.seconds : null, dir: -1 },
     ];
   }
 

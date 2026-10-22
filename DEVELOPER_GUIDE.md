@@ -151,6 +151,7 @@ Avaris2CS.exe (Electron)
 | 位置 | 修改 |
 |---|---|
 | `avaris_main.c` | 命令行入口：`avaris_engine <inp> <rpt> <out> [-nodetail]`；向 stdout 输出 `PROGRESS n`、`DONE err runoffErr flowErr qualErr seconds`、`ERROR msg`，供界面显示进度。 |
+| `couple.c` | **耦合并行引擎**（2.4.0 起）：`avaris_engine -couple <run.cpl>` 是协调进程，为每个子模型启动一个 `avaris_engine -cplworker <run.cpl> <k>` 进程；进程间用共享内存文件 + 屏障（Linux futex，Windows 两个交替的 manual-reset event）同步。详见第 11 节。 |
 | `osem_ext.c` | 读取 .inp 里的扩展注释行 `;;@OSEM CHAMBER`（检查井面积）、`;;@OSEM IMPCOEF`（不透水径流系数）。 |
 | `dynwave.c` | 动力波迭代的欠松弛系数可配置（`UnderRelaxation`）；出水口不参与节点水深迭代。 |
 | `project.c` | 新选项 `UNDER_RELAXATION`（0.1–1.0，默认 0.5）和 `NONCONV_REPORT_COUNT`（默认 100）。 |
@@ -360,9 +361,37 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 
 - **输入**：分区数；当前加载的结果作为基准（流向、反向流、溢流/2D 积水）。没有结果时按管道定义方向，不检查反向流。
 - **不能切**：往复流管（有流量 ≥ N 分钟且反向时间占 W1%–W2%，默认 5%–95%；反向 ≥ 95% 的管是单向倒流，可以切，子模型里把它掉头写出）、泵/孔口/堰/出口、分流井的出流管；可选：同一个积水区内的检查井（2D：深于阈值的相连网格；1D：溢流 ≥ X 分钟且相距 ≤ D 的节点）。往复流管组和积水区只在不超过一个分区大小时保持完整，超出的在往复最少处切开、超大积水区不作约束，检查栏给出警告。
-- **耦合时间步长（Coupling time step）**：不影响分区，只写入 partition.json，供耦合引擎在这个间隔交换流量和水位。
 - **切口处理**：管道留在上游分区，下游端点在上游子模型里变成 outfall（有基准结果时用 TIMESERIES 水位，否则 FIXED）；下游子模型里该节点加入流（`CPL_Q_<节点>` 时间序列）。耦合引擎运行时会直接设置这两个值。
 - **文件**：`<文件夹>/<模型>_Pnn.inp`（+ .prj）、`<模型>.partition.json`（模型旁边也存一份），可选 `<模型>_Pnn_2d_boundary.shp` 和 `<模型>_partitions.shp`（DEM 分区面）。
 - **Regenerate**：老节点保持原分区，新节点沿下游（否则上游、否则最近）归入分区；列出变化的对象和要重写的文件；检测子模型是否被直接改过（文件哈希）。分区面不重新计算（重新分区时才算）。
 - **验证（Riverside 示例，12 区）**：子模型单独运行（带基准边界）时，排口峰值流量和总水量与大模型相差 < 1%；节点最高水位中位数差 0，95% 分位 0.10 m。切口上游的 outfall 在退水段可能偏高（SWMM 的 outfall 水深取设定水位和临界/正常水深中的较大值），耦合引擎直接设置节点水头即可消除。
 - **性能**：8.9 万节点的模型分 40 区约 1.7 s，写出子模型约 1.3 s。
+
+## 11. 耦合并行计算（Run ▸ Coupled parallel，2.4.0 起）
+
+目标：和不分区的整体模型结果尽可能一致，同时多核并行。
+
+**算法（dynwave）**
+- 每个子模型一个进程。每个演算步开始时各子模型提出自己的变步长，**所有子模型取最小值**，所以步长序列和整体模型一样。
+- 交换发生在**每一次 Picard 迭代**里，位置和整体模型完全对应：
+  - 链路流量算完后（`findLinkFlows` 之后，钩子 `CplAfterLinks`）：上游子模型把切口管的流量、对下游节点的水面面积贡献（`surfArea2 × barrels`）、`dqdh` 发给下游子模型；下游节点把它们当作一根真实管道加入节点的 inflow/outflow、水面面积和 `sumdqdh`（`dynwave.c` 的 `addCoupledLinks`）。
+  - 节点水深算完后（`findNodeDepths` 之后，钩子 `CplAfterNodes`）：下游子模型把切口节点水头发回；上游的边界 outfall（`Node.cplBnd`）直接取这个水头（`outfall_setOutletDepth` 不再套用临界/正常水深规则；`dwflow.c` 里把它当普通节点，不做 outfall 的偏移和 Froude 处理）。
+  - 收敛判断是**全局的**：所有子模型的节点都收敛才结束这一步，所以各子模型迭代次数一致。
+- 因此耦合计算解的是和整体模型相同的方程组。剩下的差别只来自：浮点求和顺序；切口管在整体模型里两端都收敛时可以跳过计算（bypass），子模型里不跳过。
+- 其他演算方法（KW/稳态）：每步交换一次，下游接收的水量和上游送出的水量做体积校正（不丢水、不造水）。
+- 水量平衡：下游收到的切口水量记作外部入流，上游 outfall 记作外部出流；合并报告时按引擎输出的 `CPLVOL` 扣除。
+
+**文件和流程**
+- 界面：Run 对话框里有 *Coupled parallel* 选项（模型旁有 `<模型>.partition.json` 时才出现）。主模型在分区后改过（对象签名不同）时不能选，提示先 Regenerate。2D 暂不耦合（只算 1D 管网）。
+- `main.js` 的 `engine:runCoupled`：在 `<结果文件夹>/<运行名>_parts/` 写 `run.cpl`（制表符分隔：SHM、MODE、THREADS、PART k level inp rpt out、CPL up outfall link down node），启动协调进程，读 `PROGRESS / PART / CPLVOL / DONE`。
+- `app/cplmerge.js`：把各子模型的 .out 合并成一个**主模型 ID** 的 .out（节点取所属分区，边界 outfall 不要；切口管取上游子模型，掉头写出的管道把流量和流速取反、偏移量对调；系统变量：流量类求和、降雨/入渗按汇水面积加权、温度/蒸发取第一个子模型，系统出流扣掉切口流量），并合并 .rpt（连续性表求和后重算误差，对象表按主模型顺序合并，去掉边界 outfall 和 System 行）。前端和网页数字孪生只读这一个 .out/.rpt。
+- 运行记录（`<运行名>.json`）里 `type: "1D coupled"`、`seconds`、`coupled.subModels`。Scenario Comparison 的 KPI 卡片里有 *Run time*，可直接比较整体模型和耦合计算的结果和耗时。
+- 取消：协调进程被结束时，Windows 的 job object / Linux 的 `PR_SET_PDEATHSIG` 会一起结束所有子模型进程。
+
+**验证（Riverside，12 个子模型，8 个切口，1 分钟报告步长）**
+- 节点最高水深与整体模型之差：90% 分位 0.009 m、95% 分位 0.14 m、最大 5.3 m；管道峰值流量相对差 90% 分位 0.1%；排口总水量差 0.01%；耦合计算的连续性误差 -0.005%（整体模型 -0.005%）。
+- 对照：这个模型对数值扰动很敏感，只把整体模型的 ROUTING_STEP 从 5 s 改成 4.9 s 或 4.95 s，节点最高水深之差就有 90% 分位 0.009–0.020 m、95% 分位 0.17–0.35 m、最大 4.6–6.8 m。所以耦合结果和整体模型的差别不大于模型本身的数值敏感度。
+- 普通（整体）运行：引擎改动后 Riverside 的 .out 与旧引擎逐字节相同。
+
+**速度**
+- 并行收益取决于核数和模型规模：每次迭代有两次进程同步（约几十微秒）。子模型数 ≤ 物理核数、每个子模型足够大时才有明显加速；子模型数多于核数时会变慢（开发机只有 2 核，12 个子模型的 Riverside 比整体模型慢）。

@@ -231,6 +231,7 @@ void    dynwave_init(void);
 void    dynwave_close(void);
 double  dynwave_getRoutingStep(double fixedStep);
 int     dynwave_execute(double tStep);
+void    dynwave_setVariableStep(double dt);
 void    dwflow_findConduitFlow(int j, int steps, double omega, double dt);
 
 void    qualrout_init(void);
@@ -264,6 +265,7 @@ void    massbal_initTimeStepTotals(void);
 void    massbal_addInflowFlow(int type, double q);
 void    massbal_addInflowQual(int type, int pollut, double w);
 void    massbal_addOutflowFlow(double q, int isFlooded);
+void    massbal_addCplVolume(double v);
 void    massbal_addOutflowQual(int pollut, double mass, int isFlooded);
 void    massbal_addNodeLosses(double evapLoss, double infilLoss);
 void    massbal_addLinkLosses(double evapLoss, double infilLoss);

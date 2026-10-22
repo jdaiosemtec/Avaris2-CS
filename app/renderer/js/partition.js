@@ -287,7 +287,7 @@
     const m = app.model; const sig = AV.partSignatures(m); const asg = {}; for (const [id, p] of P.owner) asg[id] = p;
     return { format: 'avaris-partition', version: 1, master: built.name + '.inp', created: new Date().toISOString(), program: 'Avaris2 CS ' + ((app.info && app.info.version) || ''),
       baseResults: A.resultsName || null, settings: { partitions: P.count, balanceBy: 'nodes', tolerancePct: S.tol, doNotCut: { oscillatingFlow: { minFlowMin: S.revMin, minReversePct: S.revPct, maxReversePct: S.revMax || 95 }, keepPondingAreas: S.keepPonds !== false, ponding: { source: A.pondSource || null, depth2D: A.pondDepth || null, minFloodMin: S.pondMin, distance: A.pondDist || null } } },
-      simulation: { controlStep: S.ctrl, controlStepNote: 'coupling interval: partitions exchange flows and water levels every controlStep seconds', reportStep: m.options.REPORT_STEP || null, cores, maxPartitions: Math.floor(cores * 1.5) },
+      simulation: { coupling: 'every iteration', couplingNote: 'coupled run: all sub-models take the same routing step; flows and water levels at the cut points are exchanged in every iteration of every step', reportStep: m.options.REPORT_STEP || null, cores, maxPartitions: Math.floor(cores * 1.5) },
       partitions: built.files.map(f => ({ id: PID(f.p), inp: f.file, nodes: f.nodes, links: f.links, subcatchments: f.subs, outfalls: f.outfalls, couplingsIn: f.cin, couplingsOut: f.cout, hotstart: null, hash: fnv(f.text) })),
       couplings: built.couplings, levels: AV.partLevels(P), pattern: S.pattern, folder: S.folderRel || '.', manualChanges: P.manual || 0, assignment: asg, signatures: sig };
   };
@@ -400,5 +400,33 @@
     if (feats.length) { const fields = AV.SHP.fieldsFor(feats.map(f => f.props), ['partition', 'length', 'roughness']); const wr = AV.SHP.write('polygon', feats, fields); const b = AV.joinPath(folder, name + '_partitions');
       await window.host.writeBinary(b + '.shp', new Uint8Array(wr.shp)); await window.host.writeBinary(b + '.shx', new Uint8Array(wr.shx)); await window.host.writeBinary(b + '.dbf', new Uint8Array(wr.dbf)); if (prj) await window.host.writeText(b + '.prj', prj); }
     return files;
+  };
+
+  // ------------------------------------------------------------------ coupled parallel run
+  // what the Run dialog needs: the partition definition next to the model, its sub-model files and whether the master
+  // model changed since the sub-models were written (then they must be regenerated first)
+  AV.partitionRunInfo = async function (app) {
+    if (!app.filePath) return null; const p = app.filePath.replace(/\.inp$/i, '.partition.json');
+    let def = null; try { if (!await window.host.exists(p)) return null; def = JSON.parse(await window.host.readText(p)); } catch (e) { return null; }
+    if (!def || def.format !== 'avaris-partition' || !(def.partitions || []).length) return null;
+    const mdir = AV.dirname(app.filePath); const f = def.folder || '.';
+    const folder = /^([a-zA-Z]:|[\\/])/.test(f) ? f : f === '.' ? mdir : AV.joinPath(mdir, f.replace(/^\.[\\/]/, '').replace(/\//g, mdir.includes('\\') ? '\\' : '/'));
+    const lev = new Map(); (def.levels || []).forEach((L, i) => L.forEach(id => lev.set(id, i)));
+    const parts = def.partitions.map(x => ({ id: x.id, inp: AV.joinPath(folder, x.inp), level: lev.get(x.id) || 0, hash: x.hash }));
+    const missing = [], edited = [];
+    for (const x of parts) { try { if (!await window.host.exists(x.inp)) { missing.push(AV.basename(x.inp)); continue; } if (x.hash && AV.fnvHash(await window.host.readText(x.inp)) !== x.hash) edited.push(AV.basename(x.inp)); } catch (e) { missing.push(AV.basename(x.inp)); } }
+    // changes of the master model since the partition (object signatures)
+    const sig = AV.partSignatures(app.model), old = def.signatures || { N: {}, L: {}, S: {} }; let stale = 0;
+    for (const k of ['N', 'L', 'S']) { const a = sig[k], b = old[k] || {}; for (const id in a) if (a[id] !== b[id]) stale++; for (const id in b) if (!(id in a)) stale++; }
+    if (old.shared && old.shared !== sig.shared) stale++;
+    return { def, folder, parts, missing, edited, stale, has2D: AV.f2dEnabled ? AV.f2dEnabled(app.model) : false };
+  };
+  AV.partitionRunJob = function (app, ci) {
+    const m = app.model, def = ci.def; const pidx = new Map(def.partitions.map((x, i) => [x.id, i]));
+    return {
+      parts: ci.parts.map(x => ({ inp: x.inp, level: x.level })),
+      couplings: def.couplings.map(c => ({ up: pidx.get(c.up.partition), outfall: c.up.node, link: c.link, down: pidx.get(c.down.partition), node: c.down.node, reversed: !!c.reversed })),
+      order: { subcatch: [...m.subcatchments.keys()], node: [...m.nodes.keys()], link: [...m.links.keys()] },
+      nodeOwner: def.assignment, title: (m.title || []).slice(0, 3), usUnits: /^(CFS|GPM|MGD)$/i.test(m.flowUnits || '') };
   };
 })(window.AV);

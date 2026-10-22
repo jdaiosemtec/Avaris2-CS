@@ -1044,3 +1044,13 @@ double massbal_getStoredMass(int p)
     }
     return storedMass;
 }
+
+//=============================================================================
+
+void massbal_addCplVolume(double v)
+//  Avaris coupled run: volume (ft3) exchanged with a neighbouring sub-model
+//  that is not part of the node inflows already counted (+ in, - out).
+{
+    if ( v >= 0.0 ) FlowTotals.exInflow += v;
+    else FlowTotals.outflow -= v;
+}

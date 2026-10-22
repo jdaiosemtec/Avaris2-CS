@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('host', {
   onOpenFile: (cb) => ipcRenderer.on('app:open-file', (e, p) => cb(p)),
   engineVersion: () => ipcRenderer.invoke('engine:version'),
   runEngine: (job) => ipcRenderer.invoke('engine:run', job),
+  runCoupled: (job) => ipcRenderer.invoke('engine:runCoupled', job),
   cancelEngine: (id) => ipcRenderer.invoke('engine:cancel', id),
   onProgress: (cb) => ipcRenderer.on('engine:progress', (e, p, id) => cb(p, id)),
   cpuInfo: () => ipcRenderer.invoke('sys:cpu'),

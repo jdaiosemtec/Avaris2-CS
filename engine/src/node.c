@@ -1427,6 +1427,13 @@ void outfall_setOutletDepth(int j, double yNorm, double yCrit, double z)
     int      i = Node[j].subIndex;     // outfall index
     DateTime currentDate;              // current date/time in days
 
+    // --- Avaris coupled run: head given by the neighbouring sub-model
+    if ( Node[j].cplBnd )
+    {
+        Node[j].newDepth = MAX(0.0, Node[j].cplHead - Node[j].invertElev);
+        return;
+    }
+
     switch ( Outfall[i].type )
     {
       case FREE_OUTFALL:

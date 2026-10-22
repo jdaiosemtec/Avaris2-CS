@@ -527,6 +527,14 @@ typedef struct
    double        oldNetInflow;    // previous net inflow
    double        qualInflow;      // inflow seen for quality routing (cfs)
    double        apiExtInflow;    // inflow from swmm_setValue function (cfs)
+   // --- Avaris coupled parallel run (couple.c)
+   char          cplBnd;          // TRUE: outfall whose head is set by the coupling
+   char          cplDown;         // TRUE: node receives coupled inflow
+   double        cplHead;         // coupled boundary head (ft)
+   double        cplArea;         // surface area of the coupled link(s) (ft2)
+   double        cplDqdh;         // dQ/dH of the coupled link(s) (ft2/sec)
+   double        cplHref;         // head the coupled inflow was computed with (ft)
+   double        cplQ;            // flow of the coupled link(s) into the node (cfs)
 
 }  TNode;
 

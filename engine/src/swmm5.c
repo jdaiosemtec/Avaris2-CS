@@ -510,6 +510,51 @@ int  DLLEXPORT swmm_stride(int strideStep, double *elapsedTime)
 }
 
 //=============================================================================
+//  Avaris coupled parallel run: all sub-models advance with the same step
+//=============================================================================
+
+double swmm_proposeStep(void)
+//  Returns the routing step this model would take next (sec), limited to the
+//  rest of the simulation.
+{
+    double dt;
+    if ( ErrorCode || !IsStartedFlag ) return 0.0;
+    if ( !DoRouting ) dt = MIN(WetStep, ReportStep);
+    else dt = routing_getRoutingStep(RouteModel, RouteStep);
+    if ( NewRoutingTime + 1000.0 * dt > RoutingDuration )
+        dt = (RoutingDuration - NewRoutingTime) / 1000.0;
+    return dt;
+}
+
+int swmm_stepFixed(double routingStep, double *elapsedTime)
+//  Advances the simulation by exactly routingStep seconds.
+{
+    double nextRoutingTime;
+    *elapsedTime = 0.0;
+    if ( ErrorCode ) return ErrorCode;
+    if ( NewRoutingTime < RoutingDuration && routingStep > 0.0 )
+    {
+        TotalStepCount++;
+        if ( DoRouting && RouteModel == DW ) dynwave_setVariableStep(routingStep);
+        nextRoutingTime = NewRoutingTime + 1000.0 * routingStep;
+        if ( nextRoutingTime > RoutingDuration ) nextRoutingTime = RoutingDuration;
+        if ( DoRunoff ) while ( NewRunoffTime < nextRoutingTime )
+        {
+            runoff_execute();
+            if ( ErrorCode ) return ErrorCode;
+        }
+        else climate_setState(getDateTime(NewRoutingTime));
+        if ( DoRouting ) routing_execute(RouteModel, routingStep);
+        else NewRoutingTime = nextRoutingTime;
+    }
+    if ( SaveResultsFlag ) saveResults();
+    if ( NewRoutingTime < RoutingDuration ) ElapsedTime = NewRoutingTime / MSECperDAY;
+    else ElapsedTime = 0.0;
+    *elapsedTime = ElapsedTime;
+    return ErrorCode;
+}
+
+//=============================================================================
 
 void execRouting()
 //
@@ -1590,7 +1635,11 @@ void getAbsolutePath(const char* fname, char* absPath, size_t size)
         #ifdef WINDOWS
             GetFullPathName((LPCSTR)fname, (DWORD)size, (LPSTR)absPath, NULL);
         #else
-            realpath(fname, absPath);
+            {
+                char* full = realpath(fname, NULL);   // Avaris: no fixed-size buffer
+                if (full) { sstrncpy(absPath, full, size - 1); free(full); }
+                else sstrncpy(absPath, fname, size - 1);
+            }
         #endif
     }
 

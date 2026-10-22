@@ -324,8 +324,8 @@ int getFlowClass(int j, double q, double h1, double h2, double y1, double y2,
     z2 = Link[j].offset2;
 
     // --- base offset of an outfall conduit on outfall's depth
-    if ( Node[n1].type == OUTFALL ) z1 = MAX(0.0, (z1 - Node[n1].newDepth));
-    if ( Node[n2].type == OUTFALL ) z2 = MAX(0.0, (z2 - Node[n2].newDepth));
+    if ( Node[n1].type == OUTFALL && !Node[n1].cplBnd ) z1 = MAX(0.0, (z1 - Node[n1].newDepth));
+    if ( Node[n2].type == OUTFALL && !Node[n2].cplBnd ) z2 = MAX(0.0, (z2 - Node[n2].newDepth));
 
     // --- default class is SUBCRITICAL
     flowClass = SUBCRITICAL;
@@ -651,7 +651,8 @@ double checkNormalFlow(int j, double q, double y1, double y2, double a1,
     int    k = Link[j].subIndex;
     int    n1 = Link[j].node1;
     int    n2 = Link[j].node2;
-    int    hasOutfall = (Node[n1].type == OUTFALL || Node[n2].type == OUTFALL);
+    int    hasOutfall = ((Node[n1].type == OUTFALL && !Node[n1].cplBnd) ||
+                         (Node[n2].type == OUTFALL && !Node[n2].cplBnd));
     double qNorm;
     double f1;
 

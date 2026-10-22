@@ -344,6 +344,54 @@ ipcMain.handle('engine:run', async (e, job) => {
     });
   });
 });
+// coupled parallel run of a partitioned model: the engine coordinator starts one process per sub-model; the results
+// are merged into <base>.out / <base>.rpt with the objects of the master model
+ipcMain.handle('engine:runCoupled', async (e, job) => {
+  // job: { dir, base, parts: [{ inp, level }], couplings: [{ up, outfall, link, down, node, reversed }], threads, order, nodeOwner, title, usUnits }
+  let dir = job.dir && fs.existsSync(job.dir) ? job.dir : path.join(os.tmpdir(), 'avaris');
+  try { const probe = path.join(dir, '.avaris_write_test'); fs.writeFileSync(probe, ''); fs.unlinkSync(probe); } catch (err) { dir = path.join(os.tmpdir(), 'avaris'); }
+  const base = (job.base || 'model').replace(/[^\w\-. ]/g, '_');
+  const pdir = path.join(dir, base + '_parts'); fs.mkdirSync(pdir, { recursive: true });
+  const rpt = path.join(dir, base + '.rpt'), out = path.join(dir, base + '.out');
+  for (const [h, r] of outFiles) if (path.resolve(r.file) === path.resolve(out)) { r.close(); outFiles.delete(h); }
+  const parts = job.parts.map((p, k) => ({ inp: p.inp, level: p.level || 0, rpt: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.rpt'), out: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.out') }));
+  const cfg = path.join(pdir, 'run.cpl');
+  const L = ['AVCPL\t1', 'SHM\t' + path.join(pdir, 'run.shm'), 'MODE\t0', 'THREADS\t' + Math.max(1, job.threads || 1)];
+  parts.forEach((p, k) => L.push(['PART', k, p.level, p.inp, p.rpt, p.out].join('\t')));
+  for (const c of job.couplings) L.push(['CPL', c.up, c.outfall, c.link, c.down, c.node].join('\t'));
+  fs.writeFileSync(cfg, L.join('\n') + '\n', 'utf8');
+  return new Promise((resolve) => {
+    let buf = ''; const result = { code: -1, errors: [], rpt, out, inp: cfg, massBal: null, seconds: 0, canceled: false, coupled: { parts: [], dir: pdir, vol: [0, 0] } };
+    let proc;
+    try { proc = spawn(enginePath(), ['-couple', cfg], { cwd: pdir, windowsHide: true }); engineProcs.set(job.id || 'main', proc); engineProc = proc; }
+    catch (err) { result.errors.push('Unable to start engine: ' + err.message); resolve(result); return; }
+    const handleLine = (line) => {
+      if (line.startsWith('PROGRESS ')) { if (win) win.webContents.send('engine:progress', parseFloat(line.slice(9)), job.id || 'main'); }
+      else if (line.startsWith('ERROR ')) result.errors.push(line.slice(6));
+      else if (line.startsWith('PART ')) { const t = line.split(/\s+/); result.coupled.parts.push({ k: +t[1], err: +t[2], steps: +t[3], seconds: +t[4] }); }
+      else if (line.startsWith('CPLVOL ')) { const t = line.split(/\s+/); result.coupled.vol = [+t[1], +t[2]]; }
+      else if (line.startsWith('DONE ')) { const t = line.split(/\s+/); result.code = parseInt(t[1]); result.massBal = { runoff: parseFloat(t[2]), flow: parseFloat(t[3]), quality: parseFloat(t[4]) }; result.seconds = parseFloat(t[5]); }
+    };
+    proc.stdout.on('data', (d) => { buf += d.toString(); let i; while ((i = buf.indexOf('\n')) >= 0) { handleLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); } });
+    proc.on('error', (err) => { result.errors.push('Engine error: ' + err.message); });
+    proc.on('close', (code, signal) => {
+      if (buf.trim()) handleLine(buf.trim());
+      if (engineProcs.get(job.id || 'main') === proc) engineProcs.delete(job.id || 'main'); if (engineProc === proc) engineProc = null;
+      if (signal) { result.canceled = true; resolve(result); return; }
+      if (result.code === -1) result.code = code;
+      if (result.code === 0) {
+        try {
+          const m = require('./cplmerge')({ parts: parts.map(p => ({ out: p.out, rpt: p.rpt })), couplings: job.couplings, order: job.order, nodeOwner: job.nodeOwner, out, rpt, cplVolFt3: result.coupled.vol, usUnits: !!job.usUnits, title: job.title || [] });
+          result.massBal = m.massBal; result.coupled.mergeSeconds = m.mergeSeconds;
+        } catch (err) { result.code = 1; result.errors.push('Merging the sub-model results failed: ' + err.message); }
+      } else {
+        // keep the report of the failed sub-model where the GUI looks for it
+        try { const bad = parts.find((p, k) => (result.coupled.parts[k] || {}).err) || parts[0]; fs.copyFileSync(bad.rpt, rpt); } catch (err) { }
+      }
+      resolve(result);
+    });
+  });
+});
 ipcMain.handle('engine:cancel', async (e, id) => { let n = 0; for (const [k, p] of engineProcs) if (!id || k === id) { try { p.kill(); n++; } catch (err) { } } return n > 0; });
 // processor information for the thread recommendation (physical cores from Windows when available)
 ipcMain.handle('sys:cpu', async () => {

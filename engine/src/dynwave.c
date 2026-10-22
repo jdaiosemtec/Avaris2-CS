@@ -81,6 +81,10 @@ typedef struct
 //-----------------------------------------------------------------------------
 //  Shared Variables
 //-----------------------------------------------------------------------------
+// --- Avaris coupled parallel run (couple.c): exchange with the neighbouring
+//     sub-models inside every Picard iteration (NULL in a normal run)
+void  (*CplAfterLinks)(void) = NULL;
+int   (*CplAfterNodes)(int converged) = NULL;
 static double  VariableStep;           // size of variable time step (sec)
 static TXnode* Xnode;                  // extended nodal information
 
@@ -94,6 +98,7 @@ static void   initRoutingStep(void);
 static void   initNodeStates(void);
 static void   findBypassedLinks();
 static void   findLimitedLinks();
+static void   addCoupledLinks(void);
 
 static void   findLinkFlows(double dt);
 static int    isTrueConduit(int link);
@@ -244,7 +249,9 @@ int dynwave_execute(double tStep)
         // --- execute a routing step & check for nodal convergence
         initNodeStates();
         findLinkFlows(tStep);
+        if ( CplAfterLinks ) { CplAfterLinks(); addCoupledLinks(); }
         converged = findNodeDepths(tStep);
+        if ( CplAfterNodes ) converged = CplAfterNodes(converged);
         Steps++;
         if ( Steps > 1 )
         {
@@ -334,6 +341,25 @@ void initNodeStates()
         Xnode[i].sumdqdh = 0.0;
     }
 }
+
+static void addCoupledLinks(void)
+// Avaris coupled run: the cut conduits that end at a node of this sub-model
+// were computed by the upstream sub-model in this same iteration; they add
+// their flow, surface area and dQ/dH to the node exactly as a conduit of this
+// model would.
+{
+    int i;
+    for (i = 0; i < Nobjects[NODE]; i++)
+    {
+        if ( !Node[i].cplDown ) continue;
+        if ( Node[i].cplQ >= 0.0 ) Node[i].inflow += Node[i].cplQ;
+        else Node[i].outflow -= Node[i].cplQ;
+        Xnode[i].newSurfArea += Node[i].cplArea;
+        Xnode[i].sumdqdh += Node[i].cplDqdh;
+    }
+}
+
+void dynwave_setVariableStep(double dt) { VariableStep = dt; }
 
 //=============================================================================
 

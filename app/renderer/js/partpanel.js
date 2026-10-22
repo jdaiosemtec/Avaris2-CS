@@ -42,7 +42,6 @@
         opt('2D ponding depth', ['cells ≥', num('pondDepth', 46, { step: 0.05 }), unit], '0 = flood depth of the 2D options, else ' + (app.model.isSI ? '0.3 m' : '1 ft') + '.'),
         opt('1D ponding (no 2D results)', ['flooded ≥', num('pondMin', 46), 'min, within', num('pondDist', 52)], 'Flooded manholes closer than this distance (map units) to each other form one ponding area. 0 = ' + (app.model.isSI ? '50 m' : '150 ft') + '.'),
         opt('Size tolerance', ['±', num('tol', 46), '% of the average size']),
-        opt('Coupling time step', [num('ctrl', 46), 's'], 'Used by the coupled run (partitions exchange flows and water levels at this interval), not by the partitioning.'),
         h('div', { class: 'ah', style: { gridColumn: '1 / -1', marginTop: '4px' } }, 'Pumps, orifices, weirs, outlets and the links of flow dividers are never cut.'))));
       const status = h('span', { class: 'hint' });
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '10px 0 2px' } }, B(V.P ? 'Partition Again' : 'Partition', () => go(status), true, busy), V.P && V.sel !== null ? B('Show All', () => { V.sel = null; render(); redrawMap(); }) : null, status));

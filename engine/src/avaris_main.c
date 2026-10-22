@@ -21,6 +21,8 @@
 extern double TotalDuration;     // simulation duration (msec) from globals
 extern int    AvarisSkipDetail;  // omit time series tables from report
 int osem_applyExtensions(const char* inpFile);
+int couple_main(int argc, char* argv[]);
+double wallTime(void);
 
 int main(int argc, char *argv[])
 {
@@ -28,8 +30,10 @@ int main(int argc, char *argv[])
     double elapsed = 0.0, total, pct, lastPct = -1.0;
     float e1 = 0, e2 = 0, e3 = 0;
     int err = 0;
-    clock_t t0 = clock();
+    double t0 = wallTime();               // wall clock (clock() adds up all threads)
 
+    if (argc >= 3 && (strcmp(argv[1], "-couple") == 0 || strcmp(argv[1], "-cplworker") == 0))
+        return couple_main(argc, argv);
     if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0))
     {
         int v = swmm_getVersion();
@@ -78,6 +82,6 @@ int main(int argc, char *argv[])
     }
     swmm_close();
     printf("DONE %d %.3f %.3f %.3f %.2f\n", err, e1, e2, e3,
-           (double)(clock() - t0) / CLOCKS_PER_SEC);
+           wallTime() - t0);
     return err;
 }
