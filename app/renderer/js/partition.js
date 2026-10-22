@@ -22,7 +22,7 @@
   const fnv = (s) => { let x = 0x811c9dc5; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193); } return (x >>> 0).toString(16).padStart(8, '0'); };
   AV.fnvHash = fnv;
 
-  const DEF = { n: 12, revMin: 60, revPct: 5, pondMin: 30, pondDist: 0, tol: 25, ctrl: 60, boundary: true, folder: '', pattern: '{model}_P{nn}.inp' };
+  const DEF = { n: 12, revMin: 60, revPct: 5, revMax: 95, keepPonds: true, pondMin: 30, pondDist: 0, tol: 25, ctrl: 60, boundary: true, folder: '', pattern: '{model}_P{nn}.inp' };
 
   // ------------------------------------------------------------------ analysis of the base run
   // per link: minutes with flow, minutes with reverse flow, peak |Q|; per node: minutes flooded; 2D ponding areas
@@ -40,7 +40,7 @@
     // 2D ponding areas: connected wet cells (max depth >= flood depth threshold) and the manholes coupled to them
     const mesh = app.mesh2d, MR = app.meshResults;
     if (mesh && MR && mesh.cells && mesh.couplings) {
-      const thr = MR.thr > 0 ? MR.thr : (SI ? 0.1 : 0.3); const wet = new Map(); const key = (x, y, s) => Math.round(x / s) + ',' + Math.round(y / s);
+      const thr = S.pondDepth > 0 ? S.pondDepth : MR.thr > 0 ? MR.thr : (SI ? 0.3 : 1.0); A.pondDepth = thr; const wet = new Map(); const key = (x, y, s) => Math.round(x / s) + ',' + Math.round(y / s);
       mesh.cells.forEach((c, k) => { if (MR.maxd[k] >= thr) wet.set(key(c.x, c.y, c.s), k); });
       const comp = new Map(); let nc = 0;
       for (const [kk, k] of wet) { if (comp.has(k)) continue; const id = nc++; const st = [k]; comp.set(k, id);
@@ -70,21 +70,41 @@
   // links that must not be cut, with the reason, and the ponding area of each node
   AV.partGlue = function (app, A, S) {
     const m = app.model; const info = (id) => A.links.get(id) || { f: 0, r: 0, q: 0 };
-    const isRev = (l) => { const x = info(l.id); return x.f >= S.revMin && x.r / Math.max(x.f, 1e-9) * 100 >= S.revPct; };
+    // oscillating flow: the flow changes direction - reverse for at least revPct % but less than revMax % of the time with
+    // flow (a pipe that flows backwards nearly all the time is one-directional and may be cut; it is turned round)
+    const revMax = S.revMax > 0 ? S.revMax : 95;
+    const isRev = (l) => { const x = info(l.id); const sh = x.r / Math.max(x.f, 1e-9) * 100; return x.f >= S.revMin && sh >= S.revPct && sh < revMax; };
     const isBack = (l) => { const x = info(l.id); return x.f > 0 && x.r / x.f > 0.5; };
     const divL = new Set(); for (const n of m.nodes.values()) if (n.type === 'DIVIDER') { for (const l of m.links.values()) if (l.from === n.id) divL.add(l.id); }
     const why = new Map(); // link -> reason it must not be cut
-    for (const l of m.links.values()) { const r = l.type !== 'CONDUIT' ? l.type.toLowerCase() : isRev(l) ? 'reverse flow' : isBack(l) ? 'flows backwards' : divL.has(l.id) ? 'flow divider' : null; if (r) why.set(l.id, r); }
+    // hard: never cut (pumps, orifices, weirs, outlets, divider links, links that flow mostly backwards);
+    // soft: reverse flow by the rule - kept whole unless they join more nodes than one partition can hold
+    const hard = new Set(), rev = new Map();
+    for (const l of m.links.values()) { const x = info(l.id); const pct = x.r / Math.max(x.f, 1e-9) * 100;
+      const r = l.type !== 'CONDUIT' ? l.type.toLowerCase() : divL.has(l.id) ? 'flow divider' : isRev(l) ? 'oscillating flow ' + pct.toFixed(0) + ' %' : null;
+      if (!r) continue; why.set(l.id, r); if (r.startsWith('oscillating')) rev.set(l.id, Math.min(pct, 100 - pct)); else hard.add(l.id); }
     const pondOf = new Map(); A.ponds.forEach((g, k) => { for (const id of g) if (m.nodes.has(id)) pondOf.set(id, k); });
-    return { why, pondOf, isBack, info };
+    return { why, hard, rev, pondOf, isBack, info };
   };
   AV.partCompute = function (app, A, S) {
     const m = app.model; const G0 = AV.partGlue(app, A, S); const { why, isBack, info } = G0;
     // union-find
     const ids = [...m.nodes.keys()]; const ix = new Map(ids.map((id, i) => [id, i])); const par = new Int32Array(ids.length).map((_, i) => i);
-    const f = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; }; const un = (a, b) => { a = f(a); b = f(b); if (a !== b) par[a] = b; };
-    for (const l of m.links.values()) if (why.has(l.id) && ix.has(l.from) && ix.has(l.to)) un(ix.get(l.from), ix.get(l.to));
-    const pondOf = G0.pondOf; A.ponds.forEach((g) => { const a = g.filter(id => ix.has(id)); for (let i = 1; i < a.length; i++) un(ix.get(a[0]), ix.get(a[i])); });
+    const sz = new Int32Array(ids.length).fill(1);
+    const f = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    const un = (a, b, cap) => { a = f(a); b = f(b); if (a === b) return true; if (cap && sz[a] + sz[b] > cap) return false; par[a] = b; sz[b] += sz[a]; return true; };
+    // a group kept whole may hold at most about one partition
+    const cap = Math.max(2, Math.floor(ids.length / Math.max(1, S.n) * 0.9)); const splitRev = new Set(), splitPond = new Set();
+    for (const l of m.links.values()) if (G0.hard.has(l.id) && ix.has(l.from) && ix.has(l.to)) un(ix.get(l.from), ix.get(l.to));
+    for (const [id, pct] of [...G0.rev].sort((a, b) => b[1] - a[1])) { const l = m.links.get(id); if (ix.has(l.from) && ix.has(l.to) && !un(ix.get(l.from), ix.get(l.to), cap)) splitRev.add(id); }
+    const pondOf = G0.pondOf; (S.keepPonds === false ? [] : A.ponds).map((g, k) => [g.filter(id => ix.has(id)), k]).sort((a, b) => a[0].length - b[0].length).forEach(([a, k]) => {
+      // members joined nearest first, so that a split ponding area keeps compact pieces
+      if (a.length < 2) return; if (a.length > cap) { splitPond.add(k); return; } // larger than a partition: no use as a constraint
+      const pts = a.map(id => m.nodes.get(id));
+      if (a.length > 3000) { const o = [...pts.keys()].sort((i, j) => (pts[i].x + pts[i].y) - (pts[j].x + pts[j].y)); for (let t = 1; t < o.length; t++) if (!un(ix.get(a[o[t - 1]]), ix.get(a[o[t]]), cap)) splitPond.add(k); return; }
+      const done = [0]; const left = new Set(pts.keys()); left.delete(0);
+      while (left.size) { let bi = -1, bj = -1, bd = Infinity; for (const j of left) { const q = pts[j]; for (const i of done.slice(-30)) { const d = (pts[i].x - q.x) ** 2 + (pts[i].y - q.y) ** 2; if (d < bd) { bd = d; bi = i; bj = j; } } }
+        left.delete(bj); done.push(bj); if (!un(ix.get(a[bi]), ix.get(a[bj]), cap)) splitPond.add(k); } });
     // blocks
     const blk = new Int32Array(ids.length); const B = []; const bix = new Map();
     for (let i = 0; i < ids.length; i++) { const r = f(i); let b = bix.get(r); if (b === undefined) { b = B.length; bix.set(r, b); B.push({ w: 0, nodes: [], down: -1, dl: null, ups: [] }); } blk[i] = b; B[b].w++; B[b].nodes.push(i); }
@@ -134,7 +154,7 @@
       else { let bd = Infinity; for (let q = 0; q < cnt; q++) { if (q === sm) continue; const d = (cx[q] / size[q] - cx[sm] / size[sm]) ** 2 + (cy[q] / size[q] - cy[sm] / size[sm]) ** 2; if (d < bd) { bd = d; to = q; } } }
       for (const [id, p] of owner) owner.set(id, p === sm ? (to > sm ? to - 1 : to) : p > sm ? p - 1 : p); cnt--; }
     best.count = cnt;
-    const P = { owner, count: best.count, why, pondOf, blocks: B.length, manual: 0 };
+    const P = { owner, count: best.count, why, hard: G0.hard, pondOf, blocks: B.length, manual: 0, splitRev, splitPond, cap };
     AV.partRecut(app, P, A); return P;
   };
   // couplings: every link between two partitions; the upstream end follows the base-run flow direction
@@ -163,9 +183,12 @@
   // checks shown in the panel; errors block generation
   AV.partChecks = function (app, P, A, S, cores) {
     const out = []; const st = P.stats; const avg = app.model.nodes.size / Math.max(1, st.length);
-    const bad = P.cuts.filter(c => P.why.has(c.link.id)); const badP = P.cuts.filter(c => P.pondOf.has(c.up) && P.pondOf.get(c.up) === P.pondOf.get(c.down));
-    out.push(bad.length ? { t: 'er', s: bad.length + ' cut(s) on links that must not be cut: ' + bad.slice(0, 5).map(c => c.link.id + ' (' + P.why.get(c.link.id) + ')').join(', ') } : { t: 'ok', s: 'No cut on links with reverse flow, pumps, orifices, weirs, outlets or flow dividers' });
-    out.push(badP.length ? { t: 'er', s: badP.length + ' cut(s) through a 2D ponding area' } : { t: 'ok', s: A.ponds.length ? 'No cut through any of the ' + A.ponds.length + ' ponding areas (' + A.pondSource + ')' : 'No ponding areas in the base results' });
+    const hard = P.hard || new Set(); const bad = P.cuts.filter(c => hard.has(c.link.id)); const rv = P.cuts.filter(c => P.why.has(c.link.id) && !hard.has(c.link.id));
+    const badP = P.cuts.filter(c => P.pondOf.has(c.up) && P.pondOf.get(c.up) === P.pondOf.get(c.down)); const nRev = [...P.why.values()].filter(v => v.startsWith('oscillating')).length;
+    out.push(bad.length ? { t: 'er', s: bad.length + ' cut(s) on links that must never be cut: ' + bad.slice(0, 5).map(c => c.link.id + ' (' + P.why.get(c.link.id) + ')').join(', ') } : { t: 'ok', s: 'No cut on pumps, orifices, weirs, outlets or flow dividers' });
+    out.push(rv.length ? { t: 'wn', s: rv.length + ' cut(s) on pipes with oscillating flow: ' + rv.slice(0, 6).map(c => c.link.id + ' (' + P.why.get(c.link.id).replace('oscillating flow ', '') + ' reverse)').join(', ') + (rv.length > 6 ? ' …' : '') + '. ' + nRev + ' of ' + app.model.links.size + ' links have oscillating flow in the base results and form groups larger than one partition, so some had to be cut (the least oscillating ones).' } : { t: 'ok', s: 'No cut on pipes with oscillating flow' + (nRev ? ' (' + nRev + ' kept whole)' : '') });
+    const pondCut = new Set(badP.map(c => P.pondOf.get(c.up)));
+    if (S.keepPonds === false) out.push({ t: 'ok', s: 'Ponding areas are not used as a constraint (option off)' }); else out.push(badP.length ? { t: 'wn', s: badP.length + ' cut(s) through ' + pondCut.size + ' ponding area(s) larger than one partition (' + [...pondCut].slice(0, 3).map(k => A.ponds[k].length + ' manholes').join(', ') + '). The base results show ponding over a large part of the model; check them or raise the ponding depth.' } : { t: 'ok', s: A.ponds.length ? 'No cut through any of the ' + A.ponds.length + ' ponding areas (' + A.pondSource + ')' : 'No ponding areas in the base results' });
     const empty = st.filter(s => !s.outfalls.length && !s.cout); out.push(empty.length ? { t: 'er', s: empty.map(s => PID(s.i)).join(', ') + ': no outfall and no cut point' } : { t: 'ok', s: 'Every partition drains to an outfall or a cut point' });
     const dev = Math.max(...st.map(s => Math.abs(s.nodes - avg) / avg)) * 100;
     out.push(dev > S.tol ? { t: 'wn', s: 'Largest deviation from the average size: ' + dev.toFixed(0) + ' % (tolerance ' + S.tol + ' %) – move branches if needed' } : { t: 'ok', s: 'Partition sizes within ' + dev.toFixed(0) + ' % of the average' });
@@ -220,9 +243,11 @@
         const N = m.nodes.get(dn); const oid = cs.length === 1 ? dn : dn + '__' + c.link.id; const ser = bnd && bnd.head.has(dn) ? 'CPL_H_' + oid : null;
         sm.nodes.set(oid, { id: oid, kind: 'NODE', type: 'OUTFALL', x: N.x, y: N.y, tag: 'PartitionOut', desc: 'Coupling outlet to ' + PID(c.downPart) + ' node ' + dn, p: { elev: +N.p.elev || 0, otype: ser ? 'TIMESERIES' : 'FIXED', stage: ser || String(+N.p.elev || 0), gated: 'NO', routeTo: '' } });
         if (ser) sm.timeseries.set(ser, { file: null, rows: bnd.head.get(dn).map(([t, v]) => ['', t.toFixed(4), +v.toFixed(4)]), desc: 'Base-run water level at ' + dn + ' (' + PID(c.downPart) + ')' });
-        const l = c.link; const lk = Object.assign({}, l, { from: l.from === dn ? oid : l.from, to: l.to === dn ? oid : l.to });
+        // a pipe that flows backwards is written turned round, so that the outfall is its downstream end
+        const l = c.link; let lk = Object.assign({}, l, { from: l.from === dn ? oid : l.from, to: l.to === dn ? oid : l.to });
+        if (l.from === dn) lk = Object.assign({}, l, { from: l.to, to: oid, verts: (l.verts || []).slice().reverse(), p: Object.assign({}, l.p, { inOff: l.p.outOff, outOff: l.p.inOff, kEntry: l.p.kExit, kExit: l.p.kEntry }) });
         sm.links.set(l.id, lk);
-        couplings.push({ id: 'C' + String(++ck).padStart(3, '0'), link: l.id, up: { partition: PID(p), node: oid, type: 'OUTFALL', receives: 'stage' }, down: { partition: PID(c.downPart), node: dn, type: N.type, receives: 'inflow' } });
+        couplings.push({ id: 'C' + String(++ck).padStart(3, '0'), link: l.id, reversed: l.from === dn, up: { partition: PID(p), node: oid, type: 'OUTFALL', receives: 'stage' }, down: { partition: PID(c.downPart), node: dn, type: N.type, receives: 'inflow' } });
       });
       // raw sections: copied, rows of objects outside dropped (toINP), controls filtered, coupling inflows added
       sm.raw = {}; sm.rawOrder = m.rawOrder.slice();
@@ -260,8 +285,8 @@
   AV.partDefinition = function (app, P, A, S, built, cores) {
     const m = app.model; const sig = AV.partSignatures(m); const asg = {}; for (const [id, p] of P.owner) asg[id] = p;
     return { format: 'avaris-partition', version: 1, master: built.name + '.inp', created: new Date().toISOString(), program: 'Avaris2 CS ' + ((app.info && app.info.version) || ''),
-      baseResults: A.resultsName || null, settings: { partitions: P.count, balanceBy: 'nodes', tolerancePct: S.tol, doNotCut: { reverseFlow: { minFlowMin: S.revMin, minReversePct: S.revPct }, ponding: { source: A.pondSource || null, minFloodMin: S.pondMin, distance: A.pondDist || null } } },
-      simulation: { controlStep: S.ctrl, reportStep: m.options.REPORT_STEP || null, cores, maxPartitions: Math.floor(cores * 1.5) },
+      baseResults: A.resultsName || null, settings: { partitions: P.count, balanceBy: 'nodes', tolerancePct: S.tol, doNotCut: { oscillatingFlow: { minFlowMin: S.revMin, minReversePct: S.revPct, maxReversePct: S.revMax || 95 }, keepPondingAreas: S.keepPonds !== false, ponding: { source: A.pondSource || null, depth2D: A.pondDepth || null, minFloodMin: S.pondMin, distance: A.pondDist || null } } },
+      simulation: { controlStep: S.ctrl, controlStepNote: 'coupling interval: partitions exchange flows and water levels every controlStep seconds', reportStep: m.options.REPORT_STEP || null, cores, maxPartitions: Math.floor(cores * 1.5) },
       partitions: built.files.map(f => ({ id: PID(f.p), inp: f.file, nodes: f.nodes, links: f.links, subcatchments: f.subs, outfalls: f.outfalls, couplingsIn: f.cin, couplingsOut: f.cout, hotstart: null, hash: fnv(f.text) })),
       couplings: built.couplings, levels: AV.partLevels(P), pattern: S.pattern, folder: S.folderRel || '.', manualChanges: P.manual || 0, assignment: asg, signatures: sig };
   };
@@ -277,7 +302,7 @@
   };
   AV.partOverlay = function (map, ctx) {
     const app = map.app, V = app.partView; if (!V || !V.P) return; const P = V.P, m = app.model; ctx.save();
-    if (V.showNo && V.A) for (const g of V.A.ponds) { for (const id of g) { const n = m.nodes.get(id); if (!n) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }
+    if (V.showNo && V.A && V.S.keepPonds !== false) for (const [k, g] of V.A.ponds.entries()) { if (P.splitPond && P.splitPond.has(k)) continue; for (const id of g) { const n = m.nodes.get(id); if (!n) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }
     if (V.showCut) for (const c of P.cuts) { const a = m.nodes.get(c.link.from), b = m.nodes.get(c.link.to); const pts = [map.toScreen(a.x, a.y)].concat(c.link.verts.map(v => map.toScreen(v[0], v[1]))).concat([map.toScreen(b.x, b.y)]); const k = Math.floor(pts.length / 2);
       const X = pts.length % 2 ? pts[k][0] : (pts[k - 1][0] + pts[k][0]) / 2, Y = pts.length % 2 ? pts[k][1] : (pts[k - 1][1] + pts[k][1]) / 2;
       const bad = P.why.has(c.link.id); ctx.beginPath(); ctx.arc(X, Y, 7, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = bad ? '#ff6d00' : '#d32f2f'; ctx.lineWidth = 2; ctx.stroke();
@@ -290,8 +315,8 @@
     const V = app.partView; if (!V || !V.P) return null;
     return h('div', null, h('div', { class: 'lt' }, 'Model partition: ' + V.P.count + ' partitions'),
       h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '3px solid #37474f', verticalAlign: 'middle', marginRight: '6px' } }), 'Coupling link (cut point ⊗)'),
-      V.showNo ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '2.4px solid #8e24aa', verticalAlign: 'middle', marginRight: '6px' } }), 'Not cut (reverse flow, pump, weir …)') : null,
-      V.showNo && V.A && V.A.ponds.length ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', border: '1.5px dashed #1e88e5', verticalAlign: 'middle', marginRight: '9px' } }), 'Ponding area – kept together') : null);
+      V.showNo ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '2.4px solid #8e24aa', verticalAlign: 'middle', marginRight: '6px' } }), 'Not cut (oscillating flow, pump, weir …)') : null,
+      V.showNo && V.A && V.A.ponds.length && V.S.keepPonds !== false ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', border: '1.5px dashed #1e88e5', verticalAlign: 'middle', marginRight: '9px' } }), 'Ponding area – kept together') : null);
   };
 
   // ------------------------------------------------------------------ surface area of every partition (DEM, D8)

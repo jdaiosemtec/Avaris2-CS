@@ -5,7 +5,7 @@
   const pad2 = (i) => String(i + 1).padStart(2, '0'); const PID = (i) => 'P' + pad2(i);
   const COL = (i) => AV.partColor(i);
   const defPath = (app) => app.filePath ? app.filePath.replace(/\.inp$/i, '.partition.json') : null;
-  const prefsOf = (app) => Object.assign({ n: 12, revMin: 60, revPct: 5, pondMin: 30, pondDist: 0, tol: 25, ctrl: 60, pattern: '{model}_P{nn}.inp', folder: '', boundary: true }, app.prefs.partition || {});
+  const prefsOf = (app) => Object.assign({ n: 12, revMin: 60, revPct: 5, revMax: 95, keepPonds: true, pondMin: 30, pondDist: 0, pondDepth: 0, tol: 25, ctrl: 60, pattern: '{model}_P{nn}.inp', folder: '', boundary: true }, app.prefs.partition || {});
   let cores = null;
   const getCores = async () => { if (cores) return cores; try { const c = await window.host.cpuInfo(); cores = c.physical || c.logical || 4; } catch (e) { cores = 4; } return cores; };
 
@@ -35,17 +35,19 @@
         h('label', null, 'Number of partitions'), h('span', null, num('n', 64, { min: 2, max: 400 }), h('span', { class: 'hint' }, '  this computer: ' + C + ' cores → at most ' + mx + ' in parallel')),
         h('label', null, 'Base results'), h('span', { class: R ? '' : 'hint' }, R ? AV.basename(R.meta.file || '') + ' (' + R.meta.nPeriods + ' steps)' : 'none – run a simulation or open results (Database) first')));
       body.appendChild(h('details', { open: !!V.adv, ontoggle: (e) => { V.adv = e.target.open; } }, h('summary', null, 'Advanced'), h('div', { class: 'form', style: { marginTop: '6px' } },
-        h('label', null, 'Do not cut reverse flow'), h('span', null, 'flow ≥ ', num('revMin', 56), ' min and reverse ≥ ', num('revPct', 48), ' % of it'),
-        h('label', null, 'Ponding areas (1D results)'), h('span', null, 'flooded ≥ ', num('pondMin', 56), ' min, within ', num('pondDist', 64), ' map units (0 = auto)'),
+        h('label', null, 'Do not cut oscillating flow'), h('span', null, 'flow ≥ ', num('revMin', 56), ' min and reverse ', num('revPct', 48), ' % – ', num('revMax', 48), ' % of that time'),
+        h('label', null, 'Keep ponding areas whole'), h('label', { style: { color: 'inherit' } }, h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } }), ' manholes of one ponding area stay in one partition'),
+        h('label', null, '2D ponding area'), h('span', null, 'cells deeper than ', num('pondDepth', 56, { step: 0.05 }), ' ' + (app.model.isSI ? 'm' : 'ft') + '  (0 = flood depth of the 2D options, else ' + (app.model.isSI ? '0.3 m' : '1 ft') + ')'),
+        h('label', null, '1D ponding area'), h('span', null, 'manholes flooded ≥ ', num('pondMin', 56), ' min, closer than ', num('pondDist', 64), ' map units to each other (0 = 50 m / 150 ft)'),
         h('label', null, 'Size tolerance'), h('span', null, '± ', num('tol', 52), ' % of the average (nodes)'),
-        h('label', null, 'Control time step'), h('span', null, num('ctrl', 60), ' s  (integer multiple of the routing steps)'),
-        h('div', { class: 'note' }, 'With 1D-2D results the ponding areas are the connected wet cells of the 2D mesh; manholes coupled to one ponding area are kept in one partition. Pumps, orifices, weirs, outlets and the links of flow dividers are never cut.'))));
+        h('label', null, 'Coupling time step'), h('span', null, num('ctrl', 60), ' s  (for the coupled run: partitions exchange flows and water levels at this interval; integer multiple of the routing steps)'),
+        h('div', { class: 'note' }, 'Oscillating flow: the flow changes direction (reverse between the two percentages of the time with flow). A pipe that flows backwards nearly all the time is one-directional: it may be cut and is written turned round. Ponding areas: with 1D-2D results the connected 2D cells deeper than the given depth, with 1D results the flooded manholes close to each other. Pumps, orifices, weirs, outlets and the links of flow dividers are never cut. Oscillating pipes and ponding areas are kept whole as long as they fit in one partition; larger groups are cut where the flow oscillates least, and the checks list it.'))));
       const status = h('span', { class: 'hint' });
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '10px 0 2px' } }, B(V.P ? 'Partition Again' : 'Partition', () => go(status), true, busy), V.P && V.sel !== null ? B('Show All', () => { V.sel = null; render(); redrawMap(); }) : null, status));
       if (!V.P) { body.appendChild(h('div', { class: 'note', style: { marginTop: '8px' } }, 'Every partition drains in one direction (flow directions of the base results); pipes with reverse flow and 2D ponding areas are never cut; the cut points are placed so that the partitions have about the same size with as few cuts as possible.')); return; }
       const P = V.P, st = P.stats; const mxN = Math.max(...st.map(s => s.nodes)), mnN = Math.min(...st.map(s => s.nodes));
       body.appendChild(sec(2, 'Result'));
-      body.appendChild(h('div', { class: 'pchips' }, [[P.count, 'partitions'], [P.cuts.length, 'cut points'], [mnN + '–' + mxN, 'nodes per partition'], [P.why.size, 'links kept whole'], [V.A.ponds.length, 'ponding areas']].map(([v, l]) => h('div', { class: 'pchip' }, h('b', null, String(v)), h('span', null, l)))));
+      body.appendChild(h('div', { class: 'pchips' }, [[P.count, 'partitions'], [P.cuts.length, 'cut points'], [mnN + '–' + mxN, 'nodes per partition'], [[...P.why.values()].filter(v => v.startsWith('oscillating')).length, 'oscillating pipes'], [P.hard ? P.hard.size : 0, 'never cut (pumps …)'], [V.A.ponds.length, 'ponding areas']].map(([v, l]) => h('div', { class: 'pchip' }, h('b', null, String(v)), h('span', null, l)))));
       const tb = h('table', { class: 'ptbl' }, h('tr', null, ['', 'Partition', 'Nodes', '', 'Links', 'Subc.', 'In', 'Out', 'Outfalls'].map(x => h('th', null, x))),
         st.map(s => h('tr', { class: 'p' + (V.sel === s.i ? ' sel' : ''), onclick: () => { V.sel = V.sel === s.i ? null : s.i; render(); redrawMap(); }, ondblclick: () => zoomTo(s.i) },
           h('td', null, h('span', { class: 'sw', style: { background: COL(s.i) } })), h('td', null, PID(s.i)), h('td', { class: 'num' }, String(s.nodes)),
@@ -152,7 +154,7 @@
       if (!def || def.format !== 'avaris-partition') { st.innerHTML = ''; st.appendChild(h('div', { class: 'note' }, 'No partition definition next to this model. Use the Partition tab first.')); return; }
       busy = true; st.innerHTML = ''; st.appendChild(h('div', { class: 'hint' }, 'Comparing…'));
       try {
-        const m = app.model; const S = Object.assign({}, V.S, { revMin: def.settings.doNotCut.reverseFlow.minFlowMin, revPct: def.settings.doNotCut.reverseFlow.minReversePct, pattern: def.pattern || V.S.pattern });
+        const m = app.model; const dn = def.settings.doNotCut, osc = dn.oscillatingFlow || dn.reverseFlow || {}; const S = Object.assign({}, V.S, { revMin: osc.minFlowMin, revPct: osc.minReversePct, revMax: osc.maxReversePct || 95, keepPonds: dn.keepPondingAreas !== false, pattern: def.pattern || V.S.pattern });
         const A = await AV.partAnalyse(app, S);
         // assignment: known nodes keep their partition; new nodes follow the flow (downstream first, then upstream, then nearest)
         const owner = new Map(); const added = [], deleted = [], decide = [];
@@ -167,7 +169,7 @@
         for (const id of pending) { const n = m.nodes.get(id); let bd = Infinity, bp = 0; for (const [o, q] of owner) { const x = m.nodes.get(o); const d = (x.x - n.x) ** 2 + (x.y - n.y) ** 2; if (d < bd) { bd = d; bp = q; } } owner.set(id, bp); }
         const P = { owner, why: new Map(), pondOf: new Map(), manual: def.manualChanges || 0 };
         // links that must not be cut, with the latest results
-        const g = AV.partGlue(app, A, S); P.why = g.why; P.pondOf = g.pondOf; AV.partRecut(app, P, A);
+        const g = AV.partGlue(app, A, S); P.why = g.why; P.hard = g.hard; P.pondOf = g.pondOf; AV.partRecut(app, P, A);
         const sig = AV.partSignatures(m); const old = def.signatures || { N: {}, L: {}, S: {} };
         const changes = []; const pOfL = (l) => P.owner.get(l.from);
         for (const [k, coll, lab] of [['N', m.nodes, 'Node'], ['L', m.links, 'Link'], ['S', m.subcatchments, 'Subcatchment']]) {
