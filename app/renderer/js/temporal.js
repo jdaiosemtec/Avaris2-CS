@@ -15,13 +15,17 @@
   const T = AV.Temporal = { stores: new Map(), running: new Map(), queue: [], curP: null, listeners: new Set() };
   const truthy = (v) => v !== null && v !== undefined && v !== false && v !== 0 && v !== '' && !(typeof v === 'number' && !isFinite(v));
   const keyOf = (R, node) => R.handle + '|' + (AV.app && AV.app.model ? AV.app.model.version : 0) + '|' + node.kind + '|' + node.key;
+  // the store of a node, cached on the node (keyOf builds a long string: too slow for millions of look-ups)
+  const storeOf = (R, node) => { const v = AV.app && AV.app.model ? AV.app.model.version : 0; const c = node._sc;
+    if (c && c.h === R.handle && c.v === v && T.stores.get(c.k) === c.st) return c.st;
+    const k = keyOf(R, node); const st = T.stores.get(k); if (st) node._sc = { h: R.handle, v, k, st }; return st; };
 
   // number of true steps of an interval list within [a, b] (an open interval runs up to lastP)
   const count = (iv, a, b, lastP) => { let n = 0; for (const [s, e0] of iv) { const e = e0 < 0 ? lastP : e0; if (e < a || s > b) continue; n += Math.min(e, b) - Math.max(s, a) + 1; } return n; };
 
   T.value = function (node, o) {
     const app = AV.app; const R = app && app.results; if (!R || !o) return null;
-    const st = T.stores.get(keyOf(R, node));
+    const st = storeOf(R, node);
     if (!st) { T.request(node); return null; }
     const live = T.curP !== null && st.live; if (!st.done && !live) return null;
     // inside a pass over the results (T.curP set) a finished store is read at the pass's time step too
@@ -73,32 +77,75 @@
     const objsOf = (k) => [...(k === 'node' ? m.nodes.values() : k === 'link' ? m.links.values() : m.subcatchments.values())];
     const jobs = nodes.map(node => { const k = keyOf(R, node); const st = { done: false, live: true, n, stepMin, data: new Map() }; T.stores.set(k, st); T.running.set(k, st); return { node, st, objs: objsOf(node.kind) }; });
     const t0 = Date.now(); const handle = R.handle;
+    const busy = AV.busy ? AV.busy.start('Computing time functions') : null;
+    // which results the conditions read: only those columns are fetched (whole snapshots when unknown)
+    const full = jobs.some(J => !Array.isArray(J.node.snaps)); const need = {};
+    if (!full) for (const J of jobs) for (const [t, v] of J.node.snaps) (need[t] || (need[t] = new Set())).add(v);
+    const types = Object.keys(need); const NV = R.meta.nVars; const NO = { subcatch: R.meta.ids.subcatch.length, node: R.meta.ids.node.length, link: R.meta.ids.link.length, system: 1 };
+    const bufs = {}; for (const t of types) bufs[t] = new Float32Array(NO[t] * NV[t]);
+    const bytesPer = types.reduce((a, t) => a + 4 * NO[t] * need[t].size, 0);
+    const block = full ? 1 : Math.max(1, Math.min(n, Math.floor((24 << 20) / Math.max(1, bytesPer))));
+    // simple conditions "rptX op c" / "abs(rptX) op c" are evaluated directly on the arrays (no expression per object)
+    const RV = AV.RESULT_VARS || {}; const SHORT = { 'Head (HGL)': 'Hgl', 'Lateral Inflow': 'LatInflow', 'Total Inflow': 'TotInflow', 'Velocity': 'Vel' };
+    const varOf = (kind, nm) => { const rk = kind === 'sub' ? 'subcatch' : kind; const L = RV[rk] || []; for (let v = 0; v < L.length; v++) { const s2 = SHORT[L[v]] || L[v].replace(/[^A-Za-z]/g, ''); if (s2.toLowerCase() === nm.toLowerCase() || (nm.toLowerCase() === 'velocity' && s2 === 'Vel')) return [rk, v]; } return null; };
+    for (const J of jobs) {
+      if (full) break;
+      const k = /^(?:dur|run|win|totdur|maxrun|maxwin|first)\(\s*(abs\s*\(\s*)?rpt(\w+)\s*(\))?\s*(<=|>=|<|>)\s*(.+?)\s*(,\s*[\d.]+\s*)?\)$/i.exec(J.node.key || '');
+      if (!k || !!k[1] !== !!k[3]) continue;
+      const tv = varOf(J.node.kind, k[2]); if (!tv || !need[tv[0]] || !need[tv[0]].has(tv[1])) continue;
+      // the right-hand side must not change with the time step (a number, or e.g. max(0.0001, 2 / 100 * rptMaxFlow))
+      let rhs = null; try { rhs = AV.compileExpr(k[5], AV.exprFields(app, J.node.kind)); } catch (e) { rhs = null; }
+      if (!rhs || rhs.temporals.length) continue; const flds = AV.exprFields(app, J.node.kind); if (rhs.used.some(nm => { const f = flds.find(x => x.n === nm); return !f || f.snap || /snap|surchargeNow|valueOf\([^)]*false/.test(String(f.get)); })) continue;
+      const idx = R.idx[tv[0]]; const ii = new Int32Array(J.objs.length), cc = new Float64Array(J.objs.length);
+      J.objs.forEach((o, q) => { const x = idx && idx.get(o.id); ii[q] = x === undefined ? -1 : x; const c = rhs.fn(o); cc[q] = typeof c === 'number' && isFinite(c) ? c : NaN; });
+      J.fast = { t: tv[0], v: tv[1], abs: !!k[1], op: k[4], cc, ii, nv: NV[tv[0]] };
+    }
+    let lastYield = performance.now();
     try {
-      for (let p = 0; p < n; p++) {
+      for (let p0 = 0; p0 < n; p0 += block) {
         if (app.results !== R || R.handle !== handle) throw new Error('results changed');
-        const [s, nd, l, sy] = await Promise.all(['subcatch', 'node', 'link', 'system'].map(t => window.host.outSnapshotAll(handle, p, t)));
-        const save = R.snap; R.snap = { subcatch: s, node: nd, link: l, system: sy }; T.curP = p;
-        try {
-          for (const J of jobs) {
-            const { node, st } = J;
-            if (node.fn === 'peak') {
-              for (const o of J.objs) { let v = node.cond(o); if (typeof v === 'boolean') v = v ? 1 : 0; v = typeof v === 'number' ? v : (v === null || v === undefined ? null : Number(v)); if (v === null || !isFinite(v)) continue;
-                const d = st.data.get(o.id); if (!d) st.data.set(o.id, { max: v, pmax: p }); else if (v > d.max) { d.max = v; d.pmax = p; } }
-            } else {
-              for (const o of J.objs) { const c = truthy(node.cond(o)); let iv = st.data.get(o.id);
-                if (c) { if (!iv) st.data.set(o.id, iv = []); const L = iv[iv.length - 1]; if (!L || L[1] >= 0) iv.push([p, -1]); }
-                else if (iv) { const L = iv[iv.length - 1]; if (L && L[1] < 0) L[1] = p - 1; } }
+        const np = Math.min(block, n - p0); let cols = null;
+        if (full) { const [s, nd, l, sy] = await Promise.all(['subcatch', 'node', 'link', 'system'].map(t => window.host.outSnapshotAll(handle, p0, t))); cols = { s, nd, l, sy }; }
+        else cols = Object.fromEntries(await Promise.all(types.map(async t => [t, await window.host.outColumns(handle, p0, np, t, [...need[t]])])));
+        for (let q = 0; q < np; q++) {
+          const p = p0 + q; const save = R.snap;
+          if (full) R.snap = { subcatch: cols.s, node: cols.nd, link: cols.l, system: cols.sy };
+          else { const sn = {}; for (const t of types) { const vs = [...need[t]], A = bufs[t], C = cols[t], N = NO[t], nv = NV[t]; for (let k = 0; k < vs.length; k++) { const o = (q * vs.length + k) * N, v = vs[k]; for (let i = 0; i < N; i++) A[i * nv + v] = C[o + i]; } sn[t] = A; } R.snap = sn; }
+          T.curP = p;
+          try {
+            for (const J of jobs) {
+              const { node, st } = J; const F = J.fast;
+              if (node.fn === 'peak') {
+                // objects whose time-dependent inner functions (dur, run, win) are never true have a constant value:
+                // evaluated once only
+                if (J.skip === undefined) { J.skip = null;
+                  const dyn = (node.children || []).filter(c => /^(dur|run|win)$/.test(c.fn)); const sts = dyn.map(c => storeOf(R, c));
+                  if (Array.isArray(node.snaps) && !node.snaps.length && sts.every(x => x && x.done)) { J.skip = new Uint8Array(J.objs.length); J.objs.forEach((o, q) => { J.skip[q] = sts.every(x => { const iv = x.data.get(o.id); return !iv || !iv.length; }) ? 1 : 0; }); } }
+                for (let q2 = 0; q2 < J.objs.length; q2++) { if (J.skip && J.skip[q2] && p > 0) continue; const o = J.objs[q2]; let v = node.cond(o); if (typeof v === 'boolean') v = v ? 1 : 0; v = typeof v === 'number' ? v : (v === null || v === undefined ? null : Number(v)); if (v === null || !isFinite(v)) continue;
+                  const d = st.data.get(o.id); if (!d) st.data.set(o.id, { max: v, pmax: p }); else if (v > d.max) { d.max = v; d.pmax = p; } }
+              } else {
+                const A = F ? R.snap[F.t] : null;
+                for (let q2 = 0; q2 < J.objs.length; q2++) { const o = J.objs[q2]; let c;
+                  if (F) { const i = F.ii[q2], cv = F.cc[q2]; if (i < 0 || cv !== cv) c = false; else { let x = A[i * F.nv + F.v]; if (F.abs) x = Math.abs(x); c = F.op === '>' ? x > cv : F.op === '<' ? x < cv : F.op === '>=' ? x >= cv : x <= cv; } }
+                  else c = truthy(node.cond(o));
+                  let iv = st.data.get(o.id);
+                  if (c) { if (!iv) st.data.set(o.id, iv = []); const L = iv[iv.length - 1]; if (!L || L[1] >= 0) iv.push([p, -1]); }
+                  else if (iv) { const L = iv[iv.length - 1]; if (L && L[1] < 0) L[1] = p - 1; } }
+              }
             }
-          }
-        } finally { R.snap = save; T.curP = null; }
-        if (p % 25 === 24) { app.status('Computing time functions … ' + Math.round(100 * p / n) + ' %'); await new Promise(r => setTimeout(r, 0)); }
+          } finally { R.snap = save; T.curP = null; }
+          // keep the window responsive
+          if (performance.now() - lastYield > 40) { if (busy) busy.set((p + 1) / n); await new Promise(r => setTimeout(r, 0)); lastYield = performance.now(); if (app.results !== R) throw new Error('results changed'); }
+        }
+        const done = Math.min(n, p0 + np); if (busy) busy.set(done / n);
+        app.status('Computing time functions … ' + Math.round(100 * done / n) + ' %'); await new Promise(r => setTimeout(r, 0));
       }
       for (const J of jobs) { for (const iv of J.st.data.values()) if (Array.isArray(iv)) { const L = iv[iv.length - 1]; if (L && L[1] < 0) L[1] = n - 1; } J.st.done = true; J.st.live = false; }
       app.status('Time functions computed (' + nodes.length + ' function' + (nodes.length > 1 ? 's' : '') + ', ' + n + ' time steps, ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s).');
     } catch (e) {
       for (const J of jobs) T.stores.delete(keyOf(R, J.node));
       if (!/results changed/.test(e.message)) console.warn('temporal', e);
-    } finally { for (const J of jobs) T.running.delete(keyOf(R, J.node)); }
+    } finally { for (const J of jobs) T.running.delete(keyOf(R, J.node)); if (busy) busy.done(); }
     if (T.queue.length) return T.runQueue();
     if (app.theme) { app.theme.invalidate(); app.map.redraw(); }
     for (const fn of T.listeners) { try { fn(); } catch (e) { } }

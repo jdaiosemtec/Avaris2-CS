@@ -152,6 +152,31 @@ static char* nextField(char** s)
     return p;
 }
 
+#ifdef _WIN32
+// the GUI writes the configuration in UTF-8; the C run-time opens files with the ANSI code page. Paths are turned
+// into their short (8.3, ASCII) form when possible (folder short name + file name for files not yet written).
+static void winPath(char* s, size_t n)
+{
+    wchar_t w[MAXPATH], sh[MAXPATH], dir[MAXPATH];
+    char a[2 * MAXPATH];
+    const wchar_t* use = w; DWORD k;
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, w, MAXPATH)) return;
+    k = GetShortPathNameW(w, sh, MAXPATH);
+    if (k > 0 && k < MAXPATH) use = sh;
+    else
+    {
+        wchar_t* slash = wcsrchr(w, L'\\'); wchar_t* s2 = wcsrchr(w, L'/'); if (s2 > slash) slash = s2;
+        if (slash)
+        {
+            size_t m = slash - w; wcsncpy(dir, w, m); dir[m] = 0;
+            k = GetShortPathNameW(dir, sh, MAXPATH);
+            if (k > 0 && k + wcslen(slash) < MAXPATH) { wcscat(sh, slash); use = sh; }
+        }
+    }
+    if (WideCharToMultiByte(CP_ACP, 0, use, -1, a, sizeof(a), NULL, NULL)) { strncpy(s, a, n - 1); s[n - 1] = 0; }
+}
+#endif
+
 static int readCfg(const char* file, TCfg* c)
 {
     FILE* f = fopen(file, "rt");
@@ -198,6 +223,13 @@ static int readCfg(const char* file, TCfg* c)
         }
     }
     fclose(f);
+#ifdef _WIN32
+    {
+        int i;
+        winPath(c->shm, MAXPATH);
+        for (i = 0; i < c->nPart; i++) { winPath(c->part[i].inp, MAXPATH); winPath(c->part[i].rpt, MAXPATH); winPath(c->part[i].out, MAXPATH); }
+    }
+#endif
     return c->nPart > 0 && c->shm[0];
 }
 

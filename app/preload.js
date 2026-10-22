@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('host', {
   outSnapshot: (h, per, type, v) => ipcRenderer.invoke('out:snapshot', h, per, type, v),
   outStats: (h, type, v) => ipcRenderer.invoke('out:stats', h, type, v),
   outSnapshotAll: (h, per, type) => ipcRenderer.invoke('out:snapshotAll', h, per, type),
+  outColumns: (h, p0, np, type, vars) => ipcRenderer.invoke('out:columns', h, p0, np, type, vars),
   outStatsAll: (h) => ipcRenderer.invoke('out:statsAll', h),
   outPondStats: (h, idx, thr) => ipcRenderer.invoke('out:pondStats', h, idx, thr),
 });

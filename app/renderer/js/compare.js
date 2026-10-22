@@ -8,7 +8,7 @@
 
   // ---------------------------------------------------------------- data access per results source
   async function prep(res) {
-    if (!res.stats) res.stats = await window.host.outStatsAll(res.handle);
+    if (!res.stats) res.stats = await AV.busy.track(window.host.outStatsAll(res.handle), 'Reading the results (statistics)');
     if (res._tables === undefined) {
       let t = res.reportText; if (t === undefined) { try { t = await window.host.readText(res.rpt || res.meta.file.replace(/\.out$/i, '.rpt')); } catch (e) { t = ''; } res.reportText = t; }
       res._tables = AV.parseReportTables(t || ''); res._tmap = {};

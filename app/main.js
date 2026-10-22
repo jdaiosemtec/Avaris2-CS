@@ -362,10 +362,14 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
   fs.writeFileSync(cfg, L.join('\n') + '\n', 'utf8');
   return new Promise((resolve) => {
     let buf = ''; const result = { code: -1, errors: [], rpt, out, inp: cfg, massBal: null, seconds: 0, canceled: false, coupled: { parts: [], dir: pdir, vol: [0, 0] } };
+    // everything the engine reports is kept in run.log next to the sub-model results (for support)
+    const logF = path.join(pdir, 'run.log'); const logL = []; const flushLog = () => { try { fs.writeFileSync(logF, logL.join('\n') + '\n'); } catch (err) { } };
+    logL.push(new Date().toISOString() + ' coupled run: ' + parts.length + ' sub-models, ' + job.couplings.length + ' cut points, engine ' + enginePath());
     let proc;
     try { proc = spawn(enginePath(), ['-couple', cfg], { cwd: pdir, windowsHide: true }); engineProcs.set(job.id || 'main', proc); engineProc = proc; }
     catch (err) { result.errors.push('Unable to start engine: ' + err.message); resolve(result); return; }
     const handleLine = (line) => {
+      if (!line.startsWith('PROGRESS ')) logL.push(line);
       if (line.startsWith('PROGRESS ')) { if (win) win.webContents.send('engine:progress', parseFloat(line.slice(9)), job.id || 'main'); }
       else if (line.startsWith('ERROR ')) result.errors.push(line.slice(6));
       else if (line.startsWith('PART ')) { const t = line.split(/\s+/); result.coupled.parts.push({ k: +t[1], err: +t[2], steps: +t[3], seconds: +t[4] }); }
@@ -373,17 +377,20 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
       else if (line.startsWith('DONE ')) { const t = line.split(/\s+/); result.code = parseInt(t[1]); result.massBal = { runoff: parseFloat(t[2]), flow: parseFloat(t[3]), quality: parseFloat(t[4]) }; result.seconds = parseFloat(t[5]); }
     };
     proc.stdout.on('data', (d) => { buf += d.toString(); let i; while ((i = buf.indexOf('\n')) >= 0) { handleLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); } });
-    proc.on('error', (err) => { result.errors.push('Engine error: ' + err.message); });
+    proc.stderr.on('data', (d) => logL.push('stderr: ' + d.toString().trim()));
+    proc.on('error', (err) => { result.errors.push('Engine error: ' + err.message); logL.push('spawn error: ' + err.message); });
     proc.on('close', (code, signal) => {
       if (buf.trim()) handleLine(buf.trim());
+      logL.push('engine exit code ' + code + (signal ? ' signal ' + signal : '')); flushLog();
       if (engineProcs.get(job.id || 'main') === proc) engineProcs.delete(job.id || 'main'); if (engineProc === proc) engineProc = null;
       if (signal) { result.canceled = true; resolve(result); return; }
       if (result.code === -1) result.code = code;
+      if (result.code !== 0 && !result.errors.length) result.errors.push('The coupled engine stopped (exit code ' + code + '). Details: ' + logF);
       if (result.code === 0) {
         try {
           const m = require('./cplmerge')({ parts: parts.map(p => ({ out: p.out, rpt: p.rpt })), couplings: job.couplings, order: job.order, nodeOwner: job.nodeOwner, out, rpt, cplVolFt3: result.coupled.vol, usUnits: !!job.usUnits, title: job.title || [] });
           result.massBal = m.massBal; result.coupled.mergeSeconds = m.mergeSeconds;
-        } catch (err) { result.code = 1; result.errors.push('Merging the sub-model results failed: ' + err.message); }
+        } catch (err) { result.code = 1; result.errors.push('Merging the sub-model results failed: ' + err.message); logL.push('merge error: ' + (err.stack || err.message)); flushLog(); }
       } else {
         // keep the report of the failed sub-model where the GUI looks for it
         try { const bad = parts.find((p, k) => (result.coupled.parts[k] || {}).err) || parts[0]; fs.copyFileSync(bad.rpt, rpt); } catch (err) { }
@@ -415,6 +422,7 @@ ipcMain.handle('out:close', async (e, h) => { const r = outFiles.get(h); if (r) 
 ipcMain.handle('out:series', async (e, h, type, index, v) => outFiles.get(h).series(type, index, v));
 ipcMain.handle('out:snapshot', async (e, h, period, type, v) => outFiles.get(h).snapshot(period, type, v));
 ipcMain.handle('out:stats', async (e, h, type, v) => outFiles.get(h).stats(type, v));
+ipcMain.handle('out:columns', async (e, h, p0, np, type, vars) => outFiles.get(h).columns(p0, np, type, vars));
 ipcMain.handle('out:snapshotAll', async (e, h, period, type) => outFiles.get(h).snapshotAll(period, type));
 ipcMain.handle('out:statsAll', async (e, h) => outFiles.get(h).statsAll());
 ipcMain.handle('out:pondStats', async (e, h, idx, thr) => outFiles.get(h).pondStats(idx, thr));

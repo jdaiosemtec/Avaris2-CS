@@ -79,7 +79,8 @@
     if (ck[key]) return ck[key];
     const out = []; const seen = new Set();
     const LBL = kind === 'node' ? NODE_LABEL : kind === 'link' ? LINK_LABEL : {};
-    const add = (n, l, get, grp, al) => { if (seen.has(n)) return; seen.add(n); out.push({ n, l: LBL[n] ? LBL[n] + (/\(result\)/.test(l) ? ' (result)' : '') : l, get, g: grp || 'Properties', al: al || [], vt: 'self' }); };
+    // snap: which current-step results a field reads ([type, variable], or 'all'), so the time functions fetch only those
+    const add = (n, l, get, grp, al, snap) => { if (seen.has(n)) return; seen.add(n); out.push({ n, l: LBL[n] ? LBL[n] + (/\(result\)/.test(l) ? ' (result)' : '') : l, get, g: grp || 'Properties', al: al || [], vt: 'self', snap: snap || null }); };
     add('name', 'Name / ID', o => o.id, 'General'); add('tag', 'Tag', o => o.tag || '', 'General'); add('descrip', 'Description', o => o.desc || '', 'General'); add('type', 'Object type', o => o.type || o.kind, 'General');
     const types = kind === 'node' ? AV.NODE_TYPES : kind === 'link' ? AV.LINK_TYPES : ['SUBCATCH'];
     if (kind === 'node') { add('x', 'X coordinate', o => o.x, 'General'); add('y', 'Y coordinate', o => o.y, 'General'); }
@@ -105,19 +106,19 @@
       add('maxVolume', 'Storage volume at full depth (computed)', o => o.type === 'STORAGE' ? AV.storageVolume(m, o) : null, 'Computed');
     }
     // results
-    add('sysRain', 'System rainfall at current time step (result)', () => R && R.snap && R.snap.system ? R.snap.system[1] : null, 'Results');
+    add('sysRain', 'System rainfall at current time step (result)', () => R && R.snap && R.snap.system ? R.snap.system[1] : null, 'Results', [], ['system', 1]);
     const RV = AV.RESULT_VARS || {};
     const rk = kind === 'sub' ? 'subcatch' : kind;
     const short = { 'Head (HGL)': 'Hgl', 'Lateral Inflow': 'LatInflow', 'Total Inflow': 'TotInflow', 'Velocity': 'Vel' };
     (RV[rk] || []).forEach((vn, v) => {
       const nm = (short[vn] || vn.replace(/[^A-Za-z]/g, ''));
       add('rptMax' + nm, 'Max. ' + vn + ' (result)', o => R ? R.valueOf(o, v, true, rk === 'link' && v === 0) : null, 'Results', nm === 'Vel' ? ['rptMaxVelocity'] : []);
-      add('rpt' + nm, vn + ' at current time step (result)', o => R ? R.valueOf(o, v, false) : null, 'Results', nm === 'Vel' ? ['rptVelocity'] : []);
+      add('rpt' + nm, vn + ' at current time step (result)', o => R ? R.valueOf(o, v, false) : null, 'Results', nm === 'Vel' ? ['rptVelocity'] : [], [rk, v]);
     });
     if (kind === 'link') {
       add('rptMfFlow', 'Max. flow / full flow (result)', o => { if (!R) return null; const q = R.valueOf(o, 0, true, true), qf = AV.fullFlow(m, o); return q === null || !qf ? null : q / qf; }, 'Results');
       add('rptMfDepth', 'Max. depth / full depth (result)', o => R ? R.valueOf(o, 4, true) : null, 'Results');
-      add('rptSurcharge', 'Surcharge at current time step, 0/1 (result)', o => R ? R.surchargeNow(o) : null, 'Results', ['surcharge']);
+      add('rptSurcharge', 'Surcharge at current time step, 0/1 (result)', o => R ? R.surchargeNow(o) : null, 'Results', ['surcharge'], [['node', 1], ['link', 4]]);
       add('rptMaxSurcharge', 'Max. surcharge, 0/1 (result)', o => { if (!R) return null; if (!R.sur) R.computeSurcharge(() => app.theme && app.theme.invalidate && (app.theme.invalidate(), app.map.redraw())); return R.surchargeStat(o, 'ever'); }, 'Results');
       add('rptSurchargeHrs', 'Surcharged duration, hr (result)', o => { if (!R) return null; if (!R.sur) R.computeSurcharge(() => app.theme && app.theme.invalidate && (app.theme.invalidate(), app.map.redraw())); return R.surchargeStat(o, 'h'); }, 'Results');
     }
@@ -213,7 +214,7 @@
 
   // compile(src, fields) -> { fn(o), used: [field names] }
   AV.compileExpr = function (src, fields) {
-    const toks = tokenize(String(src || '')); let i = 0; const used = new Set(); const temporals = [];
+    const toks = tokenize(String(src || '')); let i = 0; const used = new Set(); const temporals = []; const seq = [];
     const F = new Map(); const norm = (x) => String(x).toLowerCase().replace(/\s+/g, ' ').replace(/\.$/, '').trim();
     for (const f of fields) { for (const a of f.al || []) F.set(a.toLowerCase(), f); }
     for (const f of fields) { F.set('[l]' + norm(f.l), f); F.set('[l]' + norm(f.l.replace(/ \((result|computed)\)$/, '')), f); }
@@ -253,15 +254,17 @@
         const w = tk.v.toLowerCase();
         if (!tk.br && w === 'true') return () => true; if (w === 'false') return () => false; if (w === 'null') return () => null;
         if (!tk.br && isOp('(') && TEMPORAL.has(w)) {
-          next(); const before = temporals.length; const a0 = peek(); const args = [];
+          next(); const before = temporals.length; const s0 = seq.length; const a0 = peek(); const args = [];
           if (!isOp(')')) { args.push(parseOr()); while (isOp(',')) { next(); args.push(parseOr()); } }
           const close = peek(); if (!isOp(')')) err('Missing ) after function arguments', peek()); next();
           if (!args.length) err(w + '() needs a condition', tk);
           if (w === 'win' && args.length < 2) err('win(condition, minutes) needs the window length in minutes', tk);
           const children = temporals.slice(before);
-          const node = { fn: w, cond: args[0], W: args[1] ? toNum(args[1](null)) : null, kind: fields.kind || 'node', depth: 1 + children.reduce((d, c) => Math.max(d, c.depth), -1), children,
+          // results the condition reads at each time step (null = unknown, read everything)
+          const snaps = []; let unknown = false; for (const f of seq.slice(s0)) { if (f.snap) { if (Array.isArray(f.snap[0])) snaps.push(...f.snap); else snaps.push(f.snap); } else if (/snap|surchargeNow|valueOf\([^)]*false/.test(String(f.get))) unknown = true; }
+          const node = { fn: w, cond: args[0], W: args[1] ? toNum(args[1](null)) : null, kind: fields.kind || 'node', depth: 1 + children.reduce((d, c) => Math.max(d, c.depth), -1), children, snaps: unknown ? null : snaps,
             key: w + '(' + String(src).slice(a0 ? a0.p : 0, close ? close.p : String(src).length).trim() + ')' };
-          temporals.push(node);
+          temporals.push(node); seq.length = s0;   // the fields inside belong to this function, not to an outer one
           return (o) => AV.Temporal.value(node, o);
         }
         if (!tk.br && isOp('(')) {
@@ -273,7 +276,7 @@
           return (o) => { const v = args.map(a => a(o)); const numeric = !['len', 'upper', 'lower', 'contains', 'startswith', 'endswith', 'isnull', 'str', 'num'].includes(w); if (numeric) { const n = v.map(toNum); if (n.some(x => x === null)) return null; return fn(...n); } return fn(...v); };
         }
         const f = tk.br ? (F.get(w) || F.get('[l]' + norm(tk.v))) : F.get(w); if (!f) err('Unknown field "' + tk.v + '"', tk);
-        used.add(f.n);
+        used.add(f.n); seq.push(f);
         return (o) => { const v = f.get(o); if (v === undefined || v === '') return v === '' ? '' : null; if (typeof v === 'string') { const n = toNum(v); return n !== null && /^\s*-?[\d.]/.test(v) ? n : v; } return typeof v === 'number' && !isFinite(v) ? null : v; };
       }
       err('Unexpected "' + tk.v + '"', tk);

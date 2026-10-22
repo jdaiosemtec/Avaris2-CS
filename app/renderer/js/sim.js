@@ -21,7 +21,7 @@
       };
       this.times = new Float64Array(meta.nPeriods); for (let i = 0; i < meta.nPeriods; i++) this.times[i] = (i + 1) * meta.reportStep / 3600;
     }
-    async load() { this.stats = await window.host.outStatsAll(this.handle); await this.setPeriod(this.period); }
+    async load() { this.stats = await AV.busy.track(window.host.outStatsAll(this.handle), 'Reading the results (statistics)'); await this.setPeriod(this.period); }
     async setPeriod(p) {
       this.period = Math.max(0, Math.min(this.meta.nPeriods - 1, p));
       const [s, n, l, sy] = await Promise.all(['subcatch', 'node', 'link', 'system'].map(t => window.host.outSnapshotAll(this.handle, this.period, t)));
@@ -61,12 +61,21 @@
       if (this._surP) { await this._surP; if (onDone) onDone(); return this.sur; }
       this._surP = (async () => {
         const G = this._surGeom(); const acc = new Map(); for (const [id] of G) acc.set(id, { ever: 0, h: 0 });
-        const dt = this.meta.reportStep / 3600, n = this.meta.nPeriods; const app = this.sim.app;
-        for (let p = 0; p < n; p++) {
-          if (p % 20 === 0) app.status('Computing conduit surcharge … ' + Math.round(100 * p / n) + ' %');
-          const [ns, ls] = await Promise.all([window.host.outSnapshotAll(this.handle, p, 'node'), window.host.outSnapshotAll(this.handle, p, 'link')]);
-          for (const [id, g] of G) if (this._surTest(g, ns, ls)) { const a = acc.get(id); a.ever = 1; a.h += dt; }
-        }
+        const dt = this.meta.reportStep / 3600, n = this.meta.nPeriods; const app = this.sim.app; const busy = AV.busy.start('Computing conduit surcharge');
+        // only the node heads and the link capacities are read, in blocks of time steps
+        const nN = this.meta.ids.node.length, nL = this.meta.ids.link.length, nvn = this.meta.nVars.node, nvl = this.meta.nVars.link;
+        const ns = new Float32Array(nN * nvn), ls = new Float32Array(nL * nvl); const block = Math.max(1, Math.floor((24 << 20) / (4 * (nN + nL))));
+        try {
+          for (let p0 = 0; p0 < n; p0 += block) {
+            const np = Math.min(block, n - p0); app.status('Computing conduit surcharge … ' + Math.round(100 * p0 / n) + ' %'); busy.set(p0 / n);
+            const [cn, cl] = await Promise.all([window.host.outColumns(this.handle, p0, np, 'node', [1]), window.host.outColumns(this.handle, p0, np, 'link', [4])]);
+            for (let q = 0; q < np; q++) {
+              for (let i = 0; i < nN; i++) ns[i * nvn + 1] = cn[q * nN + i];
+              for (let i = 0; i < nL; i++) ls[i * nvl + 4] = cl[q * nL + i];
+              for (const [id, g] of G) if (this._surTest(g, ns, ls)) { const a = acc.get(id); a.ever = 1; a.h += dt; }
+            }
+          }
+        } finally { busy.done(); }
         this.sur = acc; app.status('Conduit surcharge computed.');
       })();
       await this._surP; if (onDone) onDone(); return this.sur;
@@ -144,7 +153,7 @@
     async loadScenario(out, rpt, name) {
       const old = this.scen.find(s => s.name === name); if (old) { try { await window.host.outClose(old.handle); } catch (e) { } this.scen = this.scen.filter(s => s !== old); }
       const meta = await window.host.outOpen(out); const R = new Results(this, meta, rpt); R.scenName = name; R.outFile = out;
-      R.stats = await window.host.outStatsAll(R.handle); try { R.reportText = await window.host.readText(rpt); } catch (e) { R.reportText = ''; }
+      R.stats = await AV.busy.track(window.host.outStatsAll(R.handle), 'Reading the results (statistics)'); try { R.reportText = await window.host.readText(rpt); } catch (e) { R.reportText = ''; }
       this.scen.push(R); return R;
     }
     // sources for comparison graphs: current results first, then loaded scenarios

@@ -44,7 +44,8 @@
     }
     // dynamic-result themes (r: fields) are shown in play mode only, all other themes outside play mode only
     isDynamic(t) { const f = t.field || ''; if (f.startsWith('r:')) return true; if (f.startsWith('x:')) return AV.exprIsDynamic(f.slice(2)); return false; }
-    active(t) { return !!t.enabled && (!!this.app.playMode === this.isDynamic(t)); }
+    // a flag is always shown: Σ (worst over the run) does not change in play mode, ▶ shows the current time step
+    active(t) { if (t.flag) return !!t.enabled; return !!t.enabled && (!!this.app.playMode === this.isDynamic(t)); }
     passWhere(layer, t, o) { if (!t.where) return true; const c = this.compiled(layer, t.where); return c ? !!c.fn(o) : true; }
     fieldName(layer, f) { if (f && f.startsWith('x:')) { const ef = AV.exprFields(this.app, layer).find(x => x.n === f.slice(2)); return ef ? ef.l : 'ƒ ' + f.slice(2); } const a = (AV.THEME_ATTRS[layer] || []).find(x => x[0] === f); return a ? a[1] : f; }
     raw(layer, o, field) {

@@ -245,4 +245,29 @@ window.AV = window.AV || {};
   AV.dirname = (p) => { const s = String(p || ''); const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\')); return i >= 0 ? s.slice(0, i) : ''; };
   AV.joinPath = (d, f) => d ? (d.replace(/[\\/]+$/, '') + (d.includes('\\') ? '\\' : '/') + f) : f;
   AV.debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+  // ---- background work indicator: a thin green line along the top edge of the view area, shown for any job that has
+  //      been running for more than 3 s (fraction when known, sliding bar otherwise; hover for what is running)
+  AV.busy = (() => {
+    const jobs = new Set(); let el = null, fill = null, tick = null; const DELAY = 3000;
+    const ensure = () => { if (el && el.isConnected) return true; const host = document.getElementById('views'); if (!host) return false;
+      el = document.createElement('div'); el.className = 'busybar'; fill = document.createElement('div'); fill.className = 'bbfill'; el.appendChild(fill); host.appendChild(el); return true; };
+    const render = () => {
+      const now = Date.now(); const vis = [...jobs].filter(j => now - j.t0 >= DELAY);
+      if (!vis.length) { if (el) el.classList.remove('on'); if (!jobs.size && tick) { clearInterval(tick); tick = null; } return; }
+      if (!ensure()) return;
+      const known = vis.filter(j => j.frac !== null); const indet = known.length < vis.length;
+      const f = known.length ? known.reduce((a, j) => a + j.frac, 0) / known.length : 0;
+      el.classList.add('on'); el.classList.toggle('indet', indet && !known.length);
+      if (!(indet && !known.length)) fill.style.width = (100 * Math.max(0.02, Math.min(1, f))).toFixed(1) + '%'; else fill.style.width = '';
+      el.title = vis.map(j => j.label + (j.frac !== null ? ' – ' + Math.round(100 * j.frac) + ' %' : '')).join('\n');
+    };
+    const start = (label) => {
+      const j = { label: label || 'Working', t0: Date.now(), frac: null }; jobs.add(j);
+      if (!tick) tick = setInterval(render, 500);
+      return { set(f) { j.frac = f === null || f === undefined ? null : Math.max(0, Math.min(1, f)); }, label(s) { j.label = s; }, done() { jobs.delete(j); render(); } };
+    };
+    const track = (promise, label) => { const j = start(label); return Promise.resolve(promise).finally(() => j.done()); };
+    return { start, track, get count() { return jobs.size; } };
+  })();
 })(window.AV);

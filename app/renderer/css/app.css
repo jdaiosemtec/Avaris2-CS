@@ -920,3 +920,9 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .padv .al { color: #3c4a59; padding-top: 6px; } .padv .ac { padding-top: 6px; display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; white-space: nowrap; }
 .padv .ac input[type=number] { border: 1px solid var(--border2); border-radius: 3px; padding: 2px 4px; flex: none; }
 .padv .ah { grid-column: 2; color: var(--muted); font-size: 11.5px; line-height: 1.35; }
+/* background work indicator (AV.busy) */
+.busybar { position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 40; pointer-events: auto; display: none; overflow: hidden; }
+.busybar.on { display: block; }
+.busybar .bbfill { height: 100%; width: 0; background: #7cc243; transition: width .4s ease; }
+.busybar.indet .bbfill { width: 30%; animation: bbslide 1.4s ease-in-out infinite; }
+@keyframes bbslide { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }

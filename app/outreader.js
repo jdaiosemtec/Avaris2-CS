@@ -139,6 +139,18 @@ class OutReader {
   }
 
 
+  // selected variables of a type for a block of periods: Float32Array(np * vars.length * n), [period][var][object]
+  // (time functions and surcharge read only what they need instead of whole snapshots)
+  columns(p0, np, type, vars) {
+    const L = this._layout(type); p0 = Math.max(0, p0); np = Math.max(0, Math.min(np, this.nPeriods - p0));
+    const per = this.bytesPerPeriod; const out = new Float32Array(np * vars.length * L.n); if (!np || !L.n) return out;
+    let b = this._read(this.outputPos + p0 * per, np * per); if (b.byteOffset % 4) b = Buffer.from(b);
+    const f = new Float32Array(b.buffer, b.byteOffset, Math.floor(b.byteLength / 4));
+    for (let q = 0; q < np; q++) { const base = (q * per + L.off) / 4;
+      for (let k = 0; k < vars.length; k++) { const v = vars[k]; const o = (q * vars.length + k) * L.n; for (let i = 0; i < L.n; i++) out[o + i] = f[base + i * L.nv + v]; } }
+    return out;
+  }
+
   // all variables of a type at one period: Float32Array(n * nv), object-major
   snapshotAll(period, type) {
     const L = this._layout(type);

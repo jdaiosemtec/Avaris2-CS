@@ -5,7 +5,7 @@
   const pad2 = (i) => String(i + 1).padStart(2, '0'); const PID = (i) => 'P' + pad2(i);
   const COL = (i) => AV.partColor(i);
   const defPath = (app) => app.filePath ? app.filePath.replace(/\.inp$/i, '.partition.json') : null;
-  const prefsOf = (app) => Object.assign({ n: 12, revMin: 60, revPct: 5, revMax: 95, keepPonds: true, pondMin: 30, pondDist: 0, pondDepth: 0, tol: 25, ctrl: 60, pattern: '{model}_P{nn}.inp', folder: '', boundary: true }, app.prefs.partition || {});
+  const prefsOf = (app) => Object.assign({ n: 12, revMin: 60, revPct: 5, revMax: 95, revRel: 2, keepPonds: true, pondMin: 30, pondDist: 0, pondDepth: 0, tol: 25, ctrl: 60, pattern: '{model}_P{nn}.inp', folder: '', boundary: true }, app.prefs.partition || {});
   let cores = null;
   const getCores = async () => { if (cores) return cores; try { const c = await window.host.cpuInfo(); cores = c.physical || c.logical || 4; } catch (e) { cores = 4; } return cores; };
 
@@ -38,6 +38,7 @@
       const keep = h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } });
       body.appendChild(h('details', { open: !!V.adv, ontoggle: (e) => { V.adv = e.target.open; } }, h('summary', null, 'Advanced'), h('div', { class: 'padv' },
         opt('Oscillating flow (not cut)', ['flow ≥', num('revMin', 46), 'min, reverse', num('revPct', 40), '–', num('revMax', 40), '%'], 'Share of the time with flow in reverse. Above the upper value the pipe simply flows backwards: it may be cut.'),
+        opt('Flow counts above', [num('revRel', 40, { step: 0.5 }), '% of the pipe\'s peak flow'], 'Smaller flows (noise around zero) count neither as flow nor as reverse flow.'),
         opt('Keep ponding areas whole', [keep, 'manholes of one area stay together']),
         opt('2D ponding depth', ['cells ≥', num('pondDepth', 46, { step: 0.05 }), unit], '0 = flood depth of the 2D options, else ' + (app.model.isSI ? '0.3 m' : '1 ft') + '.'),
         opt('1D ponding (no 2D results)', ['flooded ≥', num('pondMin', 46), 'min, within', num('pondDist', 52)], 'Flooded manholes closer than this distance (map units) to each other form one ponding area. 0 = ' + (app.model.isSI ? '50 m' : '150 ft') + '.'),
@@ -72,7 +73,11 @@
       const F2 = AV.f2d(app.model); const demAbs = F2.DEM ? absPath(AV.dirname(app.filePath), F2.DEM.replace(/^"|"$/g, '')) : '';
       const dem = h('input', { type: 'text', value: V.S.dem || demAbs, placeholder: 'DEM (GeoTIFF / ASCII grid) – optional', style: { width: '100%' } });
       const surf = h('input', { type: 'checkbox', checked: V.S.surface !== false });
-      body.appendChild(h('div', { class: 'form' }, h('label', null, 'Folder'), h('span', { style: { display: 'flex', gap: '4px' } }, folder, B('…', async () => { const p = await window.host.openDialog({ folder: true, defaultPath: folder.value }); if (p) folder.value = p; })),
+      body.appendChild(h('div', { class: 'form' }, h('label', null, 'Folder'), h('span', { style: { display: 'flex', gap: '4px' } }, folder,
+          B('…', async () => { let d = folder.value; while (d && !await window.host.exists(d)) { const up = AV.dirname(d); if (!up || up === d) break; d = up; } const p = await window.host.openDialog({ folder: true, defaultPath: d || folder.value, title: 'Folder for the sub-models' }); if (p) folder.value = p; }),
+          B('New Folder…', async () => { const base = folder.value.trim(); let parent = base; if (!await window.host.exists(parent)) parent = AV.dirname(parent);
+            const nm = await AV.prompt('New Folder', 'Name of the new folder in ' + parent, 'Partition'); if (!nm) return; if (/[\\/:*?"<>|]/.test(nm)) { AV.toast('A folder name cannot contain \\ / : * ? " < > |', true); return; }
+            const p = AV.joinPath(parent, nm.trim()); try { await window.host.mkdir(p); folder.value = p; AV.toast('Folder created: ' + p); } catch (e) { AV.alert('Could not create the folder: ' + e.message); } })),
         h('label', null, 'File names'), patt, h('label', null, 'Standalone boundaries'), h('label', { style: { color: 'inherit' } }, bnd, ' base-run inflows and water levels at the cut points (each sub-model can run on its own)'),
         h('label', null, 'Partition areas'), h('label', { style: { color: 'inherit' } }, surf, ' surface area of each partition from the DEM (D8), written as its 2D boundary'),
         h('label', null, 'DEM'), h('span', { style: { display: 'flex', gap: '4px' } }, dem, B('…', async () => { const p = await window.host.openDialog({ filters: [{ name: 'DEM', extensions: ['tif', 'tiff', 'asc'] }] }); if (p) dem.value = p; }))));
@@ -81,13 +86,13 @@
     };
     const zoomTo = (i) => { const objs = [...V.P.owner].filter(([, p]) => p === i).map(([id]) => app.model.nodes.get(id)); app.map.zoomToObjects(objs); };
     async function go(status) {
-      if (busy) return; stopMove(); busy = true; status.textContent = 'Analysing the base results…'; render();
+      if (busy) return; stopMove(); busy = true; status.textContent = 'Analysing the base results…'; render(); const bz = AV.busy.start('Partitioning the model');
       try { await new Promise(r => setTimeout(r, 30)); const t0 = performance.now();
         V.A = await AV.partAnalyse(app, V.S); status.textContent = 'Partitioning…'; await new Promise(r => setTimeout(r, 20));
         V.P = AV.partCompute(app, V.A, V.S); V.sel = null; V.time = ((performance.now() - t0) / 1000).toFixed(1);
         app.status('Model partition: ' + V.P.count + ' partitions, ' + V.P.cuts.length + ' cut points (' + V.time + ' s).');
       } catch (e) { console.error(e); AV.alert('Partition failed: ' + e.message); }
-      busy = false; render(); redrawMap();
+      bz.done(); busy = false; render(); redrawMap();
     }
     // ---- manual change: move a cut, or add one – the number of partitions never changes, only adjacent partitions grow/shrink
     const HINT = { remove: 'Move Cut: click a cut point ⊗ – feasible new cut points nearby will blink – Esc to finish',
@@ -165,7 +170,7 @@
     // ---- generate the sub-models and the relationship file
     async function generate(folder, pattern, withBnd, demPath) {
       const P = V.P; if (!P || V.errors) return; V.S.folder = folder; V.S.pattern = pattern; V.S.boundary = withBnd; V.S.surface = !!demPath; if (demPath) V.S.dem = demPath; app.prefs.partition = V.S; app.savePrefs();
-      busy = true; render(); app.status('Writing sub-models…');
+      busy = true; render(); app.status('Writing sub-models…'); const bz = AV.busy.start('Writing the sub-models');
       try {
         const bnd = withBnd ? await AV.partBoundary(app, P) : null;
         if (withBnd && !bnd) AV.toast('Base results not usable for boundaries (none loaded or other flow units): sub-models get fixed outfalls without inflows.', true, 7000);
@@ -197,6 +202,7 @@
           buttons: [{ label: 'Open Folder', onClick: () => { window.host.showItem(AV.joinPath(folder, built.files[0].file)); return false; } }, { label: 'OK', primary: true }] });
         app.status('Sub-models written: ' + built.files.length + ' files in ' + folder);
       } catch (e) { console.error(e); busy = false; render(); AV.alert('Could not write the sub-models: ' + e.message); }
+      finally { bz.done(); }
     }
     const relPath = (base, p) => { const sep = /[\\/]/; const A = base.replace(/[\\/]+$/, '').split(sep), Bp = p.split(sep); let k = 0; while (k < A.length && k < Bp.length && A[k].toLowerCase() === Bp[k].toLowerCase()) k++;
       if (k <= 1) return p; const up = A.length - k; return (up ? '../'.repeat(up) : './') + Bp.slice(k).join('/'); };
@@ -215,7 +221,7 @@
       if (!def || def.format !== 'avaris-partition') { st.innerHTML = ''; st.appendChild(h('div', { class: 'note' }, 'No partition definition next to this model. Use the Partition tab first.')); return; }
       busy = true; st.innerHTML = ''; st.appendChild(h('div', { class: 'hint' }, 'Comparing…'));
       try {
-        const m = app.model; const dn = def.settings.doNotCut, osc = dn.oscillatingFlow || dn.reverseFlow || {}; const S = Object.assign({}, V.S, { revMin: osc.minFlowMin, revPct: osc.minReversePct, revMax: osc.maxReversePct || 95, keepPonds: dn.keepPondingAreas !== false, pattern: def.pattern || V.S.pattern });
+        const m = app.model; const dn = def.settings.doNotCut, osc = dn.oscillatingFlow || dn.reverseFlow || {}; const S = Object.assign({}, V.S, { revMin: osc.minFlowMin, revPct: osc.minReversePct, revMax: osc.maxReversePct || 95, revRel: osc.flowAbovePctOfPeak !== undefined ? osc.flowAbovePctOfPeak : 0, keepPonds: dn.keepPondingAreas !== false, pattern: def.pattern || V.S.pattern });
         const A = await AV.partAnalyse(app, S);
         // assignment: known nodes keep their partition; new nodes follow the flow (downstream first, then upstream, then nearest)
         const owner = new Map(); const added = [], deleted = [], decide = [];

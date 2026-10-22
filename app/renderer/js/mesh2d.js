@@ -199,7 +199,7 @@
     const idx = mesh.cells.map(c => { const i = R.idx.node.get(c.id); return i === undefined ? -1 : i; });
     if (!idx.some(i => i >= 0)) { app.meshResults = null; return; }
     const thr = parseFloat(AV.f2d(app.model).FLOOD_DEPTH) || 0;
-    let st = null; try { st = await window.host.outPondStats(R.handle, idx.filter(i => i >= 0), thr); } catch (e) { st = null; }
+    let st = null; try { st = await AV.busy.track(window.host.outPondStats(R.handle, idx.filter(i => i >= 0), thr), 'Computing 2D flood statistics'); } catch (e) { st = null; }
     const nv = R.meta.nVars.node; const maxd = new Float32Array(idx.length), tp = new Float32Array(idx.length), tr = new Float32Array(idx.length);
     let k = 0; idx.forEach((i, c) => { if (i < 0) { maxd[c] = NaN; tp[c] = NaN; tr[c] = NaN; return; } maxd[c] = R.stats.node.max[i * nv]; if (st) { tp[c] = st.tpond[k]; tr[c] = st.trecede[k]; } k++; });
     app.meshResults = { idx, maxd, tpond: tp, trecede: tr, thr, si: AV.f2dRun(app.model).si };
