@@ -59,10 +59,10 @@
       body.appendChild(h('div', { class: 'hint' }, 'In / Out = couplings from upstream / to downstream partitions. Click a row to highlight, double-click to zoom.'));
       body.appendChild(sec(3, 'Adjust'));
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
-        B(V.picking === 'remove' ? 'Finish' : 'Remove Cut…', () => V.picking === 'remove' ? endPick() : startPick('remove'), V.picking === 'remove'),
+        B(V.picking === 'remove' ? 'Finish' : 'Move Cut…', () => V.picking === 'remove' ? endPick() : startPick('remove'), V.picking === 'remove'),
         B(V.picking === 'add' ? 'Finish' : 'Add Cut…', () => V.picking === 'add' ? endPick() : startPick('add'), V.picking === 'add'),
         P.manual ? h('span', { class: 'hint' }, P.manual + ' manual change(s)') : null));
-      body.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, 'Remove Cut: click a cut point (⊗) – the two partitions it joins become one. Add Cut: click a conduit – its upstream branch becomes a new partition (warning for oscillating flow, ponding areas and very small partitions; pumps, weirs … cannot be cut).'));
+      body.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, 'The number of partitions never changes here – only the boundary between two adjacent partitions moves. Move Cut: click a cut point (⊗); the feasible conduits nearby blink – click one as the new cut point. Add Cut: click a conduit; its upstream branch joins the neighbouring partition (refused if that would create a new partition; warning for oscillating flow and ponding areas; pumps, weirs … cannot be cut).'));
       body.appendChild(sec(4, 'Checks'));
       const chk = AV.partChecks(app, P, V.A, V.S, C); V.errors = chk.filter(c => c.t === 'er').length;
       body.appendChild(h('div', { class: 'pchecks' }, chk.map(c => h('div', { class: c.t }, (c.t === 'ok' ? '✓ ' : c.t === 'er' ? '✗ ' : '⚠ ') + c.s))));
@@ -82,7 +82,7 @@
     };
     const zoomTo = (i) => { const objs = [...V.P.owner].filter(([, p]) => p === i).map(([id]) => app.model.nodes.get(id)); app.map.zoomToObjects(objs); };
     async function go(status) {
-      if (busy) return; busy = true; status.textContent = 'Analysing the base results…'; render();
+      if (busy) return; stopMove(); busy = true; status.textContent = 'Analysing the base results…'; render();
       try { await new Promise(r => setTimeout(r, 30)); const t0 = performance.now();
         V.A = await AV.partAnalyse(app, V.S); status.textContent = 'Partitioning…'; await new Promise(r => setTimeout(r, 20));
         V.P = AV.partCompute(app, V.A, V.S); V.sel = null; V.time = ((performance.now() - t0) / 1000).toFixed(1);
@@ -90,36 +90,78 @@
       } catch (e) { console.error(e); AV.alert('Partition failed: ' + e.message); }
       busy = false; render(); redrawMap();
     }
-    // ---- manual change: a node and its upstream branch (inside its partition) move to another partition
+    // ---- manual change: move a cut, or add one – the number of partitions never changes, only adjacent partitions grow/shrink
+    const HINT = { remove: 'Move Cut: click a cut point ⊗ – feasible new cut points nearby will blink – Esc to finish',
+      add: 'Add Cut: click a conduit – its upstream branch joins the neighbouring partition (the number of partitions stays the same) – Esc to finish' };
     function startPick(mode) { endPick(); V.picking = mode; render();
-      const hint = mode === 'remove' ? 'Remove Cut: click a cut point ⊗ – the two partitions become one – Esc to finish' : 'Add Cut: click a conduit – its upstream branch becomes a new partition – Esc to finish';
-      app.feat.startPick({ kinds: ['LINK'], hint, onPick: (hit) => { if (hit && hit.kind === 'LINK') (mode === 'remove' ? removeCut : addCut)(hit); }, onEnd: () => { V.picking = null; if (app.partView) render(); } }); }
-    function endPick() { if (V.picking) { V.picking = null; app.setTool && app.setTool('select'); } }
-    const upstream = (id, p) => { const m = app.model; const inn = new Map(); for (const l of m.links.values()) { const x = V.A.links.get(l.id); const back = x && x.f > 0 && x.r / x.f > 0.5; const u = back ? l.to : l.from, d = back ? l.from : l.to; if (!inn.has(d)) inn.set(d, []); inn.get(d).push(u); }
-      const out = [id], seen = new Set([id]); const st = [id]; while (st.length) { const x = st.pop(); for (const u of inn.get(x) || []) if (!seen.has(u) && V.P.owner.get(u) === p) { seen.add(u); out.push(u); st.push(u); } } return out; };
+      app.feat.startPick({ kinds: ['LINK'], hint: HINT[mode], onPick: (hit) => { if (hit && hit.kind === 'LINK') (mode === 'remove' ? movePick : addCut)(hit); }, onEnd: () => { V.picking = null; stopMove(); if (app.partView) render(); } }); }
+    function endPick() { stopMove(); if (V.picking) { V.picking = null; app.setTool && app.setTool('select'); } }
+    const setHint = (s) => { app.map.pickHint = s; app.map.setHint(s); };
+    // flow-direction graph from the base run (a link flowing backwards most of the time points the other way)
+    const flowGraph = () => { const inn = new Map(), out = new Map(); const add = (M, k, v) => { let a = M.get(k); if (!a) M.set(k, a = []); a.push(v); };
+      for (const l of app.model.links.values()) { const x = V.A.links.get(l.id); const back = x && x.f > 0 && x.r / x.f > 0.5; const u = back ? l.to : l.from, d = back ? l.from : l.to; add(inn, d, { n: u, l }); add(out, u, { n: d, l }); }
+      return { inn, out }; };
+    const branch = (G, id, p) => { const out = [id], seen = new Set([id]), st = [id]; while (st.length) { const x = st.pop(); for (const e of G.inn.get(x) || []) if (!seen.has(e.n) && V.P.owner.get(e.n) === p) { seen.add(e.n); out.push(e.n); st.push(e.n); } } return out; };
+    const sizeOf = (p) => { let n = 0; for (const q of V.P.owner.values()) if (q === p) n++; return n; };
+    const flowDir = (l) => { const x = V.A.links.get(l.id); const back = x && x.f > 0 && x.r / x.f > 0.5; return back ? [l.to, l.from] : [l.from, l.to]; };
+    // why a conduit is not a good cut point ('' = fine); hard = cannot be cut at all
+    const cutIssue = (l, g) => { if (g.hard.has(l.id)) return 'hard';
+      const [u, d] = flowDir(l); const x = V.A.links.get(l.id); const w = [];
+      if (g.why.has(l.id)) w.push('it has oscillating flow (' + g.why.get(l.id).replace('oscillating flow ', '') + ' of the time with flow in reverse): the coupled run exchanges water in both directions at this point');
+      if (V.S.keepPonds !== false && V.P.pondOf.has(u) && V.P.pondOf.get(u) === V.P.pondOf.get(d)) w.push('it lies in a ponding area: the ponding area would be split between two sub-models');
+      if (x && x.f === 0 && V.A.hasResults) w.push('it has no flow in the base results');
+      return w; };
+    // links that would become cuts if the nodes 'mv' moved to partition 'to' – none of them may be a pump, weir …
+    const newCuts = (G, mv, to) => { const S = new Set(mv), res = new Set();
+      for (const id of mv) for (const e of [...(G.out.get(id) || []), ...(G.inn.get(id) || [])]) if (!S.has(e.n) && V.P.owner.get(e.n) !== to) res.add(e.l); return [...res]; };
+    // Move Cut: release the cut, offer the feasible conduits nearby (up to K links up- or downstream) as the new cut point
+    function candidates(c) {
+      const P = V.P, G = flowGraph(), g = AV.partGlue(app, V.A, V.S), K = 15, cand = new Map(); const Pu = c.upPart, Pd = c.downPart;
+      const ok = (l, mv, to) => { if (l.type !== 'CONDUIT' || cutIssue(l, g) === 'hard' || cutIssue(l, g).length) return false; return newCuts(G, mv, to).every(x => !g.hard.has(x.id) && !g.why.has(x.id)); };
+      // downstream: a conduit inside Pd – the branch above it moves to Pu
+      const nD = sizeOf(Pd); let front = [c.down], seen = new Set(front);
+      for (let k = 0; k < K && front.length; k++) { const nx = []; for (const a of front) for (const e of G.out.get(a) || []) { if (P.owner.get(e.n) !== Pd || seen.has(e.n)) continue; seen.add(e.n); nx.push(e.n);
+        if (!cand.has(e.l.id)) { const mv = branch(G, a, Pd); if (mv.length < nD && ok(e.l, mv, Pu)) cand.set(e.l.id, { link: e.l, to: Pu, from: Pd, nodes: mv }); } } front = nx; }
+      // upstream: a conduit inside Pu – the nodes between it and the old cut move to Pd
+      const all = new Set(branch(G, c.up, Pu)); front = [c.up]; seen = new Set(front);
+      for (let k = 0; k < K && front.length; k++) { const nx = []; for (const a of front) for (const e of G.inn.get(a) || []) { if (P.owner.get(e.n) !== Pu || seen.has(e.n)) continue; seen.add(e.n); nx.push(e.n);
+        if (!cand.has(e.l.id)) { const keep = new Set(branch(G, e.n, Pu)); const mv = [...all].filter(id => !keep.has(id)); if (mv.length && ok(e.l, mv, Pd)) cand.set(e.l.id, { link: e.l, to: Pd, from: Pu, nodes: mv }); } } front = nx; }
+      return cand; }
+    let blink = null;
+    function stopMove() { if (blink) { clearInterval(blink); blink = null; } if (V.move) { V.move = null; app.map.redrawOverlay(); } }
+    function movePick(l) {
+      const P = V.P;
+      if (V.move) { const k = V.move.cand.get(l.id);
+        if (k) { const old = V.move.c.link.id; for (const id of k.nodes) P.owner.set(id, k.to); stopMove();
+          changed(P, 'Cut moved from ' + old + ' to ' + l.id + ': ' + k.nodes.length + ' node(s) moved from ' + PID(k.from) + ' to ' + PID(k.to) + ' (still ' + P.count + ' partitions).'); setHint(HINT.remove); return; }
+        if (l === V.move.c.link) { stopMove(); setHint(HINT.remove); app.status('Cut ' + l.id + ' kept.'); return; } }
+      const c = P.cuts.find(x => x.link === l);
+      if (!c) { AV.toast(V.move ? l.id + ' is not one of the blinking conduits. Click a blinking conduit, or ' + V.move.c.link.id + ' to keep the cut there.' : l.id + ' is not a cut point. Click a conduit marked ⊗.', true); return; }
+      stopMove(); const cand = candidates(c);
+      if (!cand.size) { AV.toast('No feasible conduit near ' + l.id + ' (within 15 links up- or downstream) can take over this cut without changing the number of partitions. The cut stays.', true); return; }
+      V.move = { c, cand, t0: Date.now() }; blink = setInterval(() => app.map.redrawOverlay(), 400); app.map.redrawOverlay();
+      setHint('Move Cut: ' + l.id + ' is released. Click one of the ' + cand.size + ' blinking conduits as the new cut point (only ' + PID(c.upPart) + ' and ' + PID(c.downPart) + ' change; the number of partitions stays ' + P.count + '). Click ' + l.id + ' again to keep it, Esc to finish.');
+    }
     const renumber = (P) => { const used = [...new Set(P.owner.values())].sort((a, b) => a - b); const ren = new Map(used.map((q, i) => [q, i])); for (const [id, q] of P.owner) P.owner.set(id, ren.get(q)); };
     const changed = (P, msg) => { renumber(P); P.manual = (P.manual || 0) + 1; AV.partRecut(app, P, V.A); render(); redrawMap(); app.status(msg); };
-    function removeCut(l) {
-      const P = V.P; const c = P.cuts.find(x => x.link === l); if (!c) { AV.toast(l.id + ' is not a cut point. Click a conduit marked ⊗.', true); return; }
-      // the two partitions joined at this conduit become one
-      let n = 0; for (const [id, q] of P.owner) if (q === c.upPart) { P.owner.set(id, c.downPart); n++; }
-      changed(P, 'Cut ' + l.id + ' removed: ' + PID(c.upPart) + ' (' + n + ' nodes) joined ' + PID(c.downPart) + '.');
-    }
+    // Add Cut: the branch above the conduit joins the neighbouring partition it borders – refused if it borders none
     async function addCut(l) {
       const P = V.P; const pa = P.owner.get(l.from), pb = P.owner.get(l.to);
       if (pa !== pb) { AV.toast(l.id + ' is already a cut point.', true); return; }
-      const g = AV.partGlue(app, V.A, V.S); const why = g.why.get(l.id);
-      if (g.hard.has(l.id)) { AV.alert(l.id + ' cannot be cut: ' + why + '. Only conduits that are not links of a flow divider can be cut.', 'Add Cut'); return; }
-      const x = V.A.links.get(l.id); const back = x && x.f > 0 && x.r / x.f > 0.5; const u = back ? l.to : l.from, d = back ? l.from : l.to;
-      const warn = [];
-      if (why) warn.push('it has oscillating flow (' + why.replace('oscillating flow ', '') + ' of the time with flow in reverse): the coupled run exchanges water in both directions at this point');
-      if (V.S.keepPonds !== false && P.pondOf.has(u) && P.pondOf.get(u) === P.pondOf.get(d)) warn.push('it lies in a ponding area: the ponding area would be split between two sub-models');
-      if (x && x.f === 0 && V.A.hasResults) warn.push('it has no flow in the base results');
-      const br = upstream(u, pa); if (br.length >= P.stats[pa].nodes) { AV.toast('Cutting ' + l.id + ' would leave nothing downstream in ' + PID(pa) + '.', true); return; }
-      if (br.length < 3) warn.push('the new partition would have only ' + br.length + ' node(s)');
-      if (warn.length && !await AV.confirm('Cutting ' + l.id + ' is not recommended:\n\n• ' + warn.join('\n• ') + '\n\nCut it anyway?', 'Add Cut', 'Cut Anyway')) return;
-      const np = P.count; for (const id of br) P.owner.set(id, np);
-      changed(P, 'Cut added at ' + l.id + ': ' + br.length + ' node(s) form ' + PID(np) + '.');
+      const g = AV.partGlue(app, V.A, V.S); const iss = cutIssue(l, g);
+      if (iss === 'hard') { AV.alert(l.id + ' cannot be cut: ' + g.why.get(l.id) + '. Only conduits that are not links of a flow divider can be cut.', 'Add Cut'); return; }
+      const G = flowGraph(); const [u] = flowDir(l); const br = branch(G, u, pa);
+      if (br.length >= sizeOf(pa)) { AV.alert('Cutting ' + l.id + ' would leave nothing downstream of it in ' + PID(pa) + ', so ' + PID(pa) + ' would disappear and the number of partitions would change.', 'Add Cut'); return; }
+      const score = new Map(); const S = new Set(br);
+      for (const id of br) { for (const e of G.out.get(id) || []) { const q = P.owner.get(e.n); if (!S.has(e.n) && q !== undefined && q !== pa) score.set(q, (score.get(q) || 0) + 2); }
+        for (const e of G.inn.get(id) || []) { const q = P.owner.get(e.n); if (!S.has(e.n) && q !== undefined && q !== pa) score.set(q, (score.get(q) || 0) + 1); } }
+      if (!score.size) { AV.alert('Cutting ' + l.id + ' would create a new partition: the ' + br.length + ' node(s) upstream of it border no other partition, so they cannot join a neighbouring one.\n\nThe number of partitions must stay ' + P.count + '. Choose a conduit whose upstream branch touches a neighbouring partition, use Move Cut, or partition again with another number.', 'Add Cut'); return; }
+      const q = [...score].sort((a, b) => b[1] - a[1])[0][0];
+      const bad = newCuts(G, br, q).filter(x => x !== l && g.hard.has(x.id));
+      if (bad.length) { AV.alert('Cutting ' + l.id + ' is not possible: moving its upstream branch to ' + PID(q) + ' would also cut ' + bad.map(x => x.id).slice(0, 5).join(', ') + ' (' + g.why.get(bad[0].id) + '), which cannot be cut.', 'Add Cut'); return; }
+      if (iss.length && !await AV.confirm('Cutting ' + l.id + ' is not recommended:\n\n• ' + iss.join('\n• ') + '\n\nCut it anyway?', 'Add Cut', 'Cut Anyway')) return;
+      for (const id of br) P.owner.set(id, q);
+      changed(P, 'Cut added at ' + l.id + ': ' + br.length + ' node(s) moved from ' + PID(pa) + ' to ' + PID(q) + ' (still ' + P.count + ' partitions).');
     }
     // ---- generate the sub-models and the relationship file
     async function generate(folder, pattern, withBnd, demPath) {

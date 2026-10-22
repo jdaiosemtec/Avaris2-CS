@@ -309,7 +309,13 @@
         if (Math.max(a.x, b.x) < vb.x1 || Math.min(a.x, b.x) > vb.x2 || Math.max(a.y, b.y) < vb.y1 || Math.min(a.y, b.y) > vb.y2) continue;
         ctx.beginPath(); const p0 = map.toScreen(a.x, a.y); ctx.moveTo(p0[0], p0[1]); for (const v of l.verts) { const q = map.toScreen(v[0], v[1]); ctx.lineTo(q[0], q[1]); } const p1 = map.toScreen(b.x, b.y); ctx.lineTo(p1[0], p1[1]); ctx.stroke(); }
       ctx.restore(); }
-    if (V.showCut) for (const c of P.cuts) { const a = m.nodes.get(c.link.from), b = m.nodes.get(c.link.to); const pts = [map.toScreen(a.x, a.y)].concat(c.link.verts.map(v => map.toScreen(v[0], v[1]))).concat([map.toScreen(b.x, b.y)]); const k = Math.floor(pts.length / 2);
+    const linePath = (l) => { const a = m.nodes.get(l.from), b = m.nodes.get(l.to); if (!a || !b) return false; ctx.beginPath(); const p0 = map.toScreen(a.x, a.y); ctx.moveTo(p0[0], p0[1]); for (const v of l.verts) { const q = map.toScreen(v[0], v[1]); ctx.lineTo(q[0], q[1]); } const p1 = map.toScreen(b.x, b.y); ctx.lineTo(p1[0], p1[1]); return true; };
+    // Move Cut: the released cut (grey) and the blinking candidate conduits
+    if (V.move) { const on = Math.floor((Date.now() - V.move.t0) / 400) % 2 === 0; ctx.save(); ctx.lineCap = 'round';
+      if (linePath(V.move.c.link)) { ctx.strokeStyle = 'rgba(96,96,96,.9)'; ctx.lineWidth = 3; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]); }
+      for (const k of V.move.cand.values()) if (linePath(k.link)) { ctx.strokeStyle = on ? 'rgba(255,234,0,.95)' : 'rgba(255,61,0,.9)'; ctx.lineWidth = on ? 10 : 6; ctx.stroke(); ctx.strokeStyle = '#212121'; ctx.lineWidth = 1.2; ctx.stroke(); }
+      ctx.restore(); }
+    if (V.showCut) for (const c of P.cuts) { if (V.move && V.move.c.link === c.link) continue; const a = m.nodes.get(c.link.from), b = m.nodes.get(c.link.to); const pts = [map.toScreen(a.x, a.y)].concat(c.link.verts.map(v => map.toScreen(v[0], v[1]))).concat([map.toScreen(b.x, b.y)]); const k = Math.floor(pts.length / 2);
       const X = pts.length % 2 ? pts[k][0] : (pts[k - 1][0] + pts[k][0]) / 2, Y = pts.length % 2 ? pts[k][1] : (pts[k - 1][1] + pts[k][1]) / 2;
       const bad = P.why.has(c.link.id); ctx.beginPath(); ctx.arc(X, Y, 7, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = bad ? '#ff6d00' : '#d32f2f'; ctx.lineWidth = 2; ctx.stroke();
       ctx.beginPath(); ctx.moveTo(X - 3.5, Y - 3.5); ctx.lineTo(X + 3.5, Y + 3.5); ctx.moveTo(X + 3.5, Y - 3.5); ctx.lineTo(X - 3.5, Y + 3.5); ctx.lineWidth = 1.8; ctx.stroke(); }
