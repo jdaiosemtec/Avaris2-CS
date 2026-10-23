@@ -13,7 +13,9 @@ rm -f $ST/LICENSE-OsemCM.txt $ST/LICENSE-Avaris2.txt
 # application icon inside the exe (Explorer, taskbar)
 python3 $P/tools/peicon.py $ST/Avaris2CS.exe $P/build/icon.png
 mkdir -p $ST/resources/app $ST/resources/engine $ST/resources/samples
-cp $P/app/main.js $P/app/preload.js $P/app/outreader.js $P/app/package.json $ST/resources/app/
+cp $P/app/*.js $P/app/package.json $ST/resources/app/
+# every local module required by the main process must be in the package
+for m in $(grep -ho "require('\./[a-z0-9_]*')" $P/app/*.js | sed "s/.*'\.\/\(.*\)'.*/\1/" | sort -u); do [ -f $ST/resources/app/$m.js ] || { echo "MISSING module $m.js in the package"; exit 1; }; done
 cp -r $P/app/renderer $ST/resources/app/
 cp $P/app/engine/win/* $ST/resources/engine/
 cp $P/app/samples/* $ST/resources/samples/

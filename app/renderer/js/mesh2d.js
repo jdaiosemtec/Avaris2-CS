@@ -284,7 +284,7 @@
   AV.MESH_DYNAMIC = { depth: true, wse: true, vel: true, hzd: true };
   // variable shown: in play mode a current-time variable (depth / water surface) unless a static / statistic one was
   // chosen while playing; outside play mode only statistic and static variables (current-time values need Play)
-  AV.meshField = (app) => { const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); const stat = FIELDS[P.field] && !AV.MESH_DYNAMIC[P.field] ? P.field : 'maxdepth';
+  AV.meshField = (app) => { const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); const stat = FIELDS[P.field] && !AV.MESH_DYNAMIC[P.field] && !(P.field === 'ddepth' && !(app.meshResults && app.meshResults.cmp)) ? P.field : 'maxdepth';
     return app.playMode && AV.MESH_DYNAMIC[P.playField] ? P.playField : stat; };
   AV.meshDefaultBreaks = (app, field) => { const si = AV.meshSI(app);
     const fixed = { depth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], maxdepth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], tpond: [0.25, 0.5, 1, 2, 4], trecede: [0.25, 0.5, 1, 2, 4],
@@ -379,7 +379,7 @@
     const fields = [{ name: 'id', type: 'C', len: 20 }, { name: 'elev', type: 'N', len: 18, dc: 4 }].concat(RF.map(([f, nm, d]) => ({ name: nm, type: 'N', len: 18, dc: d })), app.meshResults ? [{ name: 'hzclass', type: 'C', len: 20 }] : []);
     const w = AV.SHP.write('polygon', feats, fields); const base = p.replace(/\.shp$/i, '');
     await window.host.writeBinary(base + '.shp', new Uint8Array(w.shp)); await window.host.writeBinary(base + '.shx', new Uint8Array(w.shx)); await window.host.writeBinary(base + '.dbf', new Uint8Array(w.dbf));
-    if (app.crs && app.crs.wkt) await window.host.writeText(base + '.prj', app.crs.wkt);
+    if (app.crsWKT) await window.host.writeText(base + '.prj', app.crsWKT);
     AV.toast('Mesh exported to ' + base + '.shp');
   };
   // attribute table of the 2D cells: the normal Attribute Table with the '2D Meshes' layer

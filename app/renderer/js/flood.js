@@ -151,11 +151,11 @@
       app._meshRange = null; app.map.redraw(); this.render();
     }
     // ---- exports
-    async exportAs(what) {
+    async exportAs(what, opts = {}) {
       const app = this.app, MR = app.meshResults, mesh = app.mesh2d, cells = mesh.cells, thr = this.S.thr; const base0 = app.filePath ? AV.basename(app.filePath).replace(/\.inp$/i, '') : 'model';
       const writeShp = async (feats, fields, def) => { const p = await window.host.saveDialog({ title: 'Export', defaultPath: def, filters: [{ name: 'Shapefile', extensions: ['shp'] }] }); if (!p) return;
         const w = AV.SHP.write('polygon', feats, fields); const b = p.replace(/\.shp$/i, ''); await window.host.writeBinary(b + '.shp', new Uint8Array(w.shp)); await window.host.writeBinary(b + '.shx', new Uint8Array(w.shx)); await window.host.writeBinary(b + '.dbf', new Uint8Array(w.dbf));
-        if (app.crs && app.crs.wkt) await window.host.writeText(b + '.prj', app.crs.wkt); AV.toast('Exported ' + feats.length + ' polygon feature(s) to ' + b + '.shp'); };
+        if (app.crsWKT) await window.host.writeText(b + '.prj', app.crsWKT); AV.toast('Exported ' + feats.length + ' polygon feature(s) to ' + b + '.shp'); };
       const A = areaInfo(app);
       const group = (fn, labels) => { const G = labels.map(() => []); cells.forEach((c, k) => { if (MR.idx[k] < 0) return; const g = fn(k); if (g >= 0) G[g].push(c); });
         return G.map((cs, i) => cs.length ? { coords: AV.cellsToRings(cs), props: Object.assign({ class: labels[i], cells: cs.length, area: +(cs.reduce((a, c) => a + A.cell(c), 0) * A.k).toFixed(4) }) } : null).filter(Boolean); };
@@ -167,10 +167,10 @@
         return writeShp(group(k => { const hr = MR.maxhr[k]; if (!(MR.maxd[k] >= thr) || !fin(hr) || !(hr > 0)) return -1; for (let i = 0; i < AV.HAZARD_CLASSES.length; i++) if (hr < AV.HAZARD_CLASSES[i][0]) return i; return -1; }, lab), fields, base0 + '_hazard_classes.shp'); }
       if (what === 'grid') {
         const keys = AV.MESH_GROUPS.flatMap(g => g[1]).filter(k => k !== 'ddepth' || MR.cmp);
-        const r = await AV.formDialog('Export Raster Grid', [{ k: 'f', l: 'Field', t: 'choice', o: keys.map(k => [k, AV.MESH_FIELDS[k] + (AV.MESH_DYNAMIC[k] ? ' (time step ' + app.results.timeLabel(app.results.period) + ')' : '')]), d: 'maxdepth' },
-          { t: 'note', l: 'ESRI ASCII grid (.asc) with the cell size of the finest mesh cells, in map coordinates. Dry / outside cells = -9999.' }], {}); if (!r) return;
-        const p = await window.host.saveDialog({ title: 'Export raster grid', defaultPath: base0 + '_' + r.f + '.asc', filters: [{ name: 'ESRI ASCII grid', extensions: ['asc'] }] }); if (!p) return;
-        const txt = AV.meshGrid(app, r.f); await window.host.writeText(p, txt); if (app.crs && app.crs.wkt) await window.host.writeText(p.replace(/\.asc$/i, '') + '.prj', app.crs.wkt); AV.toast('Grid exported to ' + p); return;
+        const r = await AV.formDialog('Export Raster Grid', [{ k: 'f', l: 'Field', t: 'choice', o: keys.filter(k => !AV.MESH_DYNAMIC[k] || app.playMode).map(k => [k, AV.MESH_FIELDS[k] + (AV.MESH_DYNAMIC[k] ? ' (time step ' + app.results.timeLabel(app.results.period) + ')' : '')]), d: 'maxdepth' },
+          { k: 'fmt', l: 'Format', t: 'choice', o: [['tif', 'GeoTIFF (.tif)'], ['asc', 'ESRI ASCII grid (.asc)']], d: 'tif' },
+          { t: 'note', l: 'Cell size = the finest mesh cells, map coordinates. Dry / outside cells = -9999 (no data).' }], { f: opts.field || 'maxdepth' }); if (!r) return;
+        return AV.exportMeshRaster(app, r.f, r.fmt, base0);
       }
       if (what === 'cells') {
         const F = AV.MESH_GROUPS.flatMap(g => g[1]).filter(k => !AV.MESH_DYNAMIC[k] && k !== 'elev' && (k !== 'ddepth' || MR.cmp));
@@ -184,20 +184,48 @@
     }
   }
 
-  // ESRI ASCII grid of a mesh field at the finest cell size
-  AV.meshGrid = function (app, field) {
+  // raster of a mesh field at the finest cell size (map units): G[row * nc + col], row 0 = top, -9999 = no data
+  AV.meshRaster = function (app, field) {
     const cells = app.mesh2d.cells; let s0 = Infinity, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const c of cells) { s0 = Math.min(s0, c.s); x0 = Math.min(x0, c.x - c.s / 2); y0 = Math.min(y0, c.y - c.s / 2); x1 = Math.max(x1, c.x + c.s / 2); y1 = Math.max(y1, c.y + c.s / 2); }
     const nc = Math.max(1, Math.round((x1 - x0) / s0)), nr = Math.max(1, Math.round((y1 - y0) / s0)); const G = new Float32Array(nc * nr).fill(-9999);
     const dry = !/^(elev|maxwse|wse|ddepth)$/.test(field);
-    cells.forEach((c, k) => { let v = AV.cellValue(app, k, field); if (!fin(v)) return; if (dry && field !== 'elev' && !(v > 0)) return;
+    cells.forEach((c, k) => { const v = AV.cellValue(app, k, field); if (!fin(v)) return; if (dry && !(v > 0)) return;
       const i0 = Math.round((c.x - c.s / 2 - x0) / s0), j0 = Math.round((y1 - (c.y + c.s / 2)) / s0), n = Math.max(1, Math.round(c.s / s0));
       for (let j = j0; j < j0 + n && j < nr; j++) for (let i = i0; i < i0 + n && i < nc; i++) G[j * nc + i] = v; });
+    return { nc, nr, x0, y0, y1, s0, G };
+  };
+  // ESRI ASCII grid
+  AV.meshGrid = function (app, field) {
+    const { nc, nr, x0, y0, s0, G } = AV.meshRaster(app, field);
     const out = ['ncols ' + nc, 'nrows ' + nr, 'xllcorner ' + x0, 'yllcorner ' + y0, 'cellsize ' + s0, 'NODATA_value -9999'];
     for (let j = 0; j < nr; j++) { const row = new Array(nc); for (let i = 0; i < nc; i++) { const v = G[j * nc + i]; row[i] = v === -9999 ? '-9999' : String(+v.toPrecision(6)); } out.push(row.join(' ')); }
     return out.join('\n') + '\n';
   };
-
+  // EPSG code of a WKT (the AUTHORITY / ID of the outer CRS), or 0
+  AV.wktEPSG = (wkt) => { const m = /(?:AUTHORITY|ID)\s*\[\s*"EPSG"\s*,\s*"?(\d+)"?\s*\]\s*\]\s*$/i.exec(String(wkt || '').trim()); return m ? +m[1] : 0; };
+  // GeoTIFF (single band Float32, uncompressed, strips of 16 rows, little endian). geographic: CRS in degrees.
+  //   CRS: EPSG GeoKey when the WKT has an EPSG code; the full WKT is written in the .aux.xml (read by GDAL / QGIS / ArcGIS).
+  AV.writeGeoTIFF = function (R, epsg, geographic) {
+    const { nc, nr, x0, y1, s0, G } = R; const RPS = 16, ns = Math.ceil(nr / RPS);
+    const keys = [[1024, 0, 1, geographic ? 2 : 1], [1025, 0, 1, 1]]; if (epsg) keys.push([geographic ? 2048 : 3072, 0, 1, epsg]);
+    const gk = [1, 1, 0, keys.length].concat(...keys); const nod = '-9999\0';
+    // entries: tag, type, count, value(s)   types: 3 SHORT, 4 LONG, 12 DOUBLE, 2 ASCII
+    const E = [[256, 4, 1, [nc]], [257, 4, 1, [nr]], [258, 3, 1, [32]], [259, 3, 1, [1]], [262, 3, 1, [1]], [273, 4, ns, null], [277, 3, 1, [1]], [278, 4, 1, [RPS]], [279, 4, ns, null],
+      [284, 3, 1, [1]], [339, 3, 1, [3]], [33550, 12, 3, [s0, s0, 0]], [33922, 12, 6, [0, 0, 0, x0, y1, 0]], [34735, 3, gk.length, gk], [42113, 2, nod.length, nod]];
+    const sz = { 2: 1, 3: 2, 4: 4, 12: 8 }; const ifdLen = 2 + E.length * 12 + 4; let extra = 8 + ifdLen; const ext = [];
+    for (const e of E) { const n = e[2] * sz[e[1]]; if (n > 4) { e.off = extra; extra += n + (n % 2); } }
+    const dataOff = (extra + 3) & ~3; const strip = (k) => Math.min(RPS, nr - k * RPS) * nc * 4; const offs = [], cnts = []; let o = dataOff; for (let k = 0; k < ns; k++) { offs.push(o); cnts.push(strip(k)); o += strip(k); }
+    E[5][3] = offs; E[8][3] = cnts;
+    const buf = new ArrayBuffer(o); const dv = new DataView(buf); const u8 = new Uint8Array(buf);
+    u8[0] = 0x49; u8[1] = 0x49; dv.setUint16(2, 42, true); dv.setUint32(4, 8, true); dv.setUint16(8, E.length, true);
+    const put = (p, t, v) => { if (t === 3) dv.setUint16(p, v, true); else if (t === 4) dv.setUint32(p, v, true); else if (t === 12) dv.setFloat64(p, v, true); else if (t === 2) dv.setUint8(p, v.charCodeAt ? v.charCodeAt(0) : v); };
+    E.forEach((e, i) => { const p = 10 + i * 12; dv.setUint16(p, e[0], true); dv.setUint16(p + 2, e[1], true); dv.setUint32(p + 4, e[2], true); const vals = e[1] === 2 ? [...e[3]] : e[3];
+      const base = e.off !== undefined ? e.off : p + 8; if (e.off !== undefined) dv.setUint32(p + 8, e.off, true); vals.forEach((v, k) => put(base + k * sz[e[1]], e[1], v)); });
+    dv.setUint32(10 + E.length * 12, 0, true);
+    new Float32Array(buf, dataOff, nc * nr).set(G);
+    return new Uint8Array(buf);
+  };
   // ---------------------------------------------------------------- 2D cross section
   AV.crossSection2D = function (app) {
     if (!app.mesh2d || !app.meshResults) { AV.toast('Run the 1D-2D model first.', true); return; }
@@ -233,5 +261,22 @@
   AV.mapOverlays.push((map, ctx) => { const X = map.app._xsec2d; if (!X) return; ctx.save(); ctx.strokeStyle = '#d500f9'; ctx.lineWidth = 2.5; ctx.setLineDash([8, 4]); ctx.beginPath();
     X.pts.forEach((p, i) => { const [x, y] = map.toScreen(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.restore(); });
 
+  // raster export of a mesh field (GeoTIFF or ASCII grid); asks for the file
+  AV.exportMeshRaster = async function (app, field, fmt, base0) {
+    if (!app.mesh2d) return; if (field !== 'elev' && !app.meshResults) { AV.toast('Run the 1D-2D model first.', true); return; }
+    base0 = base0 || (app.filePath ? AV.basename(app.filePath).replace(/\.inp$/i, '') : 'model'); fmt = fmt || 'tif';
+    const p = await window.host.saveDialog({ title: 'Export ' + AV.MESH_FIELDS[field], defaultPath: base0 + '_' + field + '.' + fmt, filters: fmt === 'tif' ? [{ name: 'GeoTIFF', extensions: ['tif', 'tiff'] }] : [{ name: 'ESRI ASCII grid', extensions: ['asc'] }] }); if (!p) return;
+    const wkt = app.crsWKT || ''; const b = p.replace(/\.(tif|tiff|asc)$/i, '');
+    if (fmt === 'tif') { const R = AV.meshRaster(app, field); const geo = /^\s*(GEOGCS|GEOGCRS|GEODCRS)/i.test(wkt) || /^deg/i.test((app.model.mapInfo && app.model.mapInfo.units) || '');
+      await window.host.writeBinary(p, AV.writeGeoTIFF(R, AV.wktEPSG(wkt), geo));
+      if (wkt) await window.host.writeText(p + '.aux.xml', '<PAMDataset>\n  <SRS>' + wkt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</SRS>\n</PAMDataset>\n');
+      await window.host.writeText(b + '.tfw', [R.s0, 0, 0, -R.s0, R.x0 + R.s0 / 2, R.y1 - R.s0 / 2].join('\r\n') + '\r\n');
+      AV.toast(AV.MESH_FIELDS[field] + ' exported to ' + p + ' (' + R.nc + ' × ' + R.nr + ' cells of ' + R.s0 + ')'); }
+    else { await window.host.writeText(p, AV.meshGrid(app, field)); AV.toast('Grid exported to ' + p); }
+    if (wkt) await window.host.writeText(b + '.prj', wkt);
+  };
+  // exports without opening the analysis view (2D Meshes layer menu)
+  AV.flood2DExport = function (app, what, opts) { if (!app.meshResults) { AV.toast('Run the 1D-2D model first.', true); return; } app.flood2d = app.flood2d || new FloodView(app);
+    const V = app.flood2d; if (V.S.thr === undefined) V.S.thr = app.meshResults.thr > 0 ? app.meshResults.thr : AV.meshDefaultBreaks(app, 'maxdepth')[0]; return V.exportAs(what, opts); };
   AV.openFlood2D = function (app) { app.flood2d = app.flood2d || new FloodView(app); app.flood2d.open(); };
 })(window.AV);

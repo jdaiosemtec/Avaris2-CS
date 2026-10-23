@@ -16,8 +16,8 @@
             { id: 'close', label: 'Close', img: 'close', fn: () => this.closeProject() }] },
           { name: 'Scenario', items: [{ id: 'scen', label: 'Scenarios', img: 'scenarios', fn: () => F().scenarios() }] },
           { name: 'Import', items: [{ id: 'import', label: 'Import', img: 'import', fn: () => this.showRightTab('catalog'), tip: 'Open the Catalog: browse and drag GIS data (SHP, GeoJSON, KML, CSV, DXF, GeoTIFF, GDB, .out results ...) onto the map' }] },
-          { name: 'Print', items: [{ id: 'layout', label: 'Print Layout', img: 'print', fn: () => AV.openLayout(this), tip: 'Print layout: map, title block, legend, scale bar and north arrow on a page; print or save as PDF / PNG' }] },
           { name: 'Export', items: [{ id: 'export', label: 'Export', img: 'export', fn: () => this.showRightTab('export'), tip: 'Export Wizard: network objects and results to Shapefile, File Geodatabase or CSV' }] },
+          { name: 'Print', items: [{ id: 'layout', label: 'Print Layout', img: 'print', fn: () => AV.openLayout(this), tip: 'Print layout: map, title block, legend, scale bar and north arrow on a page; print or save as PDF / PNG' }] },
           { name: 'User', items: [{ small: [{ id: 'usw', label: 'Switch User', svg: 'user', fn: () => this.auth.loginDialog(false) }, { id: 'umg', label: 'Manage Users', svg: 'user', fn: () => this.auth.manageUsers(), enabled: () => this.auth && this.auth.isAdmin }, { id: 'uhist', label: 'Change History', svg: 'history', fn: () => this.hist.openWindow() }] }] },
           { name: 'Settings', items: [{ id: 'default', label: 'Default', img: 'default', fn: () => this.defaultSettings(), tip: 'Default settings: overlapping-object selection, rainfall plot, selection colours' }] },
         ]
@@ -92,13 +92,14 @@
           { name: 'Results', items: [
             { id: 'play', label: 'Play', img: 'play', fn: () => S().togglePlaybar(), active: () => !!this.playMode, tip: 'Play mode: animate the results over time (click again to leave play mode)' },
             { id: 'profile', label: 'Profile', img: 'profile', fn: () => F().profileTool() },
-            { id: 'plot', label: 'Plot', img: 'plot', fn: () => F().graphTool() },
+            { id: 'plot', label: 'Plot', img: 'plot', fn: () => F().graphTool() } ] },
+          { name: 'Analysis', items: [
             { id: 'flood2d', label: '2D Flood Analysis', img: 'flood2d', lic: '2D', badge: '1D-2D', fn: () => AV.openFlood2D(this), tip: 'Flooded area, depth / velocity / hazard classes, statistics by zone, comparison of runs, flood extent and grid exports, 2D cross section' },
             { id: 'csostat', label: 'CSO Statistics', img: 'cso', fn: () => AV.openCSO(this), tip: 'Spill events, volumes and durations of the overflow points (outfalls, weirs …) of the loaded results' },
             { id: 'comparison', label: 'Comparison', img: 'summary', fn: () => this.toggleComparison(), active: () => this.views && this.views.has('cmp'), tip: 'Open / close the Scenario Comparison window' },
             { small: [
               { id: 'report', label: 'Report', img: 'report', fn: () => S().showReport() },
-              { id: 'conv2', label: 'Convergence', img: 'convergence', fn: () => S().convergenceDiagnostics(), tip: 'Nonconvergence diagnostics' }] }] },
+              { id: 'conv2', label: 'Convergence', img: 'convergence', fn: () => S().convergenceDiagnostics(), tip: 'Nonconvergence diagnostics' }] } ] },
         ]
       },
       {

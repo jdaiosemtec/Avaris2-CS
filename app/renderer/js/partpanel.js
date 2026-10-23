@@ -75,10 +75,7 @@
       const dem = h('input', { type: 'text', value: V.S.dem || demAbs, placeholder: 'DEM (GeoTIFF / ASCII grid) – optional', style: { width: '100%' } });
       const surf = h('input', { type: 'checkbox', checked: V.S.surface !== false });
       body.appendChild(h('div', { class: 'form' }, h('label', null, 'Folder'), h('span', { style: { display: 'flex', gap: '4px' } }, folder,
-          B('…', async () => { let d = folder.value; while (d && !await window.host.exists(d)) { const up = AV.dirname(d); if (!up || up === d) break; d = up; } const p = await window.host.openDialog({ folder: true, defaultPath: d || folder.value, title: 'Folder for the sub-models' }); if (p) folder.value = p; }),
-          B('New Folder…', async () => { const base = folder.value.trim(); let parent = base; if (!await window.host.exists(parent)) parent = AV.dirname(parent);
-            const nm = await AV.prompt('New Folder', 'Name of the new folder in ' + parent, 'Partition'); if (!nm) return; if (/[\\/:*?"<>|]/.test(nm)) { AV.toast('A folder name cannot contain \\ / : * ? " < > |', true); return; }
-            const p = AV.joinPath(parent, nm.trim()); try { await window.host.mkdir(p); folder.value = p; AV.toast('Folder created: ' + p); } catch (e) { AV.alert('Could not create the folder: ' + e.message); } })),
+          B('…', async () => { let d = folder.value; while (d && !await window.host.exists(d)) { const up = AV.dirname(d); if (!up || up === d) break; d = up; } const p = await window.host.openDialog({ folder: true, defaultPath: d || folder.value, title: 'Folder for the sub-models' }); if (p) folder.value = p; })),
         h('label', null, 'File names'), patt, h('label', null, 'Standalone boundaries'), h('label', { style: { color: 'inherit' } }, bnd, ' base-run inflows and water levels at the cut points (each sub-model can run on its own)'),
         h('label', null, 'Partition areas'), h('label', { style: { color: 'inherit' } }, surf, ' surface area of each partition from the DEM (D8), written as its 2D boundary'),
         h('label', null, 'DEM'), h('span', { style: { display: 'flex', gap: '4px' } }, dem, B('…', async () => { const p = await window.host.openDialog({ filters: [{ name: 'DEM', extensions: ['tif', 'tiff', 'asc'] }] }); if (p) dem.value = p; }))));

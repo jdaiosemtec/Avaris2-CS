@@ -189,7 +189,12 @@
       row(1, [sp(), chk(S.visible, v => { app.prefs.mesh2d.visible = v; app.savePrefs(); }), ic, h('span', { class: 'lname', title: '2D flood surface, coloured by ' + AV.MESH_FIELDS[S.field] }, '2D Meshes'), h('span', { class: 'lcnt' }, String(mesh.cells.length))], {
         drag: 'mesh', dbl: () => app.symPane.open({ mesh: true }),
         menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox(meshBox()) }, '-', { label: 'Attribute Table', fn: () => AV.meshTable(app) }, { label: 'Symbology...', fn: () => app.symPane.open({ mesh: true }) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') },
-          { label: 'Export as Shapefile...', fn: () => AV.exportMeshShapefile(app) }, '-', { label: 'Rebuild Meshes', fn: () => AV.createMeshes(app) },
+          { label: 'Export as Shapefile...', fn: () => AV.exportMeshShapefile(app) },
+          ...(app.meshResults ? ['-', { label: '2D Flood Analysis...', fn: () => AV.openFlood2D(app) }, { label: '2D Cross Section', fn: () => AV.crossSection2D(app) },
+            { label: (app.prefs.mesh2d && app.prefs.mesh2d.arrows ? '✓ ' : '') + 'Flow Direction Arrows', fn: () => { const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); P.arrows = !P.arrows; app.savePrefs(); map.redraw(); } },
+            { label: 'Export Flood Extent (Shapefile)...', fn: () => AV.flood2DExport(app, 'extent') }, { label: 'Export Hazard Classes (Shapefile)...', fn: () => AV.flood2DExport(app, 'hclass') },
+            { label: 'Export Max. Depth (GeoTIFF)...', fn: () => AV.exportMeshRaster(app, 'maxdepth', 'tif') }, { label: 'Export Raster of a Field...', fn: () => AV.flood2DExport(app, 'grid', { field: AV.meshField(app) }) }] : []),
+          '-', { label: 'Rebuild Meshes', fn: () => AV.createMeshes(app) },
           { label: 'Remove Meshes', fn: async () => { if (!await AV.confirm('Remove the 2D mesh of this model? The next run is then 1D only until the mesh is created again.', 'Remove Meshes', 'Remove')) return; app.mesh2d = null; app.meshResults = null; app.meshSel = -1; const mp = AV.meshPath(app); if (mp) { try { await window.host.writeText(mp, 'null'); } catch (e) { } } this.refreshLayers(); map.redraw(); } }] });
       } };
       const show2D = m && AV.has2D(app) && (app.mesh2d || AV.f2dEnabled(m));
