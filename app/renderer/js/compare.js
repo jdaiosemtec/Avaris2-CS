@@ -95,15 +95,53 @@
 
   class ScenarioCompare {
     constructor(app) { this.app = app; this.type = 'node'; this.mk = 'maxHgl'; this.onlyChanged = true; this.filter = null; this.sortK = 'absd'; this.sortDir = -1; }
+    // every run of this model (Database) can be chosen; base and compare must be of the same kind (1D / 1D-2D).
+    // The chosen pair is also what the graph windows show (app.sim.pick).
+    async listRuns() {
+      const app = this.app; const norm = (p) => String(p || '').replace(/\\/g, '/').toLowerCase();
+      let runs = []; try { runs = app.filePath ? (await AV.listRuns(app.filePath)).filter(r => r.out) : []; } catch (e) { runs = []; }
+      runs = runs.map(r => ({ name: r.name, out: r.out, rpt: r.rpt, is2D: !!r.is2D, mtime: r.mtime }));
+      // results that are loaded but not in the results folder (opened from elsewhere)
+      for (const s of app.sim.sources(true)) { const f = s.res.outFile || (s.res.meta && s.res.meta.file); const e = runs.find(r => norm(r.out) === norm(f));
+        if (e) e.res = s.res; else runs.unshift({ name: s.name, out: f, rpt: s.res.rpt, is2D: /\.fout$/i.test(f || ''), res: s.res }); }
+      const cf = norm(app.results && (app.results.outFile || app.results.meta.file)); for (const r of runs) { r.current = !!cf && norm(r.out) === cf; if (r.current) r.res = app.results; }
+      return runs;
+    }
     async open() {
-      const app = this.app, srcs = app.sim.sources();
-      if (srcs.length < 2) { AV.alert('Load or run at least two scenarios first (Project ▸ Scenarios ▸ Run Selected & Compare).', 'Scenario Comparison'); return; }
-      app.status('Preparing comparison …');
-      for (const s of srcs) await prep(s.res, app);
-      this.srcs = srcs; if (!this.base || !srcs.some(s => s.name === this.base)) this.base = srcs[0].name; if (!this.cmp || this.cmp === this.base || !srcs.some(s => s.name === this.cmp)) this.cmp = srcs.find(s => s.name !== this.base).name;
-      if (!this.el) { this.el = h('div', { class: 'cmpview' }); app.addView('cmp', 'Scenario Comparison', this.el, { onClose: () => { this.el = null; this.clearMap(); } }); }
+      const app = this.app; app.status('Preparing comparison …');
+      this.runs = await this.listRuns();
+      if (this.runs.length < 2) { AV.alert('Run the model at least twice (or load two results) first: the comparison needs two runs of this model.', 'Scenario Comparison'); return; }
+      const cur = this.runs.find(r => r.current);
+      if (!this.base || !this.runs.some(r => r.name === this.base)) this.base = (this.wantCurAsCmp ? null : cur && cur.name) || this.runs[0].name;
+      if (this.wantCurAsCmp && cur && cur.name !== this.base) this.cmp = cur.name; this.wantCurAsCmp = false;
+      if (!this.fixPair()) { AV.alert('There is no other ' + (this.runOf(this.base).is2D ? '1D-2D' : '1D') + ' run to compare ' + this.base + ' with.', 'Scenario Comparison'); }
+      await this.loadPair();
+      if (!this.el) { this.el = h('div', { class: 'cmpview' }); app.addView('cmp', 'Scenario Comparison', this.el, { onClose: () => { this.el = null; this.clearMap(); app.sim.pick = null; this.refreshGraphs(); } }); }
       else app.activateView('cmp');
       this.render(); app.status('Scenario comparison ready.');
+    }
+    runOf(name) { return this.runs.find(r => r.name === name); }
+    // compare = a run of the same kind as the base (1D with 1D, 1D-2D with 1D-2D)
+    fixPair() {
+      const b = this.runOf(this.base); const ok = (r) => r && r.name !== this.base && r.is2D === b.is2D;
+      if (ok(this.runOf(this.cmp))) return true;
+      const c = this.runs.find(r => ok(r) && r.current) || this.runs.find(ok); this.cmp = c ? c.name : null; return !!c;
+    }
+    async loadPair() {
+      const app = this.app;
+      for (const name of [this.base, this.cmp]) { const r = this.runOf(name); if (!r || r.res) continue;
+        const ex = app.sim.scen.find(s => String(s.outFile || '').toLowerCase() === String(r.out).toLowerCase());
+        r.res = ex || await app.sim.loadScenario(r.out, r.rpt || r.out.replace(/\.fout$/i, '.frpt').replace(/\.out$/i, '.rpt'), r.name); }
+      for (const r of this.runs) if (r.res) await prep(r.res, app);
+      this.srcs = this.runs.filter(r => r.res).map(r => ({ name: r.name, res: r.res }));
+      const B = this.runOf(this.base), C = this.runOf(this.cmp);
+      app.sim.pick = B && B.res && C && C.res ? [{ name: B.name, res: B.res }, { name: C.name, res: C.res }] : null;
+      this.refreshGraphs();
+    }
+    refreshGraphs() { const f = this.app.feat; for (const g of (f && f.graphs) || []) { try { g.render(); } catch (e) { } } }
+    async choose(key, name) {
+      this[key] = name; if (key === 'base') this.fixPair(); else if (this.cmp === this.base) { const o = this.runs.find(r => r.name !== name && r.is2D === this.runOf(name).is2D); this.base = o ? o.name : this.base; }
+      this.app.status('Loading ' + name + ' …'); await this.loadPair(); this._all = null; this.render(); this.app.status('Scenario comparison ready.');
     }
     get M() { return metrics(this.app)[this.type]; }
     has2D() { return !!(this.app.mesh2d && this.srcs && this.src(this.base)._m2d && this.src(this.cmp)._m2d); }
@@ -127,15 +165,17 @@
     }
     render() {
       const app = this.app, E = this.el; E.innerHTML = '';
-      const names = this.srcs.map(s => s.name);
-      const selS = (key) => { const s = h('select', { onchange: () => { this[key] = s.value; if (this.base === this.cmp) { const other = names.find(n => n !== s.value); if (key === 'base') this.cmp = other; else this.base = other; } this.render(); } }, names.map(n => h('option', { value: n }, n))); s.value = this[key]; return s; };
+      const lbl = (r) => r.name + '  (' + (r.is2D ? '1D-2D' : '1D') + (r.current ? ', current' : '') + ')';
+      const selS = (key) => { const bs = this.runOf(this.base); const list = key === 'base' ? this.runs : this.runs.filter(r => r.name !== this.base && r.is2D === (bs && bs.is2D));
+        const s = h('select', { title: key === 'base' ? 'Any run of this model' : 'Runs of the same kind as the base (' + (bs && bs.is2D ? '1D-2D' : '1D') + ')', onchange: () => this.choose(key, s.value) }, list.map(r => h('option', { value: r.name }, lbl(r)))); s.value = this[key] || ''; return s; };
+      if (!this.cmp || !this.runOf(this.cmp) || !this.runOf(this.cmp).res) { E.appendChild(h('div', { class: 'cmpbar' }, h('span', { class: 'cmpsw' }, h('span', { class: 'cmpdot b' }), 'Base', selS('base')), h('span', { class: 'note', style: { color: 'var(--warn)' } }, 'No other ' + (this.runOf(this.base).is2D ? '1D-2D' : '1D') + ' run of this model to compare with.'))); return; }
       const typeS = h('select', { onchange: () => { this.type = typeS.value; this.mk = this.M[0].k; this.tol = null; this.filter = null; this.render(); } }, [['node', 'Nodes'], ['link', 'Links'], ['subcatch', 'Subcatchments'], ['outfall', 'Outfalls']].concat(this.has2D() ? [['cell', '2D Cells']] : []).map(([v, l]) => h('option', { value: v }, l))); if (this.type === 'cell' && !this.has2D()) { this.type = 'node'; this.mk = this.M[0].k; } typeS.value = this.type;
       const B = this.src(this.base), C = this.src(this.cmp); const mt = this.metric; const unit = mt.u(B);
       const metS = h('select', { onchange: () => { this.mk = metS.value; this.tol = null; this.filter = null; this.render(); } }, this.M.map(x => h('option', { value: x.k }, x.l))); metS.value = mt.k;
       const tolI = h('input', { type: 'number', step: 'any', min: 0, value: this.tol !== undefined && this.tol !== null ? this.tol : mt.tol, style: { width: '72px' }, title: 'Differences smaller than this count as "no change"', onchange: () => { this.tol = Math.max(0, +tolI.value || 0); this.render(); } });
       const only = h('input', { type: 'checkbox', checked: this.onlyChanged, onchange: () => { this.onlyChanged = only.checked; this.render(); } });
       E.appendChild(h('div', { class: 'cmpbar' },
-        h('span', { class: 'cmpsw' }, h('span', { class: 'cmpdot b' }), 'Base', selS('base')), h('button', { class: 'btn small', title: 'Swap base and compare', onclick: () => { [this.base, this.cmp] = [this.cmp, this.base]; this.render(); } }, '⇄'), h('span', { class: 'cmpsw' }, h('span', { class: 'cmpdot c' }), 'Compare', selS('cmp')),
+        h('span', { class: 'cmpsw' }, h('span', { class: 'cmpdot b' }), 'Base', selS('base')), h('button', { class: 'btn small', title: 'Swap base and compare', onclick: async () => { [this.base, this.cmp] = [this.cmp, this.base]; await this.loadPair(); this.render(); } }, '⇄'), h('span', { class: 'cmpsw' }, h('span', { class: 'cmpdot c' }), 'Compare', selS('cmp')),
         h('span', { class: 'cmpsep' }), typeS, metS, h('label', null, 'Tolerance ', tolI, ' ' + unit), h('label', null, only, ' Changed only'),
         h('span', { style: { flex: 1 } }),
         h('button', { class: 'btn small primary', title: 'Colour the map by the difference (Compare − Base)', onclick: () => this.showOnMap() }, 'Difference on Map'),
@@ -269,8 +309,8 @@
   AV.ScenarioCompare = ScenarioCompare;
   // from the 2D Flood Analysis: base = the other run, compare = the current results, 2D cells / max. depth
   AV.openCompare2D = async function (app, baseName) {
-    app.cmp = app.cmp || new AV.ScenarioCompare(app); const C = app.cmp; const cur = app.sim.sources().find(s => s.current);
-    C.base = baseName; C.cmp = cur ? cur.name : null; C.type = 'cell'; C.mk = 'c_maxd'; C.tol = null; C.filter = null; C.onlyChanged = true;
+    app.cmp = app.cmp || new AV.ScenarioCompare(app); const C = app.cmp;
+    C.base = baseName; C.cmp = null; C.wantCurAsCmp = true; C.type = 'cell'; C.mk = 'c_maxd'; C.tol = null; C.filter = null; C.onlyChanged = true;
     await C.open(); app.refreshRibbon && app.refreshRibbon();
   };
   AV.App.prototype.compareScenarios = function () { this.cmp = this.cmp || new AV.ScenarioCompare(this); return this.cmp.open(); };

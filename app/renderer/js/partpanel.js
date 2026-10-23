@@ -5,8 +5,7 @@
   const pad2 = (i) => String(i + 1).padStart(2, '0'); const PID = (i) => 'P' + pad2(i);
   const COL = (i) => AV.partColor(i);
   const defPath = (app) => app.filePath ? app.filePath.replace(/\.inp$/i, '.partition.json') : null;
-  const prefsOf = (app) => Object.assign({ n: 12, revMin: 60, revPct: 5, revMax: 95, revRel: 2, // rev*: taken from the flag Reverse flow event
-    keepPonds: true, pondMin: 30, pondDist: 0, pondDepth: 0, tol: 25, ctrl: 60, pattern: '{model}_P{nn}.inp', folder: '', boundary: true }, app.prefs.partition || {});
+  const prefsOf = (app) => Object.assign({ n: 12, revMin: 60, revPct: 5, revMax: 95, revRel: 2, keepPonds: true, pondMin: 30, pondDist: 0, pondDepth: 0, tol: 25, ctrl: 60, pattern: '{model}_P{nn}.inp', folder: '', boundary: true }, app.prefs.partition || {});
   let cores = null;
   const getCores = async () => { if (cores) return cores; try { const c = await window.host.cpuInfo(); cores = c.physical || c.logical || 4; } catch (e) { cores = 4; } return cores; };
 
@@ -24,11 +23,6 @@
     let busy = false;
     const B = (l, fn, pri, dis) => h('button', { class: 'btn small' + (pri ? ' primary' : ''), onclick: fn, disabled: !!dis }, l);
     const num = (k, w, attrs) => h('input', Object.assign({ type: 'number', value: V.S[k], style: { width: (w || 64) + 'px' }, onchange: (e) => { V.S[k] = +e.target.value; app.prefs.partition = V.S; app.savePrefs(); } }, attrs || {}));
-    // the reverse-flow rule is the flag 'Reverse flow event' (one rule, one set of values)
-    const revFlag = () => app.flags && app.flags.def && app.flags.def('rev');
-    const syncRev = () => { const F = app.flags, f = revFlag(); if (!f) return; const p = F.params(f); Object.assign(V.S, { revRel: +p.r, revMin: +p.n, revPct: +p.w, revMax: +p.h }); };
-    const fnum = (k, sk, w) => { syncRev(); return h('input', { type: 'number', step: 'any', min: 0, value: V.S[sk], style: { width: (w || 46) + 'px' }, onchange: (e) => { const v = +e.target.value; if (!isFinite(v)) return; const f = revFlag(); if (f) app.flags.setVal(f, k, v); V.S[sk] = v; app.prefs.partition = V.S; app.savePrefs(); } }); };
-    syncRev();
     const render = () => {
       root.innerHTML = '';
       root.appendChild(h('div', { class: 'fltb' }, ['part', 'regen'].map(t => h('button', { class: 'btn small' + (V.tab === t ? ' primary' : ''), onclick: () => { V.tab = t; render(); } }, t === 'part' ? 'Partition' : 'Regenerate')),
@@ -44,10 +38,10 @@
       const unit = app.model.isSI ? 'm' : 'ft'; const opt = (label, ctl, hint) => [h('div', { class: 'al' }, label), h('div', { class: 'ac' }, ctl), hint ? h('div', { class: 'ah' }, hint) : null];
       const keep = h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } });
       body.appendChild(h('details', { open: !!V.adv, ontoggle: (e) => { V.adv = e.target.open; } }, h('summary', null, 'Advanced'), h('div', { class: 'padv' },
-        opt('Flow counts', ['above', fnum('r', 'revRel', 44), '% of the peak, for ≥', fnum('n', 'revMin', 48), 'min']),
-        opt('Oscillating flow', ['reverse ≥', fnum('w', 'revPct', 44), '% of that time → not cut']),
-        opt('Flows backwards', ['reverse ≥', fnum('h', 'revMax', 44), '% → may be cut (drawn reversed)'],
-          'Same rule and same values as the flag Reverse flow event (Operation ▸ Flag); a change here changes the flag too. Smaller flows (noise around zero) count neither as flow nor as reverse flow.'),
+        opt('Flow counts', ['above', num('revRel', 44, { step: 0.5, min: 0 }), '% of the peak, for ≥', num('revMin', 48, { min: 0 }), 'min']),
+        opt('Oscillating flow', ['reverse ≥', num('revPct', 44, { min: 0 }), '% of that time → not cut']),
+        opt('Flows backwards', ['reverse ≥', num('revMax', 44, { min: 0 }), '% → may be cut (drawn reversed)'],
+          'Same rule as the flag Reverse flow event (Operation ▸ Flag), with its own values here. Smaller flows (noise around zero) count neither as flow nor as reverse flow.'),
         opt('Keep ponding areas whole', [keep, 'manholes of one area stay together']),
         opt('2D ponding depth', ['cells ≥', num('pondDepth', 46, { step: 0.05 }), unit], '0 = flood depth of the 2D options, else ' + (app.model.isSI ? '0.3 m' : '1 ft') + '.'),
         opt('1D ponding (no 2D results)', ['flooded ≥', num('pondMin', 46), 'min, within', num('pondDist', 52)], 'Flooded manholes closer than this distance (map units) to each other form one ponding area. 0 = ' + (app.model.isSI ? '50 m' : '150 ft') + '.'),
@@ -92,7 +86,7 @@
     };
     const zoomTo = (i) => { const objs = [...V.P.owner].filter(([, p]) => p === i).map(([id]) => app.model.nodes.get(id)); app.map.zoomToObjects(objs); };
     async function go(status) {
-      if (busy) return; syncRev(); stopMove(); busy = true; status.textContent = 'Analysing the base results…'; render(); const bz = AV.busy.start('Partitioning the model');
+      if (busy) return; stopMove(); busy = true; status.textContent = 'Analysing the base results…'; render(); const bz = AV.busy.start('Partitioning the model');
       try { await new Promise(r => setTimeout(r, 30)); const t0 = performance.now();
         V.A = await AV.partAnalyse(app, V.S); status.textContent = 'Partitioning…'; await new Promise(r => setTimeout(r, 20));
         V.P = AV.partCompute(app, V.A, V.S); V.sel = null; V.time = ((performance.now() - t0) / 1000).toFixed(1);

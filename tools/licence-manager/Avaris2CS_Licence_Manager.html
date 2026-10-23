@@ -58,6 +58,7 @@ td.notes { white-space:normal; max-width:240px; color:var(--muted); }
 .dlg .t .x { margin-left:auto; border:0; font-size:18px; padding:0 6px; line-height:1; }
 .dlg .b { padding:12px 16px; display:flex; flex-direction:column; gap:10px; }
 .dlg .f { padding:10px 16px; border-top:1px solid var(--line); display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+.dlg .f .left { margin-right:auto; }
 .form { display:grid; grid-template-columns: 150px 1fr; gap:6px 10px; align-items:center; }
 .form > label { color:var(--muted); }
 .form input[type=text], .form input[type=email] { width:100%; }
@@ -315,9 +316,33 @@ function editLicence(r, justIssued) {
     h('div', { class: 'note' }, 'Licences work offline, so a key that was already sent cannot be switched off remotely. Extending is safe (the customer activates the new key). Shortening or voiding is recorded here and takes effect only when the customer activates a new key or the old one expires.')
   ];
   dialog('Licence ' + r.ser + ' — ' + r.user, body, [
+    { label: 'Delete…', cls: 'danger left', fn: c => deleteLicence(r, c) },
     r.state === 'void' || r.state === 'released' ? { label: 'Reactivate', fn: c => setState(c, '', '') } : { label: 'Mark Void', cls: 'danger', fn: c => { if (confirm('Mark licence ' + r.ser + ' as void? (The key itself keeps working offline until it expires.)')) setState(c, 'void', ''); } },
     { label: 'Close', fn: c => c() }, { label: 'Save', cls: 'primary', fn: save }], 800);
   upd();
+}
+
+// ------------------------------------------------------------------ delete (test licences, mistakes)
+// Removes the licence - or every licence of the account - from licences.json. Nothing remains in the list, so the
+// customer can send a new request for the same computer / account without the "already licensed" warnings.
+// The daily copy in backups/ keeps the state before the deletion. Keys are checked offline: a key that was already
+// activated keeps working until it expires (or until the customer clicks Release in Help > Register).
+function deleteLicence(r, closeEdit) {
+  const acc = String(r.user || '').toLowerCase(); const same = S.ledger.records.filter(x => String(x.user || '').toLowerCase() === acc);
+  const one = h('input', { type: 'radio', name: 'delw', checked: same.length < 2 }), all = h('input', { type: 'radio', name: 'delw', checked: same.length >= 2 });
+  const body = [
+    h('div', null, 'Delete from the licence list:'),
+    h('label', { class: 'row' }, one, ' only this licence ', h('b', null, r.ser + (r.rev ? ' rev. ' + r.rev : '')), ' (' + (r.host || r.mc || '') + ')'),
+    h('label', { class: 'row' }, all, ' all ', h('b', null, String(same.length)), ' licence(s) of the account ', h('b', null, r.user || '(none)'), ': ' + same.map(x => x.ser).join(', ')),
+    h('div', { class: 'note' }, 'The deleted licences disappear from the list (the copy of today in backups/ keeps them). The account and its computers are free again: a new request from the program is issued without the "already licensed" warnings.'),
+    h('div', { class: 'note', style: { color: 'var(--warn, #b26a00)' } }, 'Licences are checked offline: a key that the customer already activated keeps working on that computer until it expires or the customer clicks Release (Help ▸ Register). For test licences use 30 days.')];
+  const close = dialog('Delete licence', body, [{ label: 'Cancel', fn: c => c() }, { label: 'Delete', cls: 'danger', fn: async (c) => {
+    const del = all.checked ? same : [r];
+    if (!confirm('Delete ' + del.length + ' licence(s) (' + del.map(x => x.ser).join(', ') + ') from the list?')) return;
+    S.ledger.deleted = (S.ledger.deleted || []).concat(del.map(x => ({ ser: x.ser, user: x.user, mc: x.mc, ed: x.ed, exp: x.exp, at: new Date().toISOString() })));
+    S.ledger.records = S.ledger.records.filter(x => !del.includes(x));
+    try { await saveLedger(); } catch (e) { toast('Could not save licences.json: ' + e.message, true); return; }
+    c(); closeEdit(); toast(del.length + ' licence(s) deleted.'); render(); } }], 620);
 }
 
 // ------------------------------------------------------------------ import / export

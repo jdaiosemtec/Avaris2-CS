@@ -149,7 +149,7 @@
     get model() { return this.app.model; }
 
     // =============================================================== scenarios (other .inp files run alongside the current one)
-    async clearScenarios() { for (const s of this.scen) { try { await window.host.outClose(s.handle); } catch (e) { } } this.scen = []; }
+    async clearScenarios() { this.pick = null; for (const s of this.scen) { try { await window.host.outClose(s.handle); } catch (e) { } } this.scen = []; }
     async loadScenario(out, rpt, name) {
       const old = this.scen.find(s => s.name === name); if (old) { try { await window.host.outClose(old.handle); } catch (e) { } this.scen = this.scen.filter(s => s !== old); }
       const meta = await window.host.outOpen(out); const R = new Results(this, meta, rpt); R.scenName = name; R.outFile = out;
@@ -157,7 +157,9 @@
       this.scen.push(R); return R;
     }
     // sources for comparison graphs: current results first, then loaded scenarios
-    sources() { const out = []; const cur = this.app.filePath ? AV.basename(this.app.filePath).replace(/\.inp$/i, '') : 'Current'; if (this.results) out.push({ name: cur, res: this.results, current: true }); for (const s of this.scen) if (s.scenName !== cur || !this.results) out.push({ name: s.scenName, res: s }); if (this.compare) out.push({ name: 'Compare (' + AV.basename(this.compare.meta.file || 'run') + ')', res: this.compare }); return out; }
+    // the Scenario Comparison sets the pair it compares (pick): the graph windows then show that pair
+    sources(all) { if (!all && this.pick && this.app.views && this.app.views.has('cmp')) return this.pick.map(p => ({ name: p.name, res: p.res, current: p.res === this.results }));
+      const out = []; const cur = this.app.filePath ? AV.basename(this.app.filePath).replace(/\.inp$/i, '') : 'Current'; if (this.results) out.push({ name: cur, res: this.results, current: true }); for (const s of this.scen) if (s.scenName !== cur || !this.results) out.push({ name: s.scenName, res: s }); if (this.compare) out.push({ name: 'Compare (' + AV.basename(this.compare.meta.file || 'run') + ')', res: this.compare }); return out; }
 
     // =============================================================== options
     // Simulation Options. The '2D Flood' tab belongs to the 2D module (AV.has2D); only2D opens that tab alone
@@ -480,7 +482,7 @@
         this.app.status('Results loaded' + (missing ? ' (' + missing + ' model nodes not found in results file)' : ''));
       } catch (e) { AV.alert('Could not load results:\n' + e.message, 'Results'); }
     }
-    async clearResults(silent) {
+    async clearResults(silent) { this.pick = null;
       this.stop();
       if (this.results) { try { await window.host.outClose(this.results.handle); } catch (e) { } }
       this.results = this.app.results = null; this.app.meshResults = null; this.app.playMode = false;

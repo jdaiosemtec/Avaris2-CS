@@ -437,8 +437,12 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - CSO 统计：两张表上下排列（全宽），水量取整加千分位。旱流对话框：Pattern name 下写明会写出什么、在哪里看到、重名会替换。Help 页签 Quick Start / Shortcuts / Diagnostics 换成与其他按钮同风格的图标（`quickstart.png`、`shortcuts.png`、`diagnostics.png`）。
 
 ## 16. 2.6.4
-- 往复流判定统一：分区（`partpanel.js` `syncRev`/`fnum`）直接读写 Flag 定义 `rev` 的参数（`app.flags.params(def('rev'))`：r 计入流量的峰值百分比、n 最短有流时间、w 往复下限、h 倒流上限），`partAnalyse` 的 `totdur(|Q| > max(eps, r% × rptMaxFlow))`、`totdur(Q < −阈值)` 与 Flag 条件（Σ 取全程）一致。验证：Riverside（r 5%、n 30 min、w 5%、h 95%）Flag 报警（不含 High）94 根 = 分区往复流 94 根，逐根相同。
+- 往复流判定统一（2.6.7 起分区有自己的参数 revRel / revMin / revPct / revMax，只是算法与 Flag `rev` 相同）：`partAnalyse` 的 `totdur(|Q| > max(eps, r% × rptMaxFlow))`、`totdur(Q < −阈值)` 与 Flag 条件（Σ 取全程）一致。验证：Riverside（r 5%、n 30 min、w 5%、h 95%）Flag 报警（不含 High）94 根 = 分区往复流 94 根，逐根相同。
 - 载入结果后不进入播放模式（`loadResults` 只建播放条）；点 Play 进入；没有结果时点 Play 先载入最近结果再进入播放。
 - 分区叠加层（不切的管道虚线、积水区圆圈）跟随图层可见性（`AV.symOf(app, type).visible`）。
 - 2.6.5：分区状态下地图左上角眼睛按钮（T 键）隐藏 / 显示分区标记（切口 ⊗、不切管道虚线、积水区蓝圈，`partOverlay` 检查 `app.themeHidden`），分区配色不变。
 - 2.6.6：分区标记（⊗ 切口、紫色虚线不切管道、蓝色虚线圈积水区）不再跟随图层开关，只由眼睛按钮统一隐藏 / 显示；`AV.partLegend` 图例（地图右下角 `#legend`，分区面板打开 / 关闭和眼睛切换时 `theme.updateLegend()` 更新）。
+
+## 17. 2.6.7
+- Scenario Comparison（`compare.js`）：`listRuns()` 列出模型 Database 里的全部运行（加上已载入但不在结果文件夹的结果），标明 1D / 1D-2D；Compare 只列与 Base 同类的运行（`fixPair`）；选中时才载入（`loadPair` → `sim.loadScenario`）。选中的一对写入 `app.sim.pick`，比较窗口打开时 `sim.sources()` 只返回这一对，图表窗口（Graph 的 Scenarios 勾选）随之更新；关闭比较窗口后恢复。整个视图可滚动，下方表格 + 散点图区域高度 max(560 px, 视窗 − 330 px)。
+- Licence Manager：许可证对话框左下角 Delete…，可删这一条或该账户全部许可证（`S.ledger.deleted` 留简要记录，当天备份在 backups/）。许可证离线验证：已激活的 key 在那台电脑上仍可用到到期或用户 Release。
