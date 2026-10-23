@@ -441,3 +441,4 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 载入结果后不进入播放模式（`loadResults` 只建播放条）；点 Play 进入；没有结果时点 Play 先载入最近结果再进入播放。
 - 分区叠加层（不切的管道虚线、积水区圆圈）跟随图层可见性（`AV.symOf(app, type).visible`）。
 - 2.6.5：分区状态下地图左上角眼睛按钮（T 键）隐藏 / 显示分区标记（切口 ⊗、不切管道虚线、积水区蓝圈，`partOverlay` 检查 `app.themeHidden`），分区配色不变。
+- 2.6.6：分区标记（⊗ 切口、紫色虚线不切管道、蓝色虚线圈积水区）不再跟随图层开关，只由眼睛按钮统一隐藏 / 显示；`AV.partLegend` 图例（地图右下角 `#legend`，分区面板打开 / 关闭和眼睛切换时 `theme.updateLegend()` 更新）。

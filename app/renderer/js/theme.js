@@ -196,7 +196,7 @@
     }
     updateLegend() {
       const el = AV.$('#legend'); if (!el) return; el.innerHTML = ''; let any = false;
-      if (this.app.partView && this.app.partView.P) { el.appendChild(AV.partLegend(this.app)); el.style.display = ''; return; }
+      if (this.app.partView && this.app.partView.P) { el.appendChild(AV.partLegend(this.app)); el.style.display = 'block'; el.classList.add('partleg'); return; } el.classList.remove('partleg');
       if (this.app.themeHidden) { el.style.display = 'none'; return; }
       for (const layer of ['node', 'link', 'sub']) for (const t of this.subsOf(layer)) {
         if (t.flag && !this.active(t)) { any = true; el.appendChild(h('div', { class: 'lt', style: { color: 'var(--muted)', fontWeight: 400 } }, LAYER_NAME[layer] + ': ' + t.name + (this.app.playMode ? ' - Σ shown outside play mode' : ' - ▶ shown while playing'))); continue; }

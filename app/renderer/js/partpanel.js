@@ -18,9 +18,9 @@
     const V = app.partView || (app.partView = { P: null, A: null, sel: null, showCut: true, showNo: true, tab: 'part', S: prefsOf(app) });
     if (tab) V.tab = tab;
     const P0 = AV.floatPanel({ id: 'partition', title: 'Model Partition', minimize: true, w: 530, h: Math.min(780, window.innerHeight - 150), body: h('div', { class: 'flp' }),
-      onClose: () => { app.partView = null; endPick(); app.theme.invalidate(); app.map.redraw(); } });
+      onClose: () => { app.partView = null; endPick(); app.theme.invalidate(); app.map.redraw(); app.theme.updateLegend && app.theme.updateLegend(); } });
     const root = P0.el ? AV.$('.flp', P0.el) : AV.$('.flp');
-    const redrawMap = () => { app.theme.invalidate(); app.map.redraw(); };
+    const redrawMap = () => { app.theme.invalidate(); app.map.redraw(); app.theme.updateLegend && app.theme.updateLegend(); };
     let busy = false;
     const B = (l, fn, pri, dis) => h('button', { class: 'btn small' + (pri ? ' primary' : ''), onclick: fn, disabled: !!dis }, l);
     const num = (k, w, attrs) => h('input', Object.assign({ type: 'number', value: V.S[k], style: { width: (w || 64) + 'px' }, onchange: (e) => { V.S[k] = +e.target.value; app.prefs.partition = V.S; app.savePrefs(); } }, attrs || {}));

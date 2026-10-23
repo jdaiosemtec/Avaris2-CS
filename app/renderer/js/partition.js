@@ -320,11 +320,9 @@
     const app = map.app, V = app.partView; if (!V || !V.P) return; const P = V.P, m = app.model;
     // the eye button (T) hides the markings: cut points, not-cut pipes, ponding areas (the partition colours stay)
     if (app.themeHidden && !V.move) return; ctx.save();
-    // the overlays follow the visibility of the layers (a hidden Conduits layer hides the not-cut pipes too)
-    const vis = (t) => { const sy = AV.symOf(app, t); return !sy || sy.visible !== false; };
-    if (V.showNo && V.A && V.S.keepPonds !== false) for (const [k, g] of V.A.ponds.entries()) { if (P.splitPond && P.splitPond.has(k)) continue; for (const id of g) { const n = m.nodes.get(id); if (!n || !vis(n.type)) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }
+    if (V.showNo && V.A && V.S.keepPonds !== false) for (const [k, g] of V.A.ponds.entries()) { if (P.splitPond && P.splitPond.has(k)) continue; for (const id of g) { const n = m.nodes.get(id); if (!n) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }
     if (V.showNo) { ctx.save(); ctx.strokeStyle = 'rgba(142,36,170,.9)'; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]); const vb = map.visibleBox();
-      for (const id of P.why.keys()) { const l = m.links.get(id); if (!l) continue; if (!vis(l.type)) continue; const a = m.nodes.get(l.from), b = m.nodes.get(l.to); if (!a || !b) continue;
+      for (const id of P.why.keys()) { const l = m.links.get(id); if (!l) continue; const a = m.nodes.get(l.from), b = m.nodes.get(l.to); if (!a || !b) continue;
         if (Math.max(a.x, b.x) < vb.x1 || Math.min(a.x, b.x) > vb.x2 || Math.max(a.y, b.y) < vb.y1 || Math.min(a.y, b.y) > vb.y2) continue;
         ctx.beginPath(); const p0 = map.toScreen(a.x, a.y); ctx.moveTo(p0[0], p0[1]); for (const v of l.verts) { const q = map.toScreen(v[0], v[1]); ctx.lineTo(q[0], q[1]); } const p1 = map.toScreen(b.x, b.y); ctx.lineTo(p1[0], p1[1]); ctx.stroke(); }
       ctx.restore(); }
@@ -343,11 +341,18 @@
     ctx.restore();
   };
   AV.partLegend = function (app) {
-    const V = app.partView; if (!V || !V.P) return null;
+    const V = app.partView; if (!V || !V.P) return null; const hid = !!app.themeHidden;
+    const sw = (st) => h('span', { style: Object.assign({ display: 'inline-block', verticalAlign: 'middle', marginRight: '7px', flex: 'none' }, st) });
+    const cut = h('span', { style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '15px', height: '15px', borderRadius: '50%', border: '2px solid #d32f2f', color: '#d32f2f', fontSize: '10px', fontWeight: 700, lineHeight: 1, marginRight: '7px', background: '#fff', verticalAlign: 'middle', boxSizing: 'border-box' } }, '✕');
+    const row = (s, t) => h('div', { class: 'lr', style: { display: 'flex', alignItems: 'center' } }, s, t);
+    const ponds = V.A && V.A.ponds.length && V.S.keepPonds !== false;
     return h('div', null, h('div', { class: 'lt' }, 'Model partition: ' + V.P.count + ' partitions'),
-      h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '3px solid #37474f', verticalAlign: 'middle', marginRight: '6px' } }), 'Coupling link (cut point ⊗)'), h('div', { class: 'lr', style: { color: '#555' } }, 'Areas: subcatchments in the colour of the partition their outlet drains to'),
-      V.showNo ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '18px', borderTop: '2px dashed #8e24aa', verticalAlign: 'middle', marginRight: '6px' } }), 'Not cut (oscillating flow, pump, weir …)') : null,
-      V.showNo && V.A && V.A.ponds.length && V.S.keepPonds !== false ? h('div', { class: 'lr' }, h('span', { style: { display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', border: '1.5px dashed #1e88e5', verticalAlign: 'middle', marginRight: '9px' } }), 'Ponding area – kept together') : null);
+      row(h('span', { style: { display: 'inline-block', width: '18px', height: '11px', background: 'rgba(120,144,156,.35)', border: '1px solid #90a4ae', marginRight: '7px', verticalAlign: 'middle' } }), 'Partition (P01 …): pipes, manholes and subcatchments draining to it'),
+      hid ? h('div', { class: 'lr', style: { color: 'var(--muted)' } }, 'Markings hidden – click the eye (T) to show them') : [
+        row(cut, 'Cut point: the pipe is cut here; the sub-models exchange flow and water level'),
+        V.P.cuts.some(c => V.P.why.has(c.link.id)) ? row(h('span', { style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '15px', height: '15px', borderRadius: '50%', border: '2px solid #ff6d00', color: '#ff6d00', fontSize: '10px', fontWeight: 700, lineHeight: 1, marginRight: '7px', background: '#fff', boxSizing: 'border-box' } }, '✕'), 'Cut on a pipe that should not be cut (see the checks in the panel)') : null,
+        row(sw({ width: '18px', borderTop: '2px dashed #8e24aa' }), 'Not cut: oscillating flow (Reverse flow event rule), pump, weir, orifice, outlet, divider link'),
+        ponds ? row(sw({ width: '12px', height: '12px', borderRadius: '50%', border: '1.5px dashed #1e88e5', marginRight: '10px' }), 'Ponding area: these manholes share surface water and stay in one partition') : null]);
   };
 
   // ------------------------------------------------------------------ surface area of every partition (DEM, D8)

@@ -987,3 +987,4 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .dwfpat input::-webkit-outer-spin-button, .dwfpat input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dwfpn { margin-top: 4px; line-height: 1.5; } .dwfpn code { background: #eef3f7; padding: 0 4px; border-radius: 3px; }
 .dwfpn ul { margin: 2px 0 4px; padding-left: 18px; } .dwfpn li { margin: 1px 0; }
+#legend.partleg { max-width: 330px; line-height: 1.35; } #legend.partleg .lr { align-items: flex-start; }

@@ -32,7 +32,7 @@
     toggleEye(v) {
       const app = this.app; app.themeHidden = v === undefined ? !app.themeHidden : !!v; this.renderEye();
       if (app.theme) app.theme.updateLegend(); app.map.redraw();
-      if (app.partView && app.partView.P) { app.status(app.themeHidden ? 'Partition markings hidden (cut points, not-cut pipes, ponding areas). Click the eye or press T to show them.' : 'Partition markings shown.'); return; }
+      if (app.partView && app.partView.P) { if (app.theme) app.theme.updateLegend(); app.status(app.themeHidden ? 'Partition markings hidden (cut points, not-cut pipes, ponding areas). Click the eye or press T to show them.' : 'Partition markings shown.'); return; }
       app.status(app.themeHidden ? 'Theme colouring hidden (objects drawn with their base symbols). Click the eye or press T to show it again.' : 'Theme colouring shown.');
     }
     toggleLocator(v) {
