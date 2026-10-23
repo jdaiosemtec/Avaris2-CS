@@ -317,7 +317,9 @@
     return null;
   };
   AV.partOverlay = function (map, ctx) {
-    const app = map.app, V = app.partView; if (!V || !V.P) return; const P = V.P, m = app.model; ctx.save();
+    const app = map.app, V = app.partView; if (!V || !V.P) return; const P = V.P, m = app.model;
+    // the eye button (T) hides the markings: cut points, not-cut pipes, ponding areas (the partition colours stay)
+    if (app.themeHidden && !V.move) return; ctx.save();
     // the overlays follow the visibility of the layers (a hidden Conduits layer hides the not-cut pipes too)
     const vis = (t) => { const sy = AV.symOf(app, t); return !sy || sy.visible !== false; };
     if (V.showNo && V.A && V.S.keepPonds !== false) for (const [k, g] of V.A.ponds.entries()) { if (P.splitPond && P.splitPond.has(k)) continue; for (const id of g) { const n = m.nodes.get(id); if (!n || !vis(n.type)) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }

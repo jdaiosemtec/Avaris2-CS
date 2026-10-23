@@ -440,3 +440,4 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 往复流判定统一：分区（`partpanel.js` `syncRev`/`fnum`）直接读写 Flag 定义 `rev` 的参数（`app.flags.params(def('rev'))`：r 计入流量的峰值百分比、n 最短有流时间、w 往复下限、h 倒流上限），`partAnalyse` 的 `totdur(|Q| > max(eps, r% × rptMaxFlow))`、`totdur(Q < −阈值)` 与 Flag 条件（Σ 取全程）一致。验证：Riverside（r 5%、n 30 min、w 5%、h 95%）Flag 报警（不含 High）94 根 = 分区往复流 94 根，逐根相同。
 - 载入结果后不进入播放模式（`loadResults` 只建播放条）；点 Play 进入；没有结果时点 Play 先载入最近结果再进入播放。
 - 分区叠加层（不切的管道虚线、积水区圆圈）跟随图层可见性（`AV.symOf(app, type).visible`）。
+- 2.6.5：分区状态下地图左上角眼睛按钮（T 键）隐藏 / 显示分区标记（切口 ⊗、不切管道虚线、积水区蓝圈，`partOverlay` 检查 `app.themeHidden`），分区配色不变。

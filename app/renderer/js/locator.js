@@ -28,10 +28,11 @@
       this.canvas.addEventListener('wheel', (e) => { e.preventDefault(); this.app.map.zoomBy(e.deltaY < 0 ? 1.25 : 0.8); }, { passive: false });
       document.addEventListener('keydown', (e) => { if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.altKey && !e.metaKey && !/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || '')) && !document.querySelector('.modal-back')) this.toggleEye(); });
     }
-    renderEye() { const hid = !!this.app.themeHidden; this.eyeBtn.innerHTML = ''; this.eyeBtn.appendChild(svg(hid ? EYE_OFF : EYE_ON)); this.eyeBtn.classList.toggle('off', hid); this.eyeBtn.title = (hid ? 'Show' : 'Hide') + ' theme colouring (T)'; }
+    renderEye() { const hid = !!this.app.themeHidden; this.eyeBtn.innerHTML = ''; this.eyeBtn.appendChild(svg(hid ? EYE_OFF : EYE_ON)); this.eyeBtn.classList.toggle('off', hid); this.eyeBtn.title = this.app.partView && this.app.partView.P ? (hid ? 'Show' : 'Hide') + ' the cut points, not-cut pipes and ponding areas of the partition (T)' : (hid ? 'Show' : 'Hide') + ' theme colouring (T)'; }
     toggleEye(v) {
       const app = this.app; app.themeHidden = v === undefined ? !app.themeHidden : !!v; this.renderEye();
       if (app.theme) app.theme.updateLegend(); app.map.redraw();
+      if (app.partView && app.partView.P) { app.status(app.themeHidden ? 'Partition markings hidden (cut points, not-cut pipes, ponding areas). Click the eye or press T to show them.' : 'Partition markings shown.'); return; }
       app.status(app.themeHidden ? 'Theme colouring hidden (objects drawn with their base symbols). Click the eye or press T to show it again.' : 'Theme colouring shown.');
     }
     toggleLocator(v) {
