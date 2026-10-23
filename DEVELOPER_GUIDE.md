@@ -430,3 +430,8 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 ## 14. 文件夹选择（2.6.2 起）
 - `folderdlg.js` `AV.folderDialog({ title, defaultPath, modelFolder })`：程序内的文件夹选择框（Windows 系统对话框不能加按钮）。左侧位置（模型文件夹、桌面、文档、下载、主目录、盘符，`main.js` IPC `fs:places`），右侧子文件夹（单击选中、双击进入），路径栏可输入，↑ 上一级；底部左侧 **New Folder**（在列表里直接输入名称，Enter 创建），右侧 Cancel / Select Folder。用于分区子模型文件夹。
 - 子模型文件夹按模型记住（`prefs.partition.folderBy[模型路径]`），不再把上一个模型的文件夹带到另一个模型。
+
+## 15. 2.6.3 的界面调整
+- 2D 对比 → Scenario Comparison：2D Flood Analysis 的 Compare… 选好另一个 1D-2D 方案后，把它作为方案载入（`sim.loadScenario`），直接打开 Scenario Comparison（`AV.openCompare2D`：基准 = 选的方案，对比 = 当前结果，对象 = 2D Cells）。`compare.js` 新增对象类型 `cell`（最大水深、最大流速、最大危险度、最大 水深×流速、到达时间、积水时间，数据来自 `AV.meshStatsFor`，按方案缓存在 `res._m2d`），顶部蓝框突出 2D 关键指标（淹没面积、淹没单元、最大水深、最大流速、HR ≥ 0.75 / ≥ 2 面积、最早到达）；Difference on Map 对 2D 单元把差值写进 `meshResults.cmp.diff` 并让 2D Meshes 显示 `ddepth`（图例写明变量和方案）。
+- 分区统计：图层变化时（`refreshLayers` 发出 `layers` 事件）视图自动刷新；面板内 Add Layer…；没有图层时显示用途和步骤；有结果时显示区域数、淹没数、HR ≥ 0.75 / ≥ 2 的数量。
+- CSO 统计：两张表上下排列（全宽），水量取整加千分位。旱流对话框：Pattern name 下写明会写出什么、在哪里看到、重名会替换。Help 页签 Quick Start / Shortcuts / Diagnostics 换成与其他按钮同风格的图标（`quickstart.png`、`shortcuts.png`、`diagnostics.png`）。

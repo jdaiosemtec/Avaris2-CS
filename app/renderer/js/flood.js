@@ -39,7 +39,7 @@
       if (!AV.has2D(app)) { AV.need2D(app, '2D Flood Analysis'); return; }
       if (!app.mesh2d) { AV.alert('There is no 2D mesh in this model (Simulation ▸ Create Meshes).', '2D Flood Analysis'); return; }
       if (!app.meshResults) { AV.alert('Run the 1D-2D model or load its results (.fout) first.', '2D Flood Analysis'); return; }
-      if (!this.el) { this.el = h('div', { class: 'csoview fldview' }); app.addView('flood2d', '2D Flood Analysis', this.el, { onClose: () => { this.el = null; } }); if (!this._off) this._off = app.on('meshresults', () => this.el && this.render()); }
+      if (!this.el) { this.el = h('div', { class: 'csoview fldview' }); app.addView('flood2d', '2D Flood Analysis', this.el, { onClose: () => { this.el = null; } }); if (!this._off) { this._off = app.on('meshresults', () => this.el && this.render()); app.on('layers', () => { if (this.el && this.layers().length !== (this._nl || 0)) this.render(); }); } }
       else app.activateView('flood2d');
       if (this.S.thr === undefined) this.S.thr = app.meshResults.thr > 0 ? app.meshResults.thr : AV.meshDefaultBreaks(app, 'maxdepth')[0];
       this.render();
@@ -107,18 +107,31 @@
         ctab('Area by max. hazard rating', hRows, 'HR = d × (v + 0.5) + DF (Defra/EA FD2320), ' + (AV.HAZARD_DF[dfSel.value] || AV.HAZARD_DF.conservative).label.toLowerCase() + '.'),
         MR.cmp ? this.cmpPane(A, fa) : null);
       // zones
-      const lays = this.layers(); const zl = h('select', { onchange: () => { S.zoneLayer = zl.value; S.zoneField = ''; this.save(); this.render(); } }, h('option', { value: '' }, lays.length ? '(choose a layer)' : '(no polygon / point layer)'), lays.map(L2 => h('option', { value: L2.name }, L2.name + ' (' + L2.kind + ')')));
+      const lays = this.layers(); const zl = h('select', { onmousedown: () => { if (this.layers().length !== lays.length) this.render(); }, onchange: () => { S.zoneLayer = zl.value; S.zoneField = ''; this.save(); this.render(); } }, h('option', { value: '' }, lays.length ? '(choose a layer)' : '(no polygon / point layer loaded)'), lays.map(L2 => h('option', { value: L2.name }, L2.name + ' (' + L2.kind + ')')));
       zl.value = this.layer() ? S.zoneLayer : ''; const Ly = this.layer();
       const zf = h('select', { onchange: () => { S.zoneField = zf.value; this.save(); this.render(); } }, h('option', { value: '' }, '(feature number)'), (Ly && Ly.fields ? Ly.fields : []).map(f => h('option', { value: f }, f))); zf.value = S.zoneField || '';
-      const Z = Ly ? this.zones() : null; this.Z = Z;
+      const Z = Ly ? this.zones() : null; this.Z = Z; this._nl = lays.length;
       const f2 = (v, d) => fin(v) ? AV.fmt(v, d) : '–';
       const ztab = Z ? h('table', { class: 'ptbl csotbl' }, h('tr', null, ['Zone', Ly.kind === 'point' ? 'Cell' : 'Area (' + A.u + ')', 'Flooded (' + A.u + ')', '%', 'Max. depth (' + L + ')', 'Mean depth (' + L + ')', 'Max. vel. (' + V + ')', 'Max. HR', 'Arrival (hr)', 'Ponded (hr)'].map(t => h('th', null, t))),
         Z.map(z => h('tr', { class: z.wet ? '' : 'dim', title: 'Double-click: zoom to the zone', ondblclick: () => this.zoomTo(z.f) }, h('td', null, z.name), h('td', { class: Ly.kind === 'point' ? '' : 'num' }, Ly.kind === 'point' ? (z.cell || 'outside the mesh') : fa(z.area)), h('td', { class: 'num' }, z.none ? '–' : fa(z.wet)),
           h('td', { class: 'num' }, z.area ? AV.fmt(100 * z.wet / z.area, 1) : '–'), h('td', { class: 'num' }, z.wet ? f2(z.maxd, 3) : '–'), h('td', { class: 'num' }, z.wet ? f2(z.meand, 3) : '–'), h('td', { class: 'num' }, z.wet ? f2(z.maxv, 3) : '–'),
           h('td', { class: 'num' }, z.wet ? f2(z.maxhr, 2) : '–'), h('td', { class: 'num' }, z.wet ? f2(z.arrive, 2) : '–'), h('td', { class: 'num' }, z.wet ? f2(z.tpond, 2) : '–')))) : null;
+      const addLayer = async () => { const ps = await window.host.openDialog({ title: 'Add a polygon or point layer', multi: true, filters: [{ name: 'GIS layers', extensions: ['shp', 'geojson', 'json', 'kml', 'gpkg', 'csv'] }] });
+        if (!ps || !ps.length) return; await AV.addData(app, ps); const nl = this.layers(); if (nl.length && !this.layer()) { S.zoneLayer = nl[0].name; S.zoneField = ''; this.save(); } this.render(); };
+      let sum = null;
+      if (Z) { const nz = Z.length, wet = Z.filter(z => z.wet > 0).length, dang = Z.filter(z => z.wet > 0 && z.maxhr >= 0.75).length, all = Z.filter(z => z.wet > 0 && z.maxhr >= 2).length;
+        sum = h('div', { class: 'fldzsum' }, [[Ly.kind === 'point' ? 'Points' : 'Zones', nz], ['Flooded', wet], ['HR ≥ 0.75 (danger for some+)', dang], ['HR ≥ 2 (danger for all)', all]].map(([l, v]) => h('span', null, l + ' ', h('b', null, String(v))))); }
+      const how = h('div', { class: 'fldhow' }, h('b', null, 'What this is for'),
+        h('p', null, 'Flood figures for your own areas or assets: which districts, parcels or catchments flood and how deep, which buildings, schools or roads lie in a dangerous hazard class, and how soon the water arrives.'),
+        h('ol', null, h('li', null, 'Load a polygon layer (land parcels, districts, catchments, a study area) or a point layer (buildings, receptors) with ', h('b', null, 'Add Layer…'), ' here or in the Layer View; you can also draw one (Layer View ▸ right-click ▸ New Layer).'),
+          h('li', null, 'Choose it in ', h('b', null, 'Layer'), ' and the attribute that names each feature in ', h('b', null, 'Name field'), '.'),
+          h('li', null, 'Polygons: one row per polygon from the 2D cells whose centre lies inside it — area, flooded area and %, max. / mean depth, max. velocity, max. hazard rating, earliest arrival, time ponded. Points: the values of the cell under each point.'),
+          h('li', null, 'Double-click a row to zoom to it on the map; Export CSV for a report. A layer must cover the 2D mesh (same coordinate system).')));
       const right = h('div', { class: 'csopane' }, h('div', { class: 'psec2' }, 'Statistics by zone / point'),
-        h('div', { class: 'dwfrow', style: { marginBottom: '6px' } }, 'Layer ', zl, ' Name field ', zf, Z ? h('button', { class: 'btn small', onclick: () => this.exportAs('zones') }, 'Export CSV') : null),
-        h('div', { class: 'ptwrap' }, ztab || h('div', { class: 'hint', style: { padding: '8px' } }, 'Choose a polygon layer (e.g. property boundaries, catchments, a study area) or a point layer (e.g. buildings, receptors) imported with Add Data or drawn with New Layer. Polygons: cells whose centre is inside. Points: the cell under the point.')));
+        h('div', { class: 'fldform' }, h('label', null, 'Layer'), h('span', { class: 'fldctl' }, zl, h('button', { class: 'btn small', title: 'Load a polygon or point layer (shapefile, GeoJSON, KML …)', onclick: addLayer }, 'Add Layer…')),
+          h('label', null, 'Name field'), h('span', { class: 'fldctl' }, zf, Z ? h('button', { class: 'btn small', onclick: () => this.exportAs('zones') }, 'Export CSV') : null)),
+        sum, Z ? h('div', { class: 'ptwrap' }, ztab) : how,
+        Ly && Z && !Z.some(z => z.area > 0 || z.cell) ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'No 2D cell lies in this layer: check that it covers the mesh and uses the map coordinate system.') : null);
       E.appendChild(h('div', { class: 'csobody' }, left, right));
     }
     cmpPane(A, fa) {
@@ -141,13 +154,15 @@
       const r = await AV.formDialog('Compare 2D Results', [{ k: 'run', l: 'Compare this run with', t: 'choice', o: opts, d: opts[0][0] }, { t: 'note', l: 'The other run must use the same 2D mesh (cells are matched by ID). Difference = this run − the other run.' }], {});
       if (!r) return; let file = r.run, name = (opts.find(o => o[0] === r.run) || [])[1];
       if (file === '__file') { file = await window.host.openDialog({ title: 'Results of the other run', filters: [{ name: '1D-2D results', extensions: ['fout', 'out'] }] }); if (!file) return; name = AV.basename(file).replace(/\.\w+$/, ''); }
-      let meta = null; try {
-        meta = await window.host.outOpen(file); const ni = new Map(meta.ids.node.map((id, i) => [id, i])); const cells = app.mesh2d.cells;
-        const idx = cells.map(c => { const i = ni.get(c.id); return i === undefined ? -1 : i; }); if (!idx.some(i => i >= 0)) { AV.alert('The 2D cells of this model are not in ' + name + '.', 'Compare 2D Results'); return; }
-        const st = await AV.busy.track(window.host.outMesh2d(meta.handle, idx, [], [], MR.thr, MR.siK, MR.df), 'Reading the 2D results of ' + name);
-        MR.cmp = { name, file, maxd: st.maxd };
-      } catch (e) { AV.alert('Cannot read ' + file + ': ' + e.message, 'Compare 2D Results'); return; }
-      finally { if (meta) window.host.outClose(meta.handle); }
+      const rpt = file.replace(/\.fout$/i, '.frpt').replace(/\.out$/i, '.rpt');
+      let S2 = null; try { S2 = await app.sim.loadScenario(file, rpt, name); } catch (e) { AV.alert('Cannot read ' + file + ': ' + e.message, 'Compare 2D Results'); return; }
+      const st = await AV.meshStatsFor(app, S2);
+      if (!st) { AV.alert('The 2D cells of this model are not in ' + name + ' (another mesh, or a 1D run).', 'Compare 2D Results'); return; }
+      MR.cmp = { name, file, maxd: st.maxd, st };
+      app._meshRange = null; app.map.redraw(); this.render();
+      // the detailed comparison: Scenario Comparison with the 2D cells and the 2D key figures
+      await AV.openCompare2D(app, name);
+      return;
       app._meshRange = null; app.map.redraw(); this.render();
     }
     // ---- exports

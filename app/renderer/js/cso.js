@@ -40,7 +40,7 @@
     fu() { const R = this.app.results; return R ? AV.FLOW_UNIT_NAMES[R.meta.flowUnits] || 'CMS' : (this.app.model.flowUnits || 'CMS'); }
     open() {
       const app = this.app; if (!app.results) { AV.alert('Load or run results first (Simulation ▸ Run, or Database ▸ Open Results).', 'CSO Statistics'); return; }
-      if (!this.el) { this.el = h('div', { class: 'csoview' }); app.addView('cso', 'CSO Statistics', this.el, { onClose: () => { this.el = null; this.showMap(false); } }); }
+      if (!this.el) { this.el = h('div', { class: 'csoview csov' }); app.addView('cso', 'CSO Statistics', this.el, { onClose: () => { this.el = null; this.showMap(false); } }); }
       else app.activateView('cso');
       this.render(); if (!this.rows || this.R !== app.results) this.compute();
     }
@@ -84,9 +84,9 @@
       if (!this.rows) { E.appendChild(h('div', { class: 'hint', style: { padding: '12px' } }, 'Computing …')); return; }
       const rows = this.rows; const sp = rows.filter(r => r.events);
       const R = this.app.results; const days = R.meta.nPeriods * R.meta.reportStep / 86400;
-      E.appendChild(h('div', { class: 'cmpkpis' }, [['Overflow points', String(rows.length)], ['Spilling', String(sp.length)], ['Spill events', String(sp.reduce((a, r) => a + r.events, 0))], ['Spills (12/24 h)', String(sp.reduce((a, r) => a + r.n1224, 0))], ['Spill volume (' + U.V + ')', AV.fmt(sp.reduce((a, r) => a + r.vol, 0), 4)], ['Simulated period', days >= 2 ? AV.fmt(days, 1) + ' days' : AV.fmt(days * 24, 1) + ' h']]
+      E.appendChild(h('div', { class: 'cmpkpis' }, [['Overflow points', String(rows.length)], ['Spilling', String(sp.length)], ['Spill events', String(sp.reduce((a, r) => a + r.events, 0))], ['Spills (12/24 h)', String(sp.reduce((a, r) => a + r.n1224, 0))], ['Spill volume (' + U.V + ')', (() => { const v = sp.reduce((a, r) => a + r.vol, 0); return v >= 100 ? Math.round(v).toLocaleString('en-US') : AV.fmt(v, 4); })()], ['Simulated period', days >= 2 ? AV.fmt(days, 1) + ' days' : AV.fmt(days * 24, 1) + ' h']]
         .map(([l, v]) => h('div', { class: 'cmpkpi neutral' }, h('div', { class: 'kl' }, l), h('div', { class: 'kv' }, h('span', { class: 'kc' }, v))))));
-      const f = (v, d) => v === null || v === undefined ? '–' : AV.fmt(v, d === undefined ? 3 : d);
+      const f = (v, d) => v === null || v === undefined ? '–' : d === 4 && Math.abs(v) >= 100 ? Math.round(v).toLocaleString('en-US') : AV.fmt(v, d === undefined ? 3 : d);
       const dtf = (d) => d === null ? '–' : AV.fmtDateTime(d).slice(0, 16);
       const tb = h('table', { class: 'ptbl csotbl' }, h('tr', null, ['Overflow point', 'Type', 'Events', 'Spills 12/24 h', 'Volume (' + U.V + ')', 'Spill hours', 'Longest event (h)', 'Peak (' + U.Q + ')', 'First spill'].map(t => h('th', null, t))),
         rows.map(r => { const tr = h('tr', { class: (this.sel === r ? 'sel' : '') + (r.events ? '' : ' dim'), onclick: () => { this.sel = r; this.app.selectMany([r.o]); this.render(); }, ondblclick: () => { this.app.activateView('map'); this.app.map.zoomToObjects([r.o]); } },

@@ -209,8 +209,8 @@
     none: { short: 'None', label: 'No debris factor', df: [1e9, 0, 1e9, 0] } };
   AV.meshDF = (app) => { const P = app.prefs.mesh2d || {}; return (AV.HAZARD_DF[P.df] || AV.HAZARD_DF.conservative).df; };
   // faces of the mesh in the results: flat [link index, cell a, cell b, axis, sign] + face width (model units)
-  function meshFaces(app) {
-    const R = app.results, mesh = app.mesh2d; const ci = new Map(mesh.cells.map((c, k) => [c.id, k])); const lf = mesh.lenFactor || 1;
+  function meshFaces(app, R0) {
+    const R = R0 || app.results, mesh = app.mesh2d; const ci = new Map(mesh.cells.map((c, k) => [c.id, k])); const lf = mesh.lenFactor || 1;
     const F = [], W = [], per = mesh.cells.map(() => []);
     for (const l of mesh.links || []) { const a = ci.get(l.a), b = ci.get(l.b); if (a === undefined || b === undefined) continue; const li = R.idx.link.get(l.id); if (li === undefined) continue;
       const A = mesh.cells[a], B = mesh.cells[b]; const dx = B.x - A.x, dy = B.y - A.y; const ax = Math.abs(dx) >= Math.abs(dy) ? 0 : 1; const sg = (ax ? dy : dx) >= 0 ? 1 : -1;
@@ -230,6 +230,17 @@
     app.meshResults = { idx, maxd: st.maxd, tpond: st.tpond, trecede: st.trecede, maxv: st.maxv, vxm: st.vxm, vym: st.vym, maxhr: st.maxhr, maxdv: st.maxdv, arrive: st.arrive, tmax: st.tmax,
       thr, si, siK, df, faces, nFaces: faces.W.length };
     app._meshDyn = null; app.emit && app.emit('meshresults');
+  };
+  // 2D statistics of any results source with the cells of the current mesh (Scenario Comparison, flood comparison),
+  // cached on the source: { maxd, maxv, maxhr, maxdv, arrive, tmax, tpond, trecede } in the order of mesh.cells (NaN = not in that run)
+  AV.meshStatsFor = async function (app, R) {
+    const mesh = app.mesh2d; if (!mesh || !R) return null; const df = AV.meshDF(app); const key = mesh.cells.length + '|' + df.join(',');
+    if (R._m2d && R._m2d.key === key) return R._m2d.st;
+    if (app.results === R && app.meshResults && app.meshResults.df.join(',') === df.join(',')) { const M = app.meshResults; const st = { maxd: M.maxd, maxv: M.maxv, maxhr: M.maxhr, maxdv: M.maxdv, arrive: M.arrive, tmax: M.tmax, tpond: M.tpond, trecede: M.trecede }; R._m2d = { key, st }; return st; }
+    const idx = mesh.cells.map(c => { const i = R.idx.node.get(c.id); return i === undefined ? -1 : i; }); if (!idx.some(i => i >= 0)) return null;
+    const thr = parseFloat(AV.f2d(app.model).FLOOD_DEPTH) || 0; const siK = AV.f2dRun(app.model).si ? 1 : 0.3048; const faces = meshFaces(app, R);
+    const st = await AV.busy.track(window.host.outMesh2d(R.handle, idx, Array.from(faces.F), Array.from(faces.W), thr, siK, df), 'Computing the 2D statistics of ' + (R.scenName || 'the run'));
+    R._m2d = { key, st }; return st;
   };
   // current-time velocity / hazard of every cell (from the link snapshot of the current period), cached per snapshot
   AV.meshDynamic = function (app) {
@@ -260,6 +271,7 @@
     if (field === 'dv') return MR.maxdv[k];
     if (field === 'arrival') return MR.arrive[k];
     if (field === 'tmax') return MR.maxd[k] > MR.thr ? MR.tmax[k] : NaN;
+    if (field === 'ddepth' && MR.cmp && MR.cmp.diff) return isFinite(MR.cmp.diff[k]) ? MR.cmp.diff[k] : null;
     if (field === 'ddepth') return MR.cmp && isFinite(MR.cmp.maxd[k]) && isFinite(MR.maxd[k]) && (MR.maxd[k] > 0 || MR.cmp.maxd[k] > 0) ? MR.maxd[k] - MR.cmp.maxd[k] : null;
     if (field === 'vel' || field === 'hzd') { const D = AV.meshDynamic(app); return D ? D[field][k] : null; }
     return null;
@@ -293,7 +305,7 @@
   AV.meshDefaultBreaks = (app, field) => { const si = AV.meshSI(app);
     const fixed = { depth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], maxdepth: si ? [0.05, 0.15, 0.3, 0.5, 1.0] : [0.15, 0.5, 1, 1.5, 3], tpond: [0.25, 0.5, 1, 2, 4], trecede: [0.25, 0.5, 1, 2, 4],
       vel: si ? [0.1, 0.5, 1, 2, 3] : [0.3, 1.5, 3, 6, 10], maxvel: si ? [0.1, 0.5, 1, 2, 3] : [0.3, 1.5, 3, 6, 10], dv: si ? [0.01, 0.1, 0.3, 0.6, 1.0] : [0.1, 1, 3, 6, 10],
-      hazard: [0.01, 0.75, 1.25, 2.0], hzd: [0.01, 0.75, 1.25, 2.0], ddepth: si ? [-0.1, -0.02, 0.02, 0.1, 0.3] : [-0.3, -0.05, 0.05, 0.3, 1] }[field];
+      hazard: [0.01, 0.75, 1.25, 2.0], hzd: [0.01, 0.75, 1.25, 2.0], ddepth: app.meshResults && app.meshResults.cmp && app.meshResults.cmp.breaks ? app.meshResults.cmp.breaks : si ? [-0.1, -0.02, 0.02, 0.1, 0.3] : [-0.3, -0.05, 0.05, 0.3, 1] }[field];
     if (field === 'arrival' || field === 'tmax') { const T = app.results ? app.results.times : null; const D = T && T.length ? T[T.length - 1] : 24; const st = D / 6; return [0, 1, 2, 3, 4, 5].map(i => +(i * st).toPrecision(3)); }
     if (fixed) return fixed;
     // elevation / water surface: 5 equal classes over the ground elevations of the mesh
@@ -363,9 +375,9 @@
     const u = AV.meshUnit(app, S.field); const hz = (S.field === 'hazard' || S.field === 'hzd') && AV.HAZARD_CLASSES.every(([b], i) => i === 0 || Math.abs(S.breaks[i] - AV.HAZARD_CLASSES[i - 1][0]) < 1e-9) && S.breaks.length === 4;
     let rows; if (S.breaks) rows = S.breaks.map((b, i) => [S.colors[i], (i === 0 && S.field === 'ddepth' ? '< ' + AV.fmt(S.breaks[1]) : i < S.breaks.length - 1 ? AV.fmt(b) + ' – ' + AV.fmt(S.breaks[i + 1]) : '> ' + AV.fmt(b)) + (hz ? '  ' + AV.HAZARD_CLASSES[i][1] : '')]);
     else { const [a, b] = AV.meshRange(app, S.field); if (!isFinite(a)) return; rows = [0, 0.25, 0.5, 0.75, 1].map(t => [rampAt(S.ramp, t, S.invert), AV.fmt(a + (b - a) * t, 2)]).reverse(); }
-    const W = hz ? 210 : 160, H = 22 + rows.length * 16, x = 10, y = map.hgt - H - 34;
+    const W = hz ? 210 : (S.field === 'ddepth' && app.meshResults && app.meshResults.cmp && app.meshResults.cmp.label ? Math.max(160, 7 * app.meshResults.cmp.label.length + 20) : 160), H = 22 + rows.length * 16, x = 10, y = map.hgt - H - 34;
     ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.strokeStyle = '#b0bec5'; ctx.fillRect(x, y, W, H); ctx.strokeRect(x + .5, y + .5, W, H);
-    ctx.font = 'bold 11px Segoe UI'; ctx.fillStyle = '#263238'; ctx.textBaseline = 'middle'; ctx.fillText('2D: ' + FIELDS[S.field].replace(/ \(.*\)/, '') + (u === '-' ? '' : ' (' + u + ')'), x + 7, y + 11);
+    ctx.font = 'bold 11px Segoe UI'; ctx.fillStyle = '#263238'; ctx.textBaseline = 'middle'; const C = S.field === 'ddepth' && app.meshResults && app.meshResults.cmp && app.meshResults.cmp.label ? app.meshResults.cmp : null; ctx.fillText('2D: ' + (C ? C.label : FIELDS[S.field].replace(/ \(.*\)/, '') + (u === '-' ? '' : ' (' + u + ')')), x + 7, y + 11);
     ctx.font = '11px Segoe UI'; rows.forEach(([c, t], i) => { const yy = y + 22 + i * 16; ctx.fillStyle = c; ctx.fillRect(x + 7, yy, 18, 11); ctx.fillStyle = '#37474f'; ctx.fillText(t, x + 31, yy + 6); });
     ctx.restore();
   };

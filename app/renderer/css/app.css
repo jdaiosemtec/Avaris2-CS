@@ -927,7 +927,10 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .busybar.indet .bbfill { width: 30%; animation: bbslide 1.4s ease-in-out infinite; }
 @keyframes bbslide { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
 /* CSO statistics */
-.csoview { background: var(--panel); }
+.csoview { background: var(--panel); display: flex; flex-direction: column; overflow: hidden; }
+.csov .csobody { grid-template-columns: 1fr; grid-template-rows: minmax(140px, 1fr) minmax(160px, 1fr); overflow: hidden; }
+.csov .csopane { min-height: 0; } .csov .ptwrap { overflow: auto; } .csov .csotbl { width: 100%; }
+.csov .cmpkpis { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .csobody { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(420px, 1.2fr) minmax(360px, 1fr); gap: 12px; padding: 0 12px 12px; }
 .csopane { display: flex; flex-direction: column; min-height: 0; }
 .csopane .psec2 { font-weight: 600; margin: 6px 0 4px; }
@@ -935,12 +938,21 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .csotbl tr.sel td { background: #e3f2fd; } .csotbl tr.dim td { color: #90a4ae; } .csotbl tr { cursor: pointer; }
 .csotbl th { position: sticky; top: 0; background: #f5f7f9; z-index: 1; }
 /* 2D flood analysis */
-.fldview .csobody { grid-template-columns: minmax(400px, 1fr) minmax(360px, 1fr); overflow: auto; }
+.fldview { overflow: auto; } .fldview .csobody { grid-template-columns: minmax(400px, 1fr) minmax(360px, 1fr); flex: none; overflow: visible; padding-bottom: 16px; }
 .fldview .ptwrap { overflow: auto; }
 .fldview .ptbl { width: 100%; } .fldview td .fldbar { min-width: 40px; }
 .fldview .csopane .csopane { flex: none; }
 .fldbar { height: 10px; background: #eceff1; border-radius: 2px; overflow: hidden; } .fldbar span { display: block; height: 100%; }
 .fldsw { display: inline-block; width: 14px; height: 11px; border: 1px solid rgba(0,0,0,.25); vertical-align: middle; }
+/* 2D block of the Scenario Comparison */
+.cmp2d { margin: 8px 12px 0; border: 1px solid #90caf9; border-left: 4px solid #1e88e5; background: #f3f9ff; border-radius: 4px; }
+.cmp2dh { display: flex; align-items: center; gap: 8px; padding: 6px 10px 0; font-weight: 600; color: #0d47a1; }
+.cmp2d .cmpkpis { padding: 8px 10px 10px; } .cmpkpi.k2d { background: #fff; }
+/* zone statistics */
+.fldform { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; margin-bottom: 8px; }
+.fldform label { color: var(--muted); } .fldctl { display: flex; gap: 6px; align-items: center; } .fldctl select { flex: 1; min-width: 0; }
+.fldzsum { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 8px; font-size: 12px; color: #455a64; } .fldzsum b { color: #0d47a1; }
+.fldhow { background: #fff; border: 1px solid var(--border); padding: 10px 14px; line-height: 1.55; } .fldhow p { margin: 4px 0 6px; } .fldhow ol { margin: 0; padding-left: 18px; } .fldhow li { margin: 3px 0; }
 /* folder dialog */
 .fdlg { display: flex; flex-direction: column; gap: 6px; }
 .fdbar { display: flex; gap: 6px; align-items: center; } .fdpath { flex: 1; }
@@ -973,3 +985,5 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .lystage { flex: 1; min-width: 0; overflow: auto; background: #cfd5db; display: flex; align-items: center; justify-content: center; }
 .lypaper { box-shadow: 0 3px 14px rgba(0,0,0,.25); background: #fff; overflow: hidden; flex: none; }
 .dwfpat input::-webkit-outer-spin-button, .dwfpat input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dwfpn { margin-top: 4px; line-height: 1.5; } .dwfpn code { background: #eef3f7; padding: 0 4px; border-radius: 3px; }
+.dwfpn ul { margin: 2px 0 4px; padding-left: 18px; } .dwfpn li { margin: 1px 0; }

@@ -134,6 +134,7 @@
 
   // ================================================================== Layer View tree
   AV.Panels.prototype.refreshLayers = function () {
+    if (this.app && this.app.emit) setTimeout(() => this.app.emit('layers'), 0);
     const app = this.app, map = app.map, m = app.model; const el = AV.$('#layers'); if (!el) return; el.innerHTML = '';
     const open = (this.layerOpen = this.layerOpen || { net: true, nodes: true, links: true, ext: true, base: true });
     if (app.addMode) { open.net = open.nodes = open.links = true; }

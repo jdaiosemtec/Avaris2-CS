@@ -115,7 +115,15 @@
       const tplSel = sel(Object.keys(TEMPLATES).map(k => [k, k]).concat([['Custom', 'Custom']]), P.tpl, (v) => { P.tpl = v; if (TEMPLATES[v]) { pat.hr = TEMPLATES[v].hr.slice(); pat.we = (TEMPLATES[v].we || TEMPLATES[v].hr).slice(); } renderPat(); });
       const pname = h('input', { type: 'text', value: P.name, style: { width: '120px' }, onchange: (e) => { P.name = e.target.value.replace(/\s+/g, '_') || 'DWF'; } });
       body.appendChild(h('div', { class: 'psec2' }, 'Diurnal pattern (multipliers; normalised to an average of 1 when written)'));
-      body.appendChild(h('div', { class: 'dwfrow' }, 'Template ', tplSel, h('label', { style: { marginLeft: '12px' } }, h('input', { type: 'checkbox', checked: P.weekend, onchange: (e) => { P.weekend = e.target.checked; renderPat(); } }), ' weekend pattern'), h('span', { style: { marginLeft: '12px' } }, 'Pattern name '), pname, h('span', { class: 'hint' }, '  → patterns <name>_HR' + (P.weekend ? ', <name>_WE' : ''))));
+      body.appendChild(h('div', { class: 'dwfrow' }, 'Template ', tplSel, h('label', { style: { marginLeft: '12px' } }, h('input', { type: 'checkbox', checked: P.weekend, onchange: (e) => { P.weekend = e.target.checked; renderPat(); pname.dispatchEvent(new Event('input')); } }), ' weekend pattern'), h('span', { style: { marginLeft: '12px' } }, 'Pattern name '), pname));
+      const pnote = h('div', { class: 'note dwfpn' }); const upd = () => { const n = (pname.value || 'DWF').replace(/\s+/g, '_');
+        pnote.innerHTML = ''; const C = (t) => h('code', null, t);
+        pnote.append(h('b', null, 'What the pattern name does'), h('ul', null,
+          h('li', null, 'The 24 multipliers below are written to [PATTERNS] as ', C(n + '_HR'), ' (type HOURLY, hour 0–23, used ' + (P.weekend ? 'Monday to Friday' : 'on every day') + ')', P.weekend ? h('span', null, ' and ', C(n + '_WE'), ' (type WEEKEND, used on Saturday and Sunday instead)') : null, '.'),
+          h('li', null, 'Every node that gets a load receives a dry weather flow in [DWF]: its average flow (baseline) and these pattern names. Flow at a given hour = baseline × multiplier of that hour; the multipliers are scaled to an average of 1, so the daily volume does not change.'),
+          h('li', null, 'Where to see it: the node\'s Inflows ▸ Dry Weather, and Hydrology ▸ Time Patterns.'),
+          h('li', null, 'A pattern with the same name is replaced. Use one name per land use (e.g. RES, COM, IND) to keep several patterns side by side.'))); };
+      pname.addEventListener('input', upd); upd(); body.appendChild(pnote);
       body.appendChild(patGrid); renderPat();
       body.appendChild(h('div', { class: 'psec2' }, 'Result')); body.appendChild(prev);
     }

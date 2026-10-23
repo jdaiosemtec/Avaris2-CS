@@ -108,9 +108,9 @@
             { id: 'about', label: 'About', img: 'about', fn: () => this.about() },
             { id: 'register', label: 'Register', img: 'register', fn: () => this.registerDialog() },
             { id: 'guide', label: 'User Guide', img: 'guide', fn: () => window.host.openExternal('https://osemtec.com/avaris.html') },
-            { id: 'qs', label: 'Quick Start', svg: 'report', fn: () => this.quickStart() },
-            { id: 'keys', label: 'Shortcuts', svg: 'options', fn: () => this.shortcuts() },
-            { id: 'diag', label: 'Diagnostics', img: 'hourglass', fn: () => AV.perfDialog(this), tip: 'Performance timings of this session (open, draw, results, play) and memory' }] },
+            { id: 'qs', label: 'Quick Start', img: 'quickstart', fn: () => this.quickStart() },
+            { id: 'keys', label: 'Shortcuts', img: 'shortcuts', fn: () => this.shortcuts(), tip: 'Keyboard shortcuts' },
+            { id: 'diag', label: 'Diagnostics', img: 'diagnostics', fn: () => AV.perfDialog(this), tip: 'Performance timings of this session (open, draw, results, play) and memory' }] },
         ]
       },
     ];

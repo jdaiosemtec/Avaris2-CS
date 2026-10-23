@@ -7,7 +7,8 @@
   const num = (x) => { const v = parseFloat(x); return isFinite(v) ? v : null; };
 
   // ---------------------------------------------------------------- data access per results source
-  async function prep(res) {
+  async function prep(res, app) {
+    if (app && app.mesh2d && AV.has2D(app) && AV.meshStatsFor && res._m2d === undefined) { try { await AV.meshStatsFor(app, res); } catch (e) { } if (!res._m2d) res._m2d = null; }
     if (!res.stats) res.stats = await AV.busy.track(window.host.outStatsAll(res.handle), 'Reading the results (statistics)');
     if (res._tables === undefined) {
       let t = res.reportText; if (t === undefined) { try { t = await window.host.readText(res.rpt || res.meta.file.replace(/\.out$/i, '.rpt')); } catch (e) { t = ''; } res.reportText = t; }
@@ -56,14 +57,23 @@
         { k: 'coef', l: 'Runoff Coefficient', u: () => '-', dir: -1, tol: 0.001, get: (r, o) => r.idx.subcatch.has(o.id) ? rptv(r, 'Subcatchment Runoff Summary', 'Runoff Coeff', o.id, false) : null },
         { k: 'infil', l: 'Total Infiltration', u: () => D, dir: 0, tol: 0.01, get: (r, o) => r.idx.subcatch.has(o.id) ? rptv(r, 'Subcatchment Runoff Summary', 'Total Infil', o.id, false) : null },
       ],
+      cell: [
+        { k: 'c_maxd', f: 'maxd', l: 'Max. Depth', u: () => L, dir: -1, tol: si ? 0.05 : 0.15, zero: true, flood: true },
+        { k: 'c_maxv', f: 'maxv', l: 'Max. Velocity', u: () => si ? 'm/s' : 'ft/s', dir: -1, tol: si ? 0.05 : 0.15 },
+        { k: 'c_hr', f: 'maxhr', l: 'Max. Hazard Rating', u: () => '-', dir: -1, tol: 0.1, zero: true },
+        { k: 'c_dv', f: 'maxdv', l: 'Max. Depth x Velocity', u: () => si ? 'm²/s' : 'ft²/s', dir: -1, tol: si ? 0.05 : 0.5 },
+        { k: 'c_arr', f: 'arrive', l: 'Flood Arrival Time', u: () => 'hr', dir: 1, tol: 0.1 },
+        { k: 'c_tpond', f: 'tpond', l: 'Time Ponded', u: () => 'hr', dir: -1, tol: 0.1, zero: true },
+      ].map(x => Object.assign(x, { get: (r, o) => { const st = r._m2d && r._m2d.st; if (!st || !st[x.f]) return null; const v = st[x.f][o.k]; return isFinite(v) ? v : null; } })),
       outfall: [
         { k: 'ofMax', l: 'Outfall Max. Flow', u: (r) => U(r, 'node', 4), dir: 0, tol: 0.001, get: (r, o) => r.idx.node.has(o.id) ? rptv(r, 'Outfall Loading Summary', 'Max Flow', o.id, false) : null },
         { k: 'ofVol', l: 'Outfall Total Volume', u: () => VOL, dir: 0, tol: 0.001, get: (r, o) => r.idx.node.has(o.id) ? rptv(r, 'Outfall Loading Summary', 'Total Volume', o.id, false) : null },
       ],
     };
   }
-  const LAYER = { node: 'node', outfall: 'node', link: 'link', subcatch: 'sub' };
-  const OBJS = (m, t) => t === 'node' ? [...m.nodes.values()] : t === 'outfall' ? [...m.nodes.values()].filter(n => n.type === 'OUTFALL') : t === 'link' ? [...m.links.values()] : [...m.subcatchments.values()];
+  const LAYER = { node: 'node', outfall: 'node', link: 'link', subcatch: 'sub', cell: 'mesh' };
+  const cellObjs = (app) => { const mesh = app.mesh2d; if (!mesh) return []; if (!mesh._cmpObjs) Object.defineProperty(mesh, '_cmpObjs', { value: mesh.cells.map((c, k) => ({ id: c.id, kind: 'CELL', cell: c, k })), enumerable: false }); return mesh._cmpObjs; };
+  const OBJS = (m, t, app) => t === 'cell' ? cellObjs(app) : t === 'node' ? [...m.nodes.values()] : t === 'outfall' ? [...m.nodes.values()].filter(n => n.type === 'OUTFALL') : t === 'link' ? [...m.links.values()] : [...m.subcatchments.values()];
 
   // system KPIs from the report
   function kpis(res, si) {
@@ -89,19 +99,20 @@
       const app = this.app, srcs = app.sim.sources();
       if (srcs.length < 2) { AV.alert('Load or run at least two scenarios first (Project ▸ Scenarios ▸ Run Selected & Compare).', 'Scenario Comparison'); return; }
       app.status('Preparing comparison …');
-      for (const s of srcs) await prep(s.res);
+      for (const s of srcs) await prep(s.res, app);
       this.srcs = srcs; if (!this.base || !srcs.some(s => s.name === this.base)) this.base = srcs[0].name; if (!this.cmp || this.cmp === this.base || !srcs.some(s => s.name === this.cmp)) this.cmp = srcs.find(s => s.name !== this.base).name;
       if (!this.el) { this.el = h('div', { class: 'cmpview' }); app.addView('cmp', 'Scenario Comparison', this.el, { onClose: () => { this.el = null; this.clearMap(); } }); }
       else app.activateView('cmp');
       this.render(); app.status('Scenario comparison ready.');
     }
     get M() { return metrics(this.app)[this.type]; }
+    has2D() { return !!(this.app.mesh2d && this.srcs && this.src(this.base)._m2d && this.src(this.cmp)._m2d); }
     get metric() { return this.M.find(x => x.k === this.mk) || this.M[0]; }
     src(name) { return this.srcs.find(s => s.name === name).res; }
     rows() {
       const mt = this.metric, B = this.src(this.base), C = this.src(this.cmp); const tol = this.tol !== undefined && this.tol !== null ? this.tol : mt.tol;
       const out = [];
-      for (const o of OBJS(this.app.model, this.type)) {
+      for (const o of OBJS(this.app.model, this.type, this.app)) {
         const b = mt.get(B, o), c = mt.get(C, o); if (b === null && c === null) continue;
         const d = b !== null && c !== null ? c - b : null; const pct = d !== null && Math.abs(b) > 1e-9 ? 100 * d / Math.abs(b) : null;
         let st;
@@ -118,7 +129,7 @@
       const app = this.app, E = this.el; E.innerHTML = '';
       const names = this.srcs.map(s => s.name);
       const selS = (key) => { const s = h('select', { onchange: () => { this[key] = s.value; if (this.base === this.cmp) { const other = names.find(n => n !== s.value); if (key === 'base') this.cmp = other; else this.base = other; } this.render(); } }, names.map(n => h('option', { value: n }, n))); s.value = this[key]; return s; };
-      const typeS = h('select', { onchange: () => { this.type = typeS.value; this.mk = this.M[0].k; this.tol = null; this.filter = null; this.render(); } }, [['node', 'Nodes'], ['link', 'Links'], ['subcatch', 'Subcatchments'], ['outfall', 'Outfalls']].map(([v, l]) => h('option', { value: v }, l))); typeS.value = this.type;
+      const typeS = h('select', { onchange: () => { this.type = typeS.value; this.mk = this.M[0].k; this.tol = null; this.filter = null; this.render(); } }, [['node', 'Nodes'], ['link', 'Links'], ['subcatch', 'Subcatchments'], ['outfall', 'Outfalls']].concat(this.has2D() ? [['cell', '2D Cells']] : []).map(([v, l]) => h('option', { value: v }, l))); if (this.type === 'cell' && !this.has2D()) { this.type = 'node'; this.mk = this.M[0].k; } typeS.value = this.type;
       const B = this.src(this.base), C = this.src(this.cmp); const mt = this.metric; const unit = mt.u(B);
       const metS = h('select', { onchange: () => { this.mk = metS.value; this.tol = null; this.filter = null; this.render(); } }, this.M.map(x => h('option', { value: x.k }, x.l))); metS.value = mt.k;
       const tolI = h('input', { type: 'number', step: 'any', min: 0, value: this.tol !== undefined && this.tol !== null ? this.tol : mt.tol, style: { width: '72px' }, title: 'Differences smaller than this count as "no change"', onchange: () => { this.tol = Math.max(0, +tolI.value || 0); this.render(); } });
@@ -142,11 +153,12 @@
           h('div', { class: 'kv' }, h('span', { class: 'kb' }, f(b)), h('span', { class: 'ka' }, '→'), h('span', { class: 'kc' }, f(c))),
           h('div', { class: 'kd' }, d === null ? '' : (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + (k.int ? Math.round(d) : AV.fmt(d, 3)) + (p !== null && isFinite(p) && Math.abs(d) > 1e-9 ? '  (' + (p > 0 ? '+' : '') + p.toFixed(1) + ' %)' : ''))));
       });
+      if (this.has2D()) E.appendChild(this.kpi2D(B, C));
       E.appendChild(cards);
       // ---- rows + summary chips
       const all = this.rows(); this._all = all;
       const C0 = { new: 0, resolved: 0, worse: 0, better: 0, up: 0, down: 0, same: 0, missing: 0 }; for (const r of all) C0[r.st]++;
-      const LBL = { new: mt.zero ? 'New ' + (/flood/i.test(mt.l) ? 'flooding' : 'occurrence') : 'New', resolved: 'Resolved', worse: 'Worse', better: 'Better', up: 'Increased', down: 'Decreased', same: 'No change', missing: 'Not in both' };
+      const LBL = { new: mt.zero ? 'New ' + (mt.flood || /flood/i.test(mt.l) ? 'flooding' : 'occurrence') : 'New', resolved: 'Resolved', worse: 'Worse', better: 'Better', up: 'Increased', down: 'Decreased', same: 'No change', missing: 'Not in both' };
       const chips = h('div', { class: 'cmpchips' }, Object.keys(LBL).filter(k => C0[k]).map(k => h('span', { class: 'cmpchip st-' + k + (this.filter === k ? ' on' : ''), title: 'Show only these', onclick: () => { this.filter = this.filter === k ? null : k; this.render(); } }, LBL[k] + ' ', h('b', null, String(C0[k])))));
       let rows = all.filter(r => this.filter ? r.st === this.filter : (!this.onlyChanged || (r.st !== 'same')));
       const key = { id: (r) => r.o.id, b: (r) => r.b, c: (r) => r.c, d: (r) => r.d, absd: (r) => r.d === null ? -1 : Math.abs(r.d), pct: (r) => r.pct, st: (r) => r.st }[this.sortK];
@@ -159,7 +171,7 @@
       for (const r of rows.slice(0, LIMIT)) {
         const w = r.d === null ? 0 : Math.abs(r.d) / maxD * 50;
         const bar = h('div', { class: 'cmpbarcell' }, h('div', { class: 'cmpmid' }), r.d ? h('div', { class: 'cmpfill st-' + r.st, style: r.d > 0 ? { left: '50%', width: w + '%' } : { left: (50 - w) + '%', width: w + '%' } }) : null);
-        const tr = h('tr', { class: this.app.selection.has(r.o) ? 'sel' : '', onclick: (e) => { this.app.selectMany([r.o], e.ctrlKey || e.metaKey); AV.$$('tr.sel', tb).forEach(x => x.classList.remove('sel')); tr.classList.add('sel'); }, ondblclick: () => { this.app.activateView('map'); this.app.map.zoomToObjects([r.o]); } },
+        const tr = h('tr', { class: this.app.selection.has(r.o) ? 'sel' : '', onclick: (e) => { if (r.o.kind === 'CELL') AV.meshSelect(this.app, [r.o.cell], e.ctrlKey || e.metaKey); else this.app.selectMany([r.o], e.ctrlKey || e.metaKey); AV.$$('tr.sel', tb).forEach(x => x.classList.remove('sel')); tr.classList.add('sel'); }, ondblclick: () => { this.app.activateView('map'); if (r.o.kind === 'CELL') { const c = r.o.cell; this.app.map.zoomToBox({ x1: c.x - 4 * c.s, y1: c.y - 4 * c.s, x2: c.x + 4 * c.s, y2: c.y + 4 * c.s }); } else this.app.map.zoomToObjects([r.o]); } },
           h('td', { class: 'id' }, r.o.id), h('td', null, h('span', { class: 'cmpchip sm st-' + r.st }, LBL[r.st])), h('td', { class: 'n' }, r.b === null ? '–' : AV.fmt(r.b, 3)), h('td', { class: 'n' }, r.c === null ? '–' : AV.fmt(r.c, 3)),
           h('td', { class: 'n d' }, r.d === null ? '–' : (r.d > 0 ? '+' : '') + AV.fmt(r.d, 3)), h('td', { class: 'n' }, r.pct === null || !isFinite(r.pct) ? '–' : (r.pct > 0 ? '+' : '') + r.pct.toFixed(1) + '%'), h('td', null, bar));
         tb.appendChild(tr);
@@ -185,11 +197,12 @@
       const COL = { new: '#d50000', worse: '#ef6c00', better: '#2e7d32', resolved: '#00c853', up: '#1e88e5', down: '#8e24aa', same: 'rgba(120,144,156,.45)' };
       const order = ['same', 'up', 'down', 'better', 'worse', 'resolved', 'new'];
       for (const st of order) { g.fillStyle = COL[st]; for (const r of pts) if (r.st === st) { g.beginPath(); g.arc(X(r.b), Y(r.c), st === 'same' ? 2.2 : 3.2, 0, 7); g.fill(); } }
-      c.onclick = (e) => { const rc = c.getBoundingClientRect(); const x = e.clientX - rc.left, y = e.clientY - rc.top; let best = null, bd = 64; for (const r of pts) { const dd = (X(r.b) - x) ** 2 + (Y(r.c) - y) ** 2; if (dd < bd) { bd = dd; best = r; } } if (best) { this.app.selectMany([best.o]); this.render(); } };
+      c.onclick = (e) => { const rc = c.getBoundingClientRect(); const x = e.clientX - rc.left, y = e.clientY - rc.top; let best = null, bd = 64; for (const r of pts) { const dd = (X(r.b) - x) ** 2 + (Y(r.c) - y) ** 2; if (dd < bd) { bd = dd; best = r; } } if (best) { if (best.o.kind === 'CELL') AV.meshSelect(this.app, [best.o.cell]); else this.app.selectMany([best.o]); this.render(); } };
     }
     // difference theme on the map
     mapValue(o) { const r = this._mapRows && this._mapRows.get(o); return r === undefined ? null : r; }
     showOnMap() {
+      if (this.type === 'cell') return this.cellsOnMap();
       const th = this.app.theme, layer = LAYER[this.type]; const mt = this.metric; const all = this._all || this.rows();
       this._mapRows = new Map(all.map(r => [r.o, r.d === null ? null : r.d]));
       const tol = this.tol !== undefined && this.tol !== null ? this.tol : mt.tol; const mx = Math.max(tol * 2, ...all.map(r => Math.abs(r.d || 0)));
@@ -209,6 +222,36 @@
       th.invalidate(); this.app.map.redraw(); th.updateLegend && th.updateLegend();
       this.app.activateView('map'); AV.toast('Map coloured by Δ ' + mt.l + '. Remove it with Clear Map (or in Theme).', false, 5000);
     }
+    // 2D cells: the 2D Meshes layer shows the difference (compare − base) of the chosen variable
+    cellsOnMap() {
+      const app = this.app, MR = app.meshResults; if (!MR) { AV.toast('Load the 1D-2D results first.', true); return; }
+      const mt = this.metric, all = this._all || this.rows(); const n = app.mesh2d.cells.length; const diff = new Float32Array(n).fill(NaN);
+      for (const r of all) if (r.d !== null) diff[r.o.k] = r.d;
+      const tol = this.tol !== undefined && this.tol !== null ? this.tol : mt.tol; let mx = 0; for (const v of diff) if (isFinite(v)) mx = Math.max(mx, Math.abs(v)); mx = Math.max(mx, 2 * tol);
+      const br = [-mx * 0.5, -tol, tol, mx * 0.25, mx * 0.6].map(v => +v.toPrecision(3));
+      const B = this.src(this.base); MR.cmp = { name: this.base, maxd: B._m2d && B._m2d.st ? B._m2d.st.maxd : MR.maxd, diff, label: 'Δ ' + mt.l + ' (' + this.cmp + ' − ' + this.base + ')', unit: mt.u(B), breaks: br, dir: mt.dir };
+      const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); P.field = 'ddepth'; if (P.classes) delete P.classes.ddepth; if (P.ramp) delete P.ramp.ddepth; if (P.invert) P.invert.ddepth = mt.dir > 0;
+      app.savePrefs && app.savePrefs(); app._meshRange = null; app.activateView('map'); app.map.redraw(); if (app.flood2d && app.flood2d.el) app.flood2d.render();
+      AV.toast('2D Meshes coloured by ' + MR.cmp.label + '. Choose another variable in its Symbology to go back.', false, 6000);
+    }
+    // the 2D key figures of both runs (highlighted at the top)
+    kpi2D(B, C) {
+      const app = this.app, cells = app.mesh2d.cells, lf = app.mesh2d.lenFactor || 1, si = AV.meshSI(app); const thr = app.flood2d && app.flood2d.S.thr !== undefined ? app.flood2d.S.thr : AV.meshDefaultBreaks(app, 'maxdepth')[0];
+      const ak = si ? 1e-4 : 1 / 43560, au = si ? 'ha' : 'ac', L = si ? 'm' : 'ft', V = si ? 'm/s' : 'ft/s';
+      const fig = (R) => { const s = R._m2d.st; let area = 0, n = 0, md = 0, mv = 0, hr75 = 0, hr2 = 0, arr = Infinity, vol = 0;
+        for (let k = 0; k < cells.length; k++) { const d = s.maxd[k]; if (!(d >= thr) || !(d > 0)) continue; const a = (cells[k].s * lf) ** 2; area += a; n++; vol += a * d; md = Math.max(md, d);
+          if (isFinite(s.maxv[k])) mv = Math.max(mv, s.maxv[k]); if (s.maxhr[k] >= 0.75) hr75 += a; if (s.maxhr[k] >= 2) hr2 += a; if (isFinite(s.arrive[k])) arr = Math.min(arr, s.arrive[k]); }
+        return { area: area * ak, n, md, mv, hr75: hr75 * ak, hr2: hr2 * ak, arr: isFinite(arr) ? arr : null }; };
+      const b = fig(B), c = fig(C);
+      const K = [['Flooded area', au, 'area', -1], ['Flooded cells', '', 'n', -1, true], ['Max. depth', L, 'md', -1], ['Max. velocity', V, 'mv', -1], ['Area HR ≥ 0.75', au, 'hr75', -1], ['Area HR ≥ 2 (danger for all)', au, 'hr2', -1], ['Earliest arrival', 'hr', 'arr', 1]];
+      const box = h('div', { class: 'cmp2d' }, h('div', { class: 'cmp2dh' }, '2D flood  ·  flooded = max. depth ≥ ' + AV.fmt(thr) + ' ' + L, h('button', { class: 'btn small', style: { marginLeft: 'auto' }, onclick: () => { this.type = 'cell'; this.mk = 'c_maxd'; this.tol = null; this.filter = null; this.render(); } }, 'Compare the 2D cells')));
+      const row = h('div', { class: 'cmpkpis' });
+      for (const [l, u, key, dir, int] of K) { const x = b[key], y = c[key]; const d = x !== null && y !== null ? y - x : null; const p = d !== null && Math.abs(x) > 1e-9 ? 100 * d / Math.abs(x) : null;
+        const cls = d === null || Math.abs(d) < 1e-9 ? 'same' : (d * dir > 0 ? 'better' : 'worse'); const f = (v) => v === null ? '–' : int ? String(v) : AV.fmt(v, 3);
+        row.appendChild(h('div', { class: 'cmpkpi k2d ' + cls }, h('div', { class: 'kl' }, l + (u ? ' (' + u + ')' : '')), h('div', { class: 'kv' }, h('span', { class: 'kb' }, f(x)), h('span', { class: 'ka' }, '→'), h('span', { class: 'kc' }, f(y))),
+          h('div', { class: 'kd' }, d === null ? '' : (d > 0 ? '▲ +' : d < 0 ? '▼ ' : '= ') + (int ? d : AV.fmt(d, 3)) + (p !== null && isFinite(p) && Math.abs(d) > 1e-9 ? '  (' + (p > 0 ? '+' : '') + p.toFixed(1) + ' %)' : '')))); }
+      box.appendChild(row); return box;
+    }
     clearMap(keep) { const th = this.app.theme; for (const k in th.layers) th.layers[k].subs = th.layers[k].subs.filter(x => !x.cmp); if (this._off) { for (const x of this._off) x.enabled = true; this._off = null; } if (keep) return; th.invalidate(); this.app.map.redraw(); th.updateLegend && th.updateLegend(); }
     graph() {
       let sel = [...this.app.selection].filter(o => o.kind !== 'GAGE' && o.kind !== 'LABEL');
@@ -224,5 +267,11 @@
     }
   }
   AV.ScenarioCompare = ScenarioCompare;
+  // from the 2D Flood Analysis: base = the other run, compare = the current results, 2D cells / max. depth
+  AV.openCompare2D = async function (app, baseName) {
+    app.cmp = app.cmp || new AV.ScenarioCompare(app); const C = app.cmp; const cur = app.sim.sources().find(s => s.current);
+    C.base = baseName; C.cmp = cur ? cur.name : null; C.type = 'cell'; C.mk = 'c_maxd'; C.tol = null; C.filter = null; C.onlyChanged = true;
+    await C.open(); app.refreshRibbon && app.refreshRibbon();
+  };
   AV.App.prototype.compareScenarios = function () { this.cmp = this.cmp || new AV.ScenarioCompare(this); return this.cmp.open(); };
 })(window.AV);
