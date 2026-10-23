@@ -349,9 +349,9 @@
         const miss = await AV.missingDataFiles(inpText, AV.dirname(app.filePath));
         if (miss.length) { this.runDlg.close(); this.runDlg = null; app.status('Simulation not started.');
           const onlyOpt = miss.every(x => x.optional);
-          const a = await AV.modal({ title: 'Run Simulation - files not found', width: 640, body: h('div', { style: { lineHeight: 1.55 } },
-              h('div', null, 'The model uses these files, but they were not found on this computer:'),
-              h('ul', { style: { margin: '6px 0 8px 18px', padding: 0 } }, miss.map(x => h('li', null, h('b', null, x.what), ': ', h('code', { style: { wordBreak: 'break-all' } }, x.abs)))),
+          const a = await AV.modal({ title: miss.some(x => x.reason) ? 'Run Simulation - files not found or not usable' : 'Run Simulation - files not found', width: 640, body: h('div', { style: { lineHeight: 1.55 } },
+              h('div', null, miss.some(x => x.reason) ? 'The model uses these files, but they were not found on this computer or cannot be used:' : 'The model uses these files, but they were not found on this computer:'),
+              h('ul', { style: { margin: '6px 0 8px 18px', padding: 0 } }, miss.map(x => h('li', null, h('b', null, x.what), ': ', h('code', { style: { wordBreak: 'break-all' } }, x.abs), x.reason ? h('span', { style: { color: '#c62828' } }, ' – ' + x.reason) : ''))),
               h('div', { class: 'note' }, 'Copy the file to that place, or change the path: interface files (hot start, rainfall) in Simulation Options ▸ Files; rain gage and time-series files in their editors.' + (onlyOpt ? ' Or run without them: the missing interface files are left out of this run only (a run without its hot start file starts dry).' : ''))),
             buttons: [{ label: 'Cancel', value: null }, { label: 'Open Interface Files', value: 'files' }].concat(onlyOpt ? [{ label: 'Run Without Them', primary: true, value: 'skip' }] : []) }).done;
           if (a === 'files') { this.optionsDialog('Files'); return; }
@@ -866,7 +866,10 @@
   AV.missingDataFiles = async function (text, modelDir) {
     const isAbs = (p) => /^([a-zA-Z]:|[\\/])/.test(p); const abs = (f) => isAbs(f) ? f : AV.joinPath(modelDir || '', f.replace(/^\.[\\/]/, ''));
     const out = []; let sec = ''; const lines = text.split('\n');
+    // data files of rain gages (Data Source FILE): such a file named in [FILES] USE RAINFALL / RUNOFF is not an interface file
+    const gf = new Set(); { let sc = ''; for (const l of lines) { const tr = l.trim(); if (/^\[/.test(tr)) { sc = tr.toUpperCase(); continue; } if (sc === '[RAINGAGES]' && tr && tr[0] !== ';') { const t = AV.tokenize(l); if (/^FILE$/i.test(t[4] || '') && t[5]) gf.add(AV.basename(t[5].replace(/^"|"$/g, '')).toLowerCase()); } } }
     for (let i = 0; i < lines.length; i++) { const tr = lines[i].trim(); if (/^\[/.test(tr)) { sec = tr.toUpperCase(); continue; } if (!tr || tr[0] === ';') continue;
+      if (sec === '[FILES]') { const t = AV.tokenize(lines[i]); if (/^USE$/i.test(t[0]) && /^(RAINFALL|RUNOFF)$/i.test(t[1] || '') && t.length >= 3) { const f = t.slice(2).join(' ').replace(/^"|"$/g, ''); if (gf.has(AV.basename(f).toLowerCase())) { out.push({ what: (t[1] || '').toLowerCase() + ' interface file', file: f, abs: f, line: i, optional: true, reason: 'is the data file of a rain gage, not a ' + t[1].toLowerCase() + ' interface file (the rain gage reads it by itself)' }); continue; } } }
       const t = AV.tokenize(lines[i]); let f = null, what = '', opt = false;
       if (sec === '[FILES]' && /^USE$/i.test(t[0]) && t.length >= 3) { f = t.slice(2).join(' '); what = (t[1] || '').toLowerCase() + ' interface file'; opt = true; }
       else if (sec === '[RAINGAGES]' && /^FILE$/i.test(t[4] || '') && t[5]) { f = t[5]; what = 'rainfall file of rain gage ' + t[0]; }
@@ -941,7 +944,12 @@
     const selUse = h('select', null, [h('option', { value: 'USE' }, 'Use'), h('option', { value: 'SAVE' }, 'Save')]);
     const path = h('input', { type: 'text', placeholder: '(file name, relative to the model folder)', style: { width: '100%' } });
     const label = (f) => (f.use === 'USE' ? 'Use  ' : 'Save ') + FILE_LABEL[f.type].padEnd(9) + ' ' + (f.path || '(no file)');
-    const renderList = () => { list.innerHTML = ''; files.forEach(f => list.appendChild(h('option', null, label(f)))); if (cur >= 0) list.selectedIndex = cur; };
+    const gageFiles = new Set([...m.gages.values()].filter(g => g.p.source === 'FILE' && g.p.series).map(g => AV.basename(String(g.p.series).replace(/^"|"$/g, '')).toLowerCase()));
+    const gageFileUse = (f) => f.use === 'USE' && (f.type === 'RAINFALL' || f.type === 'RUNOFF') && f.path && gageFiles.has(AV.basename(f.path).toLowerCase());
+    const warn = h('div', { class: 'note', style: { color: '#c62828', display: 'none', marginTop: '4px' } });
+    const renderList = () => { list.innerHTML = ''; files.forEach(f => list.appendChild(h('option', { style: gageFileUse(f) ? { color: '#c62828' } : null }, label(f) + (gageFileUse(f) ? '   ⚠ rain gage data file' : '')))); if (cur >= 0) list.selectedIndex = cur;
+      const bad = files.filter(gageFileUse); warn.style.display = bad.length ? '' : 'none';
+      warn.textContent = bad.length ? '⚠ ' + bad.map(f => f.path).join(', ') + ' is the data file of a rain gage (Rain Gage Editor ▸ Data Source FILE). A rain gage reads it by itself; Use Rainfall here expects a binary rainfall interface file written by Save Rainfall of an earlier run, so the run would stop with a file format error. Remove this line.' : ''; };
     const prop = h('div', { class: 'form', style: { marginTop: '8px' } });
     const showProp = () => { const f = files[cur]; [selType, selUse, path, browse].forEach(e => e.disabled = !f); selType.value = f ? f.type : 'HOTSTART'; selUse.value = f ? f.use : 'USE'; path.value = f ? f.path : ''; path.title = path.value; };
     const upd = () => { const f = files[cur]; if (!f) return; f.type = selType.value; f.use = selUse.value; f.path = path.value.trim(); renderList(); };
@@ -958,8 +966,8 @@
       h('button', { class: 'btn small', title: 'Add a file', onclick: add }, '+'), h('button', { class: 'btn small', title: 'Remove the selected file', onclick: del }, '−'),
       h('button', { class: 'btn small', title: 'Remove all files', onclick: clr }, 'Clear All'));
     prop.append(h('h4', null, 'File Property'), h('label', null, 'File Type'), selType, h('label', null, 'Usage Type'), selUse, h('label', null, 'File Path'), h('div', { class: 'fpick', style: { maxWidth: 'none' } }, path, browse),
-      h('div', { class: 'note' }, 'Use = read the file at the start of the run (e.g. a hot start file with the initial state). Save = write it during the run (e.g. a hot start file of the state at the end, for the next run). A file name without a folder is in the model folder; paths are stored relative to the model folder, so the model can be moved with its files.'));
-    const el = h('div', { class: 'full filestab' }, h('h4', { style: { marginTop: 0 } }, 'Interface Files'), tools, list, prop);
+      h('div', { class: 'note' }, 'Use = read the file at the start of the run (e.g. a hot start file with the initial state). Save = write it during the run (e.g. a hot start file of the state at the end, for the next run). Rainfall / Runoff / RDII files here are binary interface files written by Save of an earlier run; text rain data are linked in the Rain Gage Editor (Data Source FILE), not here. A file name without a folder is in the model folder; paths are stored relative to the model folder, so the model can be moved with its files.'));
+    const el = h('div', { class: 'full filestab' }, h('h4', { style: { marginTop: 0 } }, 'Interface Files'), tools, list, warn, prop);
     renderList(); showProp();
     const apply = () => {
       const bad = files.find(f => !f.path); if (bad) AV.toast('Interface files without a file name were left out.', true);

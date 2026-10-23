@@ -36,7 +36,7 @@
       const tbl = (ty, depth) => leaf(TYPE_LABEL[ty], () => AV.openTable(this.app, ty), depth, cnt(ty));
       const raw = (sec, label, depth) => leaf(label, () => AV.openSectionEditor(this.app, sec, label), depth, (m.raw[sec] || []).filter(l => l.trim() && !l.trim().startsWith(';')).length || undefined);
       root.appendChild(leaf('Title / Notes', () => this.editTitle(), 0));
-      root.appendChild(group('Options', [leaf('Simulation Options', () => this.app.sim.optionsDialog(), 1), leaf('Reporting', () => AV.reportingDialog(this.app), 1), raw('FILES', 'Interface Files (hot start, rainfall)', 1)]));
+      root.appendChild(group('Options', [leaf('Simulation Options', () => this.app.sim.optionsDialog(), 1), leaf('Reporting', () => AV.reportingDialog(this.app), 1), leaf('Interface Files (hot start, rainfall)', () => this.app.sim.optionsDialog('Files'), 1, (m.raw.FILES || []).filter(l => l.trim() && !l.trim().startsWith(';')).length || undefined)]));
       root.appendChild(group('Climatology', ['Temperature', 'Evaporation', 'Wind Speed', 'Snow Melt', 'Areal Depletion', 'Adjustments'].map(t => leaf(t, () => AV.climatologyEditor(this.app, t), 1))));
       const dataRows = (sec) => (m.raw[sec] || []).filter(l => l.trim() && !l.trim().startsWith(';'));
       const names = (sec, col) => new Set(dataRows(sec).map(l => AV.tokenize(l)[col || 0])).size || undefined;
