@@ -36,7 +36,7 @@
       const tbl = (ty, depth) => leaf(TYPE_LABEL[ty], () => AV.openTable(this.app, ty), depth, cnt(ty));
       const raw = (sec, label, depth) => leaf(label, () => AV.openSectionEditor(this.app, sec, label), depth, (m.raw[sec] || []).filter(l => l.trim() && !l.trim().startsWith(';')).length || undefined);
       root.appendChild(leaf('Title / Notes', () => this.editTitle(), 0));
-      root.appendChild(group('Options', [leaf('Simulation Options', () => this.app.sim.optionsDialog(), 1), leaf('Reporting', () => AV.reportingDialog(this.app), 1)]));
+      root.appendChild(group('Options', [leaf('Simulation Options', () => this.app.sim.optionsDialog(), 1), leaf('Reporting', () => AV.reportingDialog(this.app), 1), raw('FILES', 'Interface Files (hot start, rainfall)', 1)]));
       root.appendChild(group('Climatology', ['Temperature', 'Evaporation', 'Wind Speed', 'Snow Melt', 'Areal Depletion', 'Adjustments'].map(t => leaf(t, () => AV.climatologyEditor(this.app, t), 1))));
       const dataRows = (sec) => (m.raw[sec] || []).filter(l => l.trim() && !l.trim().startsWith(';'));
       const names = (sec, col) => new Set(dataRows(sec).map(l => AV.tokenize(l)[col || 0])).size || undefined;
@@ -54,7 +54,7 @@
       root.appendChild(group('Curves', Object.keys(AV.CURVE_GROUPS).map(g => ed(AV.CURVE_GROUPS[g], () => AV.curveTypeEditor(this.app, g), [...m.curves.values()].filter(c => g === 'PUMP' ? /^PUMP/.test(c.type || '') : (c.type || '') === g).length || undefined))));
       root.appendChild(leaf('Time Series', () => AV.timeSeriesEditor(this.app), 0, m.timeseries.size || undefined));
       root.appendChild(leaf('Time Patterns', () => AV.patternEditor(this.app), 0, names('PATTERNS')));
-      const other = Object.keys(m.raw).filter(s => !KNOWN_RAW.has(s) && dataRows(s).length);
+      const other = Object.keys(m.raw).filter(s => s !== 'FILES' && !KNOWN_RAW.has(s) && dataRows(s).length); // FILES: under Options
       if (other.length) root.appendChild(group('Other Sections', other.map(s => raw(s, s === 'FILES' ? 'Interface Files' : s, 1))));
       el.appendChild(root);
       this.app.updateTitle();

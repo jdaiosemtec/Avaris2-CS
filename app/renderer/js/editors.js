@@ -18,6 +18,7 @@
     LID_CONTROLS: ';;Name  Type/Layer  Parameters',
     LID_USAGE: ';;Subcatchment  LID Process  Number  Area  Width  InitSat  FromImp  ToPerv  RptFile  DrainTo  FromPerv',
     TEMPERATURE: ';;Data Element  Values',
+    FILES: ';;USE|SAVE  HOTSTART|RAINFALL|RUNOFF|RDII|INFLOWS|OUTFLOWS  FileName\n;;e.g.  USE HOTSTART hs.hsf          (file next to the model: the folder can be moved / copied)\n;;      USE HOTSTART "2D Flood\\hs.hsf"  (sub-folder of the model folder; quotes when the path has spaces)\n;;      SAVE HOTSTART end_state.hsf   (writes the state at the end of the run)',
     __REPORT: ';;e.g.\n;;INPUT NO\n;;CONTROLS NO\n;;SUBCATCHMENTS ALL\n;;NODES ALL\n;;LINKS ALL\n;;(Runs from this program always save results for all objects.)',
   };
 

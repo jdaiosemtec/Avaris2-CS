@@ -349,8 +349,9 @@
           const a = await AV.modal({ title: 'Run Simulation - files not found', width: 640, body: h('div', { style: { lineHeight: 1.55 } },
               h('div', null, 'The model uses these files, but they were not found on this computer:'),
               h('ul', { style: { margin: '6px 0 8px 18px', padding: 0 } }, miss.map(x => h('li', null, h('b', null, x.what), ': ', h('code', { style: { wordBreak: 'break-all' } }, x.abs)))),
-              h('div', { class: 'note' }, 'Copy the file to that place, or change the path: interface files (hot start, rainfall) in Parameter View ▸ Other Sections ▸ Interface Files; rain gage and time-series files in their editors.' + (onlyOpt ? ' Or run without them: the missing interface files are left out of this run only (a run without its hot start file starts dry).' : ''))),
-            buttons: [{ label: 'Cancel', value: null }].concat(onlyOpt ? [{ label: 'Run Without Them', primary: true, value: 'skip' }] : []) }).done;
+              h('div', { class: 'note' }, 'Copy the file to that place, or change the path: interface files (hot start, rainfall) in Parameter View ▸ Options ▸ Interface Files; rain gage and time-series files in their editors.' + (onlyOpt ? ' Or run without them: the missing interface files are left out of this run only (a run without its hot start file starts dry).' : ''))),
+            buttons: [{ label: 'Cancel', value: null }, { label: 'Open Interface Files', value: 'files' }].concat(onlyOpt ? [{ label: 'Run Without Them', primary: true, value: 'skip' }] : []) }).done;
+          if (a === 'files') { AV.openSectionEditor(app, 'FILES', 'Interface Files (hot start, rainfall)'); return; }
           if (a !== 'skip') return;
           const L = inpText.split('\n'); for (const x of miss) L[x.line] = ';' + L[x.line] + ' ;; left out: file not found'; inpText = L.join('\n');
           this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false }); }
