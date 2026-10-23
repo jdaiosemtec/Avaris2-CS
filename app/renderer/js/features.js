@@ -622,7 +622,7 @@
             if (AV.f2dEnabled(m) && AV.has2D(app) && app.mesh2d && app.mesh2d.cells.length) { text = AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m); flood2d = true; } else text = m.toINP({ reportAll: true }); }
           else { if (!await window.host.exists(j.p)) throw new Error('file not found'); enc = await window.host.encoding(j.p); m = AV.Model.parse(await window.host.readText(j.p)); text = m.toINP({ reportAll: true }); }
           const dir = AV.resultsDir(j.p); try { await window.host.mkdir(dir); } catch (e) { }
-          const res = await window.host.runEngine({ inpText: one(text), dir, base: rn.name, detail: false, encoding: enc, flood2d, named: true, id: j.id });
+          const res = await window.host.runEngine({ inpText: AV.runDataPaths(one(text), AV.dirname(j.p), dir), dir, base: rn.name, detail: false, encoding: enc, flood2d, named: true, id: j.id });
           const secs = (Date.now() - ts) / 1000;
           if (res.canceled) { j.state = 'stopped'; j.el.st.textContent = 'stopped'; return; }
           const ok = res.code === 0 && !res.errors.length;

@@ -341,6 +341,7 @@
           this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false });
         } else { inpText = AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m); flood2d = true; pct.textContent = 'Starting engine (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' surface cells)...'; }
       }
+      if (app.filePath) inpText = AV.runDataPaths(inpText, AV.dirname(app.filePath), dir);
       const res = await window.host.runEngine({ inpText, dir, base, detail: !!this.detailReport, encoding, flood2d, named: true, id: 'main' });
       this.runDlg.close(); this.runDlg = null;
       const secs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -840,6 +841,28 @@
     return { nodes, links };
   };
 
+
+  // ---- data files named in the model (rain gage files, time-series files, [FILES], [TEMPERATURE] FILE) are relative to the
+  // model folder, but the engine resolves relative names from the folder of the input file it runs (the results folder):
+  // rewrite them relative to that folder (keeps the path short and ASCII where the model path has e.g. Chinese folder names)
+  AV.runDataPaths = function (text, modelDir, runDir) {
+    if (!modelDir || !runDir) return text;
+    const isAbs = (p) => /^([a-zA-Z]:|[\\/])/.test(p);
+    const rel = (base, p) => { const sep = /[\\/]/; const A = base.replace(/[\\/]+$/, '').split(sep), B = p.split(sep); let k = 0; while (k < A.length && k < B.length && A[k].toLowerCase() === B[k].toLowerCase()) k++;
+      if (k <= 1) return p; const up = A.length - k; const s = base.includes('\\') ? '\\' : '/'; return (up ? ('..' + s).repeat(up) : '') + B.slice(k).join(s); };
+    const fix = (f) => { f = String(f).replace(/^"|"$/g, ''); if (!f || isAbs(f)) return f; return rel(runDir, AV.joinPath(modelDir, f.replace(/^\.[\\/]/, ''))); };
+    const q = (p) => /\s/.test(p) ? '"' + p + '"' : p;
+    let sec = ''; let n = 0;
+    const out = text.split('\n').map((line) => {
+      const tr = line.trim(); if (/^\[/.test(tr)) { sec = tr.toUpperCase(); return line; } if (!tr || tr[0] === ';') return line;
+      const t = AV.tokenize(line); let r = null;
+      if (sec === '[FILES]' && t.length >= 3) r = t[0] + ' ' + t[1] + ' ' + q(fix(t.slice(2).join(' ')));
+      else if (sec === '[TEMPERATURE]' && /^FILE$/i.test(t[0]) && t[1]) r = t[0] + ' ' + q(fix(t[1])) + (t[2] ? ' ' + t.slice(2).join(' ') : '');
+      else if (sec === '[RAINGAGES]' && /^FILE$/i.test(t[4] || '') && t[5]) { t[5] = q(fix(t[5])); r = t.map((x, i) => i === 5 ? x : q(x)).join(' '); }
+      else if (sec === '[TIMESERIES]' && /^FILE$/i.test(t[1] || '') && t[2]) r = q(t[0]) + ' FILE ' + q(fix(t[2]));
+      if (r !== null && r !== line) n++; return r === null ? line : r; });
+    return n ? out.join('\n') : text;
+  };
   // =================================================================== quick validation before a run
   AV.validateQuick = function (m) {
     const out = [];
