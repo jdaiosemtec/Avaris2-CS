@@ -277,7 +277,7 @@
       if (!OV) {
         ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--mapbg') || '#fff';
         ctx.fillRect(0, 0, this.w, this.hgt);
-        this.basemapAttr = ''; try { if (this.drawBasemap) this.drawBasemap(); } catch (e) { console.warn('basemap', e); }
+        this.basemapAttr = ''; if (this._bmNote) this._bmNote.style.display = 'none'; try { if (this.drawBasemap) this.drawBasemap(); } catch (e) { console.warn('basemap', e); }
         ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
         for (const L of this.extLayers) if (L.visible && L.order === 'below') this.drawExt(L);
       }

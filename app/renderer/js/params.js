@@ -496,7 +496,7 @@
     form: (it, ctx) => { const nm = inp(it.name, 330), ds = inp(it.desc, 330);
       const rf = h('input', { type: 'radio', name: 'tsrc', checked: it.useFile }), rd = h('input', { type: 'radio', name: 'tsrc', checked: !it.useFile });
       const fp = inp(it.file, 300); const fb = h('button', { class: 'btn small', onclick: async () => { const p = await window.host.openDialog({ title: 'Time series file', filters: [{ name: 'Data files', extensions: ['dat', 'txt', 'csv', 'tsf'] }, { name: 'All files', extensions: ['*'] }] }); if (p) { fp.value = p; rf.checked = true; } } }, '…');
-      const tb = h('tbody'); const addRow = (r) => { const tr = h('tr', null, [r[0] || '', r[1] || '', r[2] === undefined ? '' : r[2]].map(v => h('td', null, h('input', { type: 'text', value: String(v) })))); tr.addEventListener('input', () => { if (tr === tb.lastChild) addRow(['', '', '']); rd.checked = true; }); tb.appendChild(tr); };
+      const tb = h('tbody'); const addRow = (r) => { const tr = h('tr', null, [r[0] || '', r[1] || '', r[2] === undefined ? '' : r[2]].map(v => h('td', null, h('input', { type: 'text', value: typeof v === 'number' && isFinite(v) && !Number.isInteger(v) ? String(+v.toPrecision(12)) : String(v) })))); tr.addEventListener('input', () => { if (tr === tb.lastChild) addRow(['', '', '']); rd.checked = true; }); tb.appendChild(tr); };
       const fill = (R) => { tb.innerHTML = ''; R.forEach(addRow); for (let i = R.length; i < Math.max(20, R.length + 10); i++) addRow(['', '', '']); };
       fill(it.rows);
       const rowsNow = () => [...tb.children].map(tr => [...tr.querySelectorAll('input')].map(x => x.value.trim())).filter(r => r[1] !== '' || r[2] !== '').map(r => [r[0], r[1], parseFloat(r[2])]);

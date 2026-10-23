@@ -117,10 +117,11 @@
     const g0 = geo(this.w / 2, this.hgt / 2), g1 = geo(this.w / 2 + 100, this.hgt / 2); if (!g0 || !g1) return;
     const dxTile0 = Math.hypot(lon2x(g1[0], 0) - lon2x(g0[0], 0), lat2y(g1[1], 0) - lat2y(g0[1], 0)) * 256 / 100; // tile px at z0 per screen px
     let z = Math.round(Math.log2(1 / Math.max(dxTile0, 1e-12)) + Math.log2(this.dpr || 1) * 0.5); z = Math.max(0, Math.min(src.max, z));
-    const n = Math.pow(2, z);
-    let x1 = Math.floor(lon2x(lo1, z)), x2 = Math.floor(lon2x(lo2, z)), y1 = Math.floor(lat2y(la2, z)), y2 = Math.floor(lat2y(la1, z));
-    x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(n - 1, x2); y2 = Math.min(n - 1, y2);
-    if ((x2 - x1 + 1) * (y2 - y1 + 1) > 150) return;
+    // tile range; on very large / high-dpi screens use a coarser zoom rather than drawing no basemap at all
+    let n, x1, x2, y1, y2;
+    for (;;) { n = Math.pow(2, z);
+      x1 = Math.max(0, Math.floor(lon2x(lo1, z))); x2 = Math.min(n - 1, Math.floor(lon2x(lo2, z))); y1 = Math.max(0, Math.floor(lat2y(la2, z))); y2 = Math.min(n - 1, Math.floor(lat2y(la1, z)));
+      if ((x2 - x1 + 1) * (y2 - y1 + 1) <= 150 || z <= 0) break; z--; }
     // tiles go through the avtile:// protocol of the main process, which keeps a disk cache (offline use, fewer downloads)
     const web = (z, x, y) => src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{s}', src.sub ? src.sub[(x + y) % src.sub.length] : '');
     const url = (z, x, y) => window.host && window.host.tileCache ? 'avtile://t/' + bm.src + '/' + z + '/' + x + '/' + y + '.png?u=' + encodeURIComponent(web(z, x, y)) : web(z, x, y);
@@ -144,5 +145,13 @@
     }
     ctx.restore();
     this.basemapAttr = src.attr;
+    // every tile of the view failed: say so on the map instead of showing an empty background
+    let nT = 0, nErr = 0, nOk = 0; for (let x = x1; x <= x2; x++) for (let y = y1; y <= y2; y++) { const e = cache.get(url(z, x, y)); nT++; if (e && e.err) nErr++; if (e && e.ok) nOk++; }
+    this.basemapFailed = nT > 0 && nErr === nT;
+    // shown as a small note over the map (a DOM element, so the network does not cover it)
+    if (!this._bmNote) { this._bmNote = document.createElement('div'); this._bmNote.className = 'bmnote'; this.wrap.appendChild(this._bmNote); }
+    this._bmNote.style.display = this.basemapFailed ? 'block' : 'none';
+    if (this.basemapFailed) { this._bmNote.innerHTML = ''; const b = document.createElement('b'); b.textContent = 'Basemap: ' + src.name + ' tiles could not be loaded'; this._bmNote.append(b, document.createElement('br'), 'No internet connection, or the tile server is blocked on this network. Try another source in Symbology ▸ Basemap.');
+      if (!this._bmRetry) { this._bmRetry = setTimeout(() => { this._bmRetry = null; for (const [k, e] of cache) if (e.err) cache.delete(k); this.redrawBackground(); }, 30000); } }
   };
 })(window.AV);

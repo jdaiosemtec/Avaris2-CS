@@ -356,7 +356,11 @@ window.AV = window.AV || {};
         const l = m.links.get(id); if (!l) continue;
         const sh = (t[1] || 'CIRCULAR').toUpperCase();
         if (sh === 'IRREGULAR') { Object.assign(l.p, { shape: sh, g1: t[2] || '', g2: '', g3: '', g4: '', barrels: 1, culvert: '' }); XT(l, 'XSECTIONS', t, 3); }
-        else if (sh === 'CUSTOM') Object.assign(l.p, { shape: sh, g1: t[2] || '1', g2: t[3] || '', g3: '', g4: '', barrels: num(t[4], 1), culvert: '' });
+        else if (sh === 'CUSTOM') {
+          // SWMM 5.2: Link CUSTOM Geom1 Curve [Geom3 Geom4] [Barrels [Culvert]] - the geom3 / geom4 placeholders come before the barrels;
+          // the short form Link CUSTOM Geom1 Curve Barrels (some older files) is also read
+          const b = t.length >= 7 ? num(t[6], 1) : t.length === 5 ? num(t[4], 1) : 1;
+          Object.assign(l.p, { shape: sh, g1: t[2] || '1', g2: t[3] || '', g3: '', g4: '', barrels: b >= 1 ? Math.round(b) : 1, culvert: t.length >= 8 ? t[7] : '' }); }
         else if (sh === 'STREET') Object.assign(l.p, { shape: sh, g1: t[2] || '', g2: '', g3: '', g4: '', barrels: 1, culvert: '' });
         else { Object.assign(l.p, { shape: sh, g1: t[2] || '0', g2: t[3] || '0', g3: t[4] || '0', g4: t[5] || '0', barrels: num(t[6], 1), culvert: t[7] || '' }); XT(l, 'XSECTIONS', t, 8); }
       }
@@ -430,7 +434,7 @@ window.AV = window.AV || {};
         if (g.p.source !== 'FILE' && (u === 'IN' || u === 'MM') && u !== projRU && this.timeseries.has(g.p.series)) rainConv.set(g.p.series, { name: g.p.series + '__' + u + '_TO_' + projRU, f: u === 'MM' ? 1 / 25.4 : 25.4 }); }
       const W = (s) => o.push(s);
       const pad = (s, n) => { s = q(s); return s.length >= n ? s + ' ' : s + ' '.repeat(n - s.length); };
-      const fmt = (v) => (typeof v === 'number') ? String(v) : (v === undefined || v === null ? '' : String(v));
+      const fmt = (v) => (typeof v === 'number') ? (Number.isInteger(v) || !isFinite(v) ? String(v) : String(+v.toPrecision(12))) : (v === undefined || v === null ? '' : String(v)); // 12 digits: no float noise like 2.7782750000000003
       const row = (arr, w = 16) => arr.map((v, i) => i === arr.length - 1 ? q(fmt(v)) : pad(fmt(v), i === 0 ? Math.max(16, w) : 10)).join('').trimEnd();
       // rows in free-form sections that point to an object which no longer exists (deleted / merged) are dropped,
       // otherwise the engine stops with "undefined object"
@@ -553,7 +557,7 @@ window.AV = window.AV || {};
             for (const l of a) {
               const p = l.p; const sh = p.shape || 'CIRCULAR';
               if (sh === 'IRREGULAR' || sh === 'STREET') W(row(XW(l, 'XSECTIONS', [l.id, sh, p.g1])));
-              else if (sh === 'CUSTOM') W(row([l.id, sh, p.g1, p.g2, l.type === 'CONDUIT' ? p.barrels : 1]));
+              else if (sh === 'CUSTOM') { const r = [l.id, sh, p.g1, p.g2, 0, 0]; if (l.type === 'CONDUIT') { r.push(+p.barrels >= 1 ? p.barrels : 1); if (p.culvert) r.push(p.culvert); } W(row(r)); } // the engine needs 6 items: geom3 / geom4 placeholders
               else { const r = [l.id, sh, p.g1 || 0, p.g2 || 0, p.g3 || 0, p.g4 || 0]; if (l.type === 'CONDUIT') { r.push(p.barrels || 1); if (p.culvert) r.push(p.culvert); } W(row(XW(l, 'XSECTIONS', r))); }
             }
             W(''); break;
