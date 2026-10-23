@@ -13,12 +13,15 @@
   <a class="card" href="#twod-overview"><b>2D flood modelling</b><span>Couple the pipe network to a 2D surface mesh.</span></a>
   <a class="card" href="#flood-analysis"><b>2D flood analysis</b><span>Flooded areas, hazard rating, zone statistics, comparisons and GIS exports.</span></a>
   <a class="card" href="#partition"><b>High Performance Simulation</b><span>Split a large model into sub-models and run them in parallel.</span></a>
+  <a class="card" href="#calib-overview"><b>Auto Calibration</b><span>Calibrate the model against flow-survey data, in groups and within physical ranges.</span></a>
   <a class="card" href="#infer"><b>Model data tools</b><span>Fill missing data, generate dry weather flow, validate the model.</span></a>
 </div>
-<h2>New in versions 2.3 to 2.6</h2>
+<h2>New in versions 2.3 to 2.8</h2>
 <p>If you already know Avaris2 CS 2.2, these are the additions since then. Each item links to its topic.</p>
 <div class="tablewrap"><table>
 <tr><th>Area</th><th>What is new</th><th>Where</th></tr>
+<tr><td>Auto Calibration (HPS edition, 2.7–2.8)</td><td><a href="#calib-overview">Calibration against flow-survey data</a>: <a href="#calib-mapping">monitor mapping</a>, <a href="#calib-observed">automatic reading and cleaning of survey data</a>, <a href="#calib-params">parameter groups and sensitivity</a>, <a href="#calib-run">acceptance criteria and automatic calibration</a>, <a href="#calib-results">options, scorecard and apply</a>.</td><td><span class="ui">Simulation ▸ Calibration ▸ Auto Calibration</span></td></tr>
+<tr><td>Interface files (2.7)</td><td><a href="#sim-options">Files tab</a> of Simulation Options: hot start, rainfall, runoff, RDII, inflow and outflow files with relative paths.</td><td><span class="ui">Simulation ▸ Options ▸ Files</span></td></tr>
 <tr><td>High Performance Simulation (HPS edition)</td><td><a href="#partition">Model partition</a>: one click splits the model into sub-models along the flow; <a href="#coupled-run">coupled parallel simulation</a> runs them at the same time on several processor cores, for 1D and 1D-2D models, with results merged into one run of the whole model.</td><td><span class="ui">Tools ▸ Partition ▸ Partition Model</span>, <span class="ui">Simulation ▸ Run</span></td></tr>
 <tr><td>2D results (1D-2D edition)</td><td>Max. velocity, <a href="#hazard">hazard rating</a> (Defra FD2320), depth × velocity, flood arrival time, time of max. depth, flow direction arrows, <a href="#twod-results">heat-map rendering</a>, 2D cell graph, <a href="#flood-analysis">2D Flood Analysis</a> (flooded area, area by class, statistics by zone or point), comparison of two 1D-2D runs, 2D cross section, flood extent shapefiles and GeoTIFF grids.</td><td><span class="ui">Simulation ▸ Analysis ▸ 2D Flood Analysis</span>, 2D Meshes layer</td></tr>
 <tr><td>Model data</td><td><a href="#infer">Infer &amp; Clean</a> fills missing lengths, sizes, roughness, inverts and manhole depths and finds data errors; <a href="#dwf">Dry Weather Flow</a> generates foul flow and diurnal patterns from subcatchments or a GIS layer.</td><td><span class="ui">Tools ▸ Model Data</span></td></tr>

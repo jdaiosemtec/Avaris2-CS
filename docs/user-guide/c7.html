@@ -31,6 +31,17 @@
 <li>maximum trials per step;</li>
 <li>head convergence tolerance.</li>
 </ul>
+<h2>Files</h2>
+<p>The <span class="ui">Files</span> tab lists the interface files of the model. <span class="ui">Parameter View ▸ Options ▸ Interface Files</span> opens the same tab.</p>
+<figure class="narrow"><img src="images/opt_files.png" alt="Files tab of Simulation Options"></figure>
+<ol class="steps">
+<li>Click <span class="ui">+</span> to add a file, <span class="ui">−</span> to remove the selected one, <span class="ui">Clear All</span> to remove all.</li>
+<li>Under <span class="ui">File Property</span> choose the <span class="ui">File Type</span> (Hotstart, Rainfall, Runoff, RDII, Inflows, Outflows) and the <span class="ui">Usage Type</span>: <i>Use</i> reads the file at the start of the run, <i>Save</i> writes it during the run.</li>
+<li>Type the <span class="ui">File Path</span> or click <span class="ui">…</span>. The path is stored relative to the model folder, so a hot start file next to the model is simply <code>hs.hsf</code> and the model can be moved or copied with its files.</li>
+<li>Click <span class="ui">OK</span>. The change is one undo step.</li>
+</ol>
+<div class="callout"><b class="t">Rain data files:</b><p>A text file of rain-gauge data is linked to its rain gage (Rain Gage Editor, Data Source <i>FILE</i>, with the Station ID), not here. <i>Use Rainfall</i> on this tab expects a binary rainfall interface file written by <i>Save Rainfall</i> of an earlier run. When a line names the data file of a rain gage it is shown in red with an explanation, and the check before a run lists it.</p></div>
+<p>Before a run, files the model needs and that are missing (interface files, rain gage files, time series files, the climate file) are listed. <span class="ui">Open Interface Files</span> opens this tab; <span class="ui">Run Without Them</span> leaves missing interface files out of this run only.</p>
 <h2>Avaris Engine</h2>
 <figure class="narrow"><img src="images/opt_engine.png" alt="Avaris Engine tab"></figure>
 <div class="tablewrap"><table>

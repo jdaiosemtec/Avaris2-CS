@@ -188,7 +188,7 @@
 
     // called by App.exec / undo / redo
     record(cmd, mode) {
-      const auth = this.app.auth; const t = nowISO(); const user = auth ? auth.user : '', role = auth ? auth.role : '';
+      const auth = this.app.auth; const t = nowISO(); const user = cmd.asUser ? cmd.asUser.user : auth ? auth.user : '', role = cmd.asUser ? cmd.asUser.role : auth ? auth.role : '';
       const und = mode === 'undo';
       if (cmd.changes && cmd.changes.length) {
         for (const c of cmd.changes) {

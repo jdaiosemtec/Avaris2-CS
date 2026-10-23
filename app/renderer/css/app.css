@@ -1069,3 +1069,55 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .calgrid { grid-template-columns: minmax(470px, 47%) minmax(0, 1fr); }
 .calev select { max-width: 104px; }
 .calkpi .kv { overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+/* 2.8.0: bigger KPI cards filling the space under the chart; header on one line; steps 3–5 */
+.calhead { flex-wrap: nowrap; }
+.calhead .calsteps { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+.calstep { white-space: nowrap; }
+.calgrid { align-items: stretch; }
+.calgrid > .calcol { min-height: 100%; }
+.calgrid .calchart { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 520px; }
+.calgrid .calchart .calmain { flex: 1 1 auto; min-height: 330px; height: auto; }
+.calkpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.calkpi { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-height: 118px; }
+.calkpi > .muted:first-child { font-size: 13px; font-weight: 600; color: #4a5866; }
+.calkpi .kv { font-size: 22px; font-weight: 700; line-height: 1.25; }
+.calkpi .ks { font-size: 13px; line-height: 1.4; }
+.calkpis.three { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 10px 10px; }
+.calkpis.three .calkpi { min-height: 90px; }
+.calgrid2.wide { grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); }
+.calpar td { white-space: nowrap; } .calpar td:nth-child(2), .calpar td:nth-child(4), .calpar td:nth-child(9) { white-space: normal; }
+.calsens { display: inline-flex; align-items: center; gap: 4px; } .calsens .bar { display: inline-block; width: 64px; height: 7px; border-radius: 4px; background: #e3e7ec; overflow: hidden; }
+.calsens .bar span { display: block; height: 100%; background: #1565c0; } .calsens.medium .bar span { background: #42a5f5; } .calsens.low .bar span { background: #b0bec5; }
+.calsens.low { color: var(--muted); }
+.calsensbar { display: grid; grid-template-columns: auto 1fr 1.4fr auto auto; gap: 12px; align-items: center; padding: 10px; border-top: 1px solid var(--border); }
+.calnote2 { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; } .calnote2 .ttl { font-size: 13.5px; }
+.calsee td, .calsee th { text-align: center; } .calsee td:first-child, .calsee th:first-child { text-align: left; }
+.calform { padding: 8px 12px; grid-template-columns: max-content 1fr; }
+.calprog { flex: 1; height: 8px; background: #e3e7ec; border-radius: 4px; overflow: hidden; min-width: 120px; } .calprog div { height: 100%; background: #1565c0; transition: width .3s; }
+.calconv { height: 300px; padding: 4px 6px; } .calconv .chartbox { width: 100%; height: 100%; }
+.btn.danger { color: #c62828; border-color: #e57373; }
+.calgrid3 { display: grid; grid-template-columns: minmax(260px, 310px) minmax(0, 1fr) minmax(320px, 400px); gap: 12px; align-items: start; }
+.calopt { display: flex; flex-direction: column; gap: 6px; text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; cursor: pointer; font: inherit; }
+.calopt.on { border: 2px solid #1565c0; background: #eef5fd; } .calopt .r1, .calopt .r2 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .calopt .r1 b { font-size: 15px; }
+.calpareto text { font-size: 10px; fill: #637081; } .calpareto text.ax { font-size: 10px; }
+.calsc th.sort { cursor: pointer; user-select: none; } .calsc tr { cursor: pointer; }
+.scorebar { display: inline-block; width: 60px; height: 7px; background: #e3e7ec; border-radius: 4px; overflow: hidden; vertical-align: middle; margin-right: 6px; } .scorebar span { display: block; height: 100%; }
+.calreschart .calmain { height: 300px; }
+.calstat { display: inline-block; margin-right: 12px; } .calstat.good { color: #2e7d32; } .calstat.mid { color: #b45309; } .calstat.bad { color: #c62828; }
+.calwarn { border: 1px solid #f5c08a; background: #fff8ef; border-radius: 6px; padding: 10px 12px; line-height: 1.5; } .calwarn b { color: #b45309; } .calwarn .btns { display: flex; gap: 8px; margin-top: 6px; }
+.calpc tr.det td { background: #fafbfc; } .caltbl.inner { margin-top: 2px; } .caltbl.inner th { position: static; }
+.calgrid3 { grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); }
+.calgrid3b { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.calgrid3b > * { min-width: 0; }
+.calreschart .chartbox { width: 100%; height: 100%; }
+.calpc td { white-space: normal; } .calpc td.n, .calpc td:last-child { white-space: nowrap; }
+.calgrid2.wide { grid-template-columns: minmax(0, 1fr); }
+.calgrid2.wide > .calcol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.calgrid2.wide > .calcol > .calnext { grid-column: 1 / -1; }
+.calsensbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.calsensbar > .muted:nth-child(3) { flex: 1 1 320px; }
+.calgrid .calkpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.calkpi .kv { font-size: 18px; }
+.calkpis.three .calkpi .kv { font-size: 22px; }
+.calgrid .calkpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.calgrid .calkpi .kv { font-size: 20px; }

@@ -446,7 +446,7 @@ ipcMain.handle('sys:cpu', async () => {
   return { logical, physical, model: (os.cpus()[0] || {}).model || '', memGB: Math.round(os.totalmem() / 1073741824) };
 });
 // simulation results of a model live in <model>_Results; only files there may be deleted / renamed from the Database panel
-const inResults = (p) => /_Results[\\/][^\\/]+$/i.test(p);
+const inResults = (p) => /(_Results|_Calibration[\\/]runs)[\\/][^\\/]+$/i.test(p);
 ipcMain.handle('fs:rmRun', async (e, files) => { for (const f of files) if (inResults(f)) { try { await fs.promises.unlink(f); } catch (err) { } } return true; });
 ipcMain.handle('fs:renameRun', async (e, pairs) => { for (const [a, b] of pairs) { if (!inResults(a) || !inResults(b)) throw new Error('refused'); if (fs.existsSync(a)) await fs.promises.rename(a, b); } return true; });
 

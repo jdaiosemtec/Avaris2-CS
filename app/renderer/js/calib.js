@@ -5,7 +5,7 @@
 (function (AV) {
   const h = AV.h;
   const STEPS = ['Mapping', 'Observed Data', 'Parameters', 'Criteria & Run', 'Results'];
-  const READY = 2; // steps available in this version
+  const READY = 5; // steps available
   const VARS = ['Flow', 'Depth', 'Velocity', 'Rainfall'];
   // observed units -> SI (m3/s, m, m/s, mm/h); 'd' = rain depth per time step
   const SI = {
@@ -347,20 +347,21 @@
       const E = this.el; if (!E) return; E.innerHTML = ''; this.charts = null;
       E.appendChild(this.head = h('div', { class: 'calhead' })); this.renderHead();
       const body = h('div', { class: 'calbody' }); E.appendChild(body);
-      if (this.step === 0) this.renderMapping(body); else if (this.step === 1) this.renderObserved(body); else this.renderLater(body);
+      if (this.step === 0) this.renderMapping(body); else if (this.step === 1) this.renderObserved(body); else if (this.step === 2) this.renderParams(body); else if (this.step === 3) this.renderCriteria(body); else if (this.step === 4) this.renderResults(body); else this.renderLater(body);
     }
     renderHead() {
       const H = this.head; if (!H) return; H.innerHTML = ''; const C = this.P.cleaning;
-      const done = [this.resolveMapping().some(r => r.ok), C.confirmed];
+      const done = [this.resolveMapping().some(r => r.ok), C.confirmed, !!(this.P.params && this.P.params.sens), !!(this.P.results && this.P.results.options), !!(this.P.results && this.P.results.applied)];
       const steps = h('div', { class: 'calsteps' }); STEPS.forEach((s, i) => { if (i) steps.appendChild(h('span', { class: 'calarrow' }, '›'));
         steps.appendChild(h('button', { class: 'calstep' + (i === this.step ? ' on' : '') + (i >= READY ? ' later' : ''), title: i >= READY ? 'Comes in the next version' : '', onclick: () => this.go(i) }, (done[i] && i !== this.step ? '✓ ' : '') + (i + 1) + ' ' + s)); });
       const sel = h('select', { title: 'Calibration projects of this model', onchange: (e) => { if (e.target.value === '__new') { e.target.value = this.P.name; this.newProject(); } else this.openProject(e.target.value); } }, h('option', { value: this.P.name }, this.P.name));
       this.listProjects().then(L => { for (const n of L) if (n !== this.P.name) sel.appendChild(h('option', { value: n }, n)); sel.appendChild(h('option', { value: '__new' }, 'New project…')); });
-      H.append(steps, h('span', { style: { flex: 1 } }), h('span', { class: 'muted' }, 'Calibration project:'), sel,
+      H.append(steps, h('span', { style: { flex: 1 } }), h('span', { class: 'muted nowrap' }, 'Project'), sel,
         h('button', { class: 'btn small' + (this.dirty ? ' primary' : ''), onclick: () => this.save() }, this.dirty ? 'Save *' : 'Save'),
-        h('button', { class: 'btn small', title: 'Open the project folder', onclick: () => window.host.showItem(this.folder()) }, 'Folder'));
+        h('button', { class: 'btn small', title: 'Open the project folder (' + this.folder() + ')', onclick: () => window.host.showItem(this.folder()) }, '📁'));
     }
     async go(i) {
+      if (this._live || this._sensRun) { AV.toast('The calibration is running: wait for it or press Stop.', true); return; }
       if (i >= READY) { AV.toast('Step ' + (i + 1) + ' (' + STEPS[i] + ') comes in the next version. Mapping and Observed Data can be prepared now.', false, 5000); return; }
       this.step = i; this.render();
     }
@@ -605,6 +606,6 @@
     for (const s of hdr.series) { const t = new Float64Array(buf.slice(off, off + s.n * 8)); off += s.n * 8; const v = new Float32Array(buf.slice(off, off + s.n * 4)); off += Math.ceil(s.n * 4 / 8) * 8; map.set(s.k, { t, v }); }
     return map;
   }
-  AV.Calib = Calib;
+  AV.Calib = Calib; AV.encodeObs = encodeObs; AV.decodeObs = decodeObs;
   AV.openCalibration = function (app) { if (!AV.hasHPS(app)) { AV.needHPS(app, 'Auto Calibration'); return; } app.calib = app.calib || new Calib(app); app.calib.open(); };
 })(window.AV);

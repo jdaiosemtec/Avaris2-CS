@@ -1,0 +1,151 @@
+
+<section class="topic" id="calib-overview" data-ch="Auto Calibration" data-title="Auto Calibration overview">
+<h1>Auto Calibration overview</h1>
+<p class="lead"><span class="ui">Simulation ▸ Calibration ▸ Auto Calibration</span> calibrates the model against flow-survey data in five steps. Every monitor and every calibration event is scored together, the parameters are changed in groups within physical ranges, and the result is checked on validation events that were not used for fitting.</p>
+<div class="callout"><b class="t">Edition:</b><p>Auto Calibration is part of Avaris2 CS High Performance Simulation (HPS). In other editions the button shows a lock.</p></div>
+<figure><img src="images/cal_observed.png" alt="Auto Calibration, step 2 Observed Data"><figcaption>Step 2 Observed Data: data files, monitors, rainfall events and the chart of the selected monitor and event.</figcaption></figure>
+<h2>The five steps</h2>
+<div class="tablewrap"><table>
+<tr><th>Step</th><th>What you do</th></tr>
+<tr><td>1 Mapping</td><td>Link each monitor (flow meter, depth sensor, rain gauge) to a conduit, node or rain gage of the model.</td></tr>
+<tr><td>2 Observed Data</td><td>Read the survey files, choose the rainfall events, clean the data and confirm the cleaning. The data checks follow.</td></tr>
+<tr><td>3 Parameters</td><td>Choose the parameter groups and their ranges, then run the sensitivity analysis.</td></tr>
+<tr><td>4 Criteria &amp; Run</td><td>Choose the acceptance standard and the monitor weights, then start the automatic calibration.</td></tr>
+<tr><td>5 Results</td><td>Compare the options, check the scorecard and the graphs, accept parameter changes and apply them to the model.</td></tr>
+</table></div>
+<h2>Calibration projects</h2>
+<p>A calibration project is saved in the folder <code>&lt;model&gt;_Calibration</code> next to the model file:</p>
+<ul>
+<li><code>&lt;name&gt;.avcal</code> holds the settings: mapping, files, monitors, events, cleaning decisions, parameters, criteria, search results.</li>
+<li><code>&lt;name&gt;.avobs</code> holds the observed data read from the survey files.</li>
+<li><code>&lt;name&gt;.avres</code> holds the simulated series of the options for the result graphs.</li>
+</ul>
+<p>The survey files themselves are never changed. Use the <span class="ui">Project</span> list at the top right to open another project or to create a new one (the mapping can be copied); <span class="ui">Save</span> saves the project and the folder button opens the project folder.</p>
+<div class="callout"><b class="t">Tip:</b><p>Load a run that covers the survey period (Database) before step 2: the chart then shows the model next to the observed data, and the time-shift check of the cleaning can compare against it.</p></div>
+</section>
+
+<section class="topic" id="calib-mapping" data-ch="Auto Calibration" data-title="Step 1: Mapping">
+<h1>Step 1: Mapping</h1>
+<p>The mapping links every monitor ID of the survey to an object of the model. The kind of object (conduit, junction, rain gage …) is found automatically.</p>
+<figure><img src="images/cal_mapping.png" alt="Step 1 Mapping with the Not matched list"></figure>
+<h2>Steps</h2>
+<ol class="steps">
+<li>Click <span class="ui">Export Template…</span> to get a CSV with the two columns <code>Monitor ID, Object ID</code>. If observed data were already read, their monitor IDs are filled in.</li>
+<li>Fill in the object IDs in Excel or a text editor and save as CSV or Excel (.xlsx).</li>
+<li>Click <span class="ui">Import Mapping…</span>. Rows with a monitor ID that is already in the table are updated; new rows are added.</li>
+<li>Correct the rows in the table if needed: type the object ID, or select the object on the map and click <span class="ui">⌖</span>. <span class="ui">◎</span> shows the object on the map; <span class="ui">×</span> deletes the row.</li>
+</ol>
+<h2>Not matched</h2>
+<p>Every row that cannot be linked is listed on the right with its reason, for example <i>object C_999 is not in the model</i>, <i>J_569 is already used by DM01</i> or <i>no object ID</i>. When an object with the same name in other letter case exists it is named. <span class="ui">Export Not Matched…</span> writes the list as CSV so that it can be corrected and imported again.</p>
+</section>
+
+<section class="topic" id="calib-observed" data-ch="Auto Calibration" data-title="Step 2: Observed Data">
+<h1>Step 2: Observed Data</h1>
+<p>Step 2 reads the survey data, finds the rainfall events, cleans the data and checks it. The page is laid out in the order of the work: data files, monitors and events with the chart, data cleaning, and the data checks last.</p>
+<h2>Read the data files</h2>
+<p>Drop files or a whole folder on the dashed area, or use <span class="ui">Add Files…</span> / <span class="ui">Add Folder…</span>. CSV, TXT, DAT and Excel (.xlsx, every sheet) files of any size are read; large files are read in the background. The <span class="ui">Batch data read</span> table shows what was recognised in each file:</p>
+<div class="tablewrap"><table>
+<tr><th>Recognised</th><th>How</th></tr>
+<tr><td>Layout</td><td>One column per monitor; one file per monitor (the monitor ID comes from the column header, the file name or a line above the header); a long table (monitor, time, value); the rain-gauge format <code>STA YYYY MM DD HH mm value</code>.</td></tr>
+<tr><td>Date and time</td><td>ISO dates, dd/MM/yyyy and MM/dd/yyyy (told apart by the values; if they cannot be told apart a list lets you choose), separate date and time columns, AM/PM, Excel dates.</td></tr>
+<tr><td>Monitor, variable, units</td><td>Monitor IDs of the mapping are preferred. The variable (flow, depth, velocity, rainfall) and the units come from the header, e.g. <code>FM01 Flow (l/s)</code> or a units row below the header.</td></tr>
+</table></div>
+<p>Monitor IDs that are not yet in the mapping are added to it with an empty object ID.</p>
+<h2>Monitors</h2>
+<p>The <span class="ui">Monitors</span> table lists every monitor with its type, units, model object, number of records and data quality. Values are converted to the model units (for example l/s to m³/s). Where a file has no units, the units list is marked orange and model units are assumed: choose the right units there. Untick <span class="ui">Use</span> to leave a monitor out.</p>
+<h2>Rainfall events</h2>
+<p>Events are found in the rainfall of the chosen rain gauge. <span class="ui">Separation</span> is the dry time that separates two events, <span class="ui">Min. depth</span> the smallest event kept. <span class="ui">Use … largest</span> sets how many of the largest events are used; they alternate between calibration and validation. Change <span class="ui">Use as</span> on any row: Calibration, Validation or Not used. Dry days (three days without rain) are listed for the dry weather flow check; click one to show it in the chart.</p>
+<h2>The chart</h2>
+<p>Click a monitor and an event: the chart shows the rainfall at the top, the observed data and the model of the loaded run. The four cards below compare peak, volume, time of peak and the shape of the hydrograph (NSE) with the WaPUG limits. <span class="ui">Whole record</span> shows the full survey period. Drag in the chart to zoom, double-click to zoom out.</p>
+<h2>Data cleaning</h2>
+<p>Tick the methods, set their values and click <span class="ui">Run Cleaning</span>. The original data are never changed: the cleaning is kept as a layer.</p>
+<div class="tablewrap"><table>
+<tr><th>Method</th><th>What it does</th></tr>
+<tr><td>Spikes / outliers</td><td>Removes values more than <i>k</i> times the median of their neighbours (not applied to rainfall).</td></tr>
+<tr><td>Flat line</td><td>Removes values of a stuck sensor: the same value for at least <i>h</i> hours while it rains. Low dry-weather values and a level held at the top of the record (pipe full) are kept.</td></tr>
+<tr><td>Out of range</td><td>Removes negative flows and depths, and depths above the manhole rim plus surcharge depth.</td></tr>
+<tr><td>Fill short gaps</td><td>Interpolates gaps up to the set length; longer gaps stay empty and are left out of the scoring.</td></tr>
+<tr><td>Time shift</td><td>Finds a constant offset (for example daylight saving) against the loaded run and corrects it.</td></tr>
+<tr><td>Smoothing</td><td>Moving average for noisy depth and velocity sensors.</td></tr>
+<tr><td>Area–velocity check</td><td>Flags (does not change) flows that differ from velocity × wetted area by more than the set percentage.</td></tr>
+</table></div>
+<figure><img src="images/cal_cleaning.png" alt="Cleaning results with Accept and Reject"></figure>
+<ol class="steps">
+<li>Click a result row: the chart shows the data before and after this change.</li>
+<li>Click <span class="ui">Accept</span> or <span class="ui">Reject</span> on each row, or <span class="ui">Accept All</span>.</li>
+<li>Click <span class="ui">Confirm Cleaning</span>. Rows not decided yet can be accepted in one step. The name of the user who confirmed is saved with the project.</li>
+</ol>
+<h2>Data checks</h2>
+<p>After the cleaning is confirmed the data checks are shown: monitors without a model object, units, data steps, calibration and validation events, data missing in events, rain volume against flow volume (runoff coefficient), values still missing, cleaning that was rejected on purpose, and dry days. <span class="ui">Next: Parameters</span> becomes available only after the cleaning is confirmed.</p>
+</section>
+
+<section class="topic" id="calib-params" data-ch="Auto Calibration" data-title="Step 3: Parameters">
+<h1>Step 3: Parameters</h1>
+<p>Parameters are calibrated in groups: one value per group, applied to every object of the group, never object by object. This keeps the model physical and the number of unknowns small.</p>
+<figure><img src="images/cal_params.png" alt="Step 3 Parameters with sensitivity"></figure>
+<h2>Parameter groups</h2>
+<p>A first set of groups is proposed: % impervious (by land-use tag when the subcatchments have tags), width, depression storage, Manning's n of impervious areas, infiltration, and Manning's n of the conduits (not ticked). To add groups, choose <span class="ui">Group by</span> and click <span class="ui">+ Add Group</span>:</p>
+<div class="tablewrap"><table>
+<tr><th>Group by</th><th>Groups</th></tr>
+<tr><td>Land use (tag)</td><td>One group per tag of the subcatchments (or conduits).</td></tr>
+<tr><td>Soil type / infiltration class</td><td>Subcatchments with the same infiltration parameters.</td></tr>
+<tr><td>Sewershed / monitor catchment</td><td>The area that drains to each monitor (to the nearest monitor downstream).</td></tr>
+<tr><td>Partition</td><td>The sub-models of the model partition (HPS).</td></tr>
+<tr><td>Polygon layer</td><td>The polygons of a layer, named by an attribute; objects are assigned by their centre.</td></tr>
+<tr><td>Selected objects</td><td>The subcatchments or conduits selected on the map.</td></tr>
+<tr><td>All objects</td><td>All subcatchments or all conduits.</td></tr>
+</table></div>
+<p>Parameters are % impervious, width and % slope (× factor), depression storage, Manning's n of impervious and pervious areas, % zero-impervious (set value), the first two infiltration parameters (× factor) and Manning's n of conduits (set value).</p>
+<h2>Ranges</h2>
+<p>Min and Max can be changed but never beyond the physical limits (for example % impervious 0–100, factors &gt; 0, Manning's n 0.009–0.05). A changed range is marked orange; write the reason in <span class="ui">Range from</span>. Both are saved with the project and listed in the calibration report.</p>
+<h2>Sensitivity analysis</h2>
+<p><span class="ui">Run Sensitivity Analysis</span> runs every calibration event with each group at its Min and at its Max and measures how much every monitor moves, in units of the acceptance tolerance. Groups with a low effect are unticked and keep their value (<i>low – kept</i>). The table <span class="ui">Which monitor sees which group</span> shows the share of each monitor's response explained by each group (●●● large, ●● medium, ● small) and warns about monitors that see no calibrated group.</p>
+<h2>Keeping the model physical</h2>
+<ul>
+<li><b>Hard limits</b>: a value never leaves its range.</li>
+<li><b>Penalty</b>: every change away from the current value costs score (None, Low, Medium, High).</li>
+<li><b>Upstream of the monitors only</b>: groups are limited to the areas that drain to a monitor.</li>
+</ul>
+</section>
+
+<section class="topic" id="calib-run" data-ch="Auto Calibration" data-title="Step 4: Criteria &amp; Run">
+<h1>Step 4: Criteria &amp; Run</h1>
+<figure><img src="images/cal_criteria.png" alt="Step 4 Criteria and Run"></figure>
+<h2>Acceptance criteria</h2>
+<p>Choose the standard: <i>CIWEM / WaPUG Code of Practice (UK)</i>, <i>US – MSDGC Modeling Guidelines 2013</i> or <i>US EPA 1999 CSO Guidance</i> (no numeric limits are given there: enter the values agreed for the project). Every cell of the table can be changed; changed cells are marked orange and saved with the project. <span class="ui">Reset to Standard</span> restores the values. Depth limits in metres are converted to feet for US models.</p>
+<p>Each check gives 1 inside its tolerance, falling linearly to 0 at twice the tolerance. A monitor's score (0–100) is the weighted average of its checks over the events; the overall score weights the monitors. A monitor meets the criteria when all its checks pass in at least two of three events.</p>
+<h2>Monitor weights</h2>
+<p>Every monitor starts with weight 1.0, minus 0.1 for each cleaning method applied to it and 0.2 when gaps were filled (at least 0.5). Change any weight; 0 means the monitor is not scored.</p>
+<h2>Search</h2>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Meaning</th></tr>
+<tr><td>Method</td><td><b>Multi-objective (NSGA-II)</b> finds options from "small change" to "best fit"; <b>SCE-UA</b> and <b>DDS</b> optimise one score (fit minus the penalty for change); DDS is the fastest.</td></tr>
+<tr><td>Simulations</td><td>The number of parameter sets tried. Each runs all calibration events.</td></tr>
+<tr><td>Parallel runs</td><td>How many event runs work at the same time; blank uses the number of processors minus one.</td></tr>
+</table></div>
+<ol class="steps">
+<li>Click <span class="ui">Start Calibration</span>. The current model is run first as the reference.</li>
+<li>The chart shows the criteria met and the best score so far; the cards show the current model, the best so far and the number of options on the front. <span class="ui">Stop</span> ends the search early; the simulations done so far are kept.</li>
+<li>At the end the three options are run on all events, including the validation events, and <span class="ui">Results</span> opens step 5.</li>
+</ol>
+<div class="callout"><b class="t">How the events are run:</b><p>Each event run starts 12 hours before the rain (warm-up), uses the observed rainfall of the mapped rain gauges and ends 12 hours after the rain. Only the monitored objects are written to the results, and the runs are deleted after scoring. The model file is not changed.</p></div>
+</section>
+
+<section class="topic" id="calib-results" data-ch="Auto Calibration" data-title="Step 5: Results">
+<h1>Step 5: Results</h1>
+<figure><img src="images/cal_results.png" alt="Step 5 Results"></figure>
+<h2>Options</h2>
+<p>The chart plots the calibration score against the mean parameter change for the non-dominated simulations. Three options are offered: <b>A</b> closest to the current model, <b>B</b> balanced (recommended), <b>C</b> best fit of the calibration events. C is marked <i>Over-fit risk</i> when it scores lower than B on the validation events.</p>
+<h2>Scorecard and graphs</h2>
+<p>The scorecard lists every monitor with its score and largest miss. Search, sort by clicking a header, or export the scores of all options with <span class="ui">Export CSV</span>. Click a row to see its graph: observed data, current model and the option, for any calibration or validation event, with the checks of that event below.</p>
+<h2>Diagnosis</h2>
+<p>When a monitor scores below 50 a box explains why. If the same check misses in the same direction in every event and every option, no parameter within its range can fix it: the box points to the model or the data (a weir crest, a missing connection, the sensor level, the meter calibration) and offers <span class="ui">Zoom to</span> the object and <span class="ui">Exclude … and re-run</span>.</p>
+<h2>Parameter changes and Apply</h2>
+<ol class="steps">
+<li>Tick <span class="ui">Accept</span> for the groups to apply. ▸ lists the old and new value of every object of a group.</li>
+<li>To change a value, edit <span class="ui">New</span> (within the range) and click <span class="ui">Re-check Score</span>: the edited values are run on all events and become the option <i>Edited</i>.</li>
+<li>Click <span class="ui">Apply</span>. The accepted groups are written to the model as one step (Ctrl+Z undoes it). Every changed value is recorded in the change history under the user <b>System</b> (role <i>system</i>) with the note "Calibration – project, option". Save the model to keep the change.</li>
+<li>With <span class="ui">Run all events afterwards as named runs</span> ticked, each event is run and saved in the Database as <i>Calib B E1</i> etc., ready for <a href="#comparison">Comparison</a>.</li>
+</ol>
+<p><span class="ui">Calibration Report…</span> writes an HTML report of the data, cleaning, events, parameters, criteria and results into the project folder; <span class="ui">Export CSV</span> writes the old and new value of every object.</p>
+</section>

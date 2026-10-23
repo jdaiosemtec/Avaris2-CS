@@ -454,3 +454,11 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - `renderer/js/calib.js`：`AV.Calib`，`AV.openCalibration(app)`（无 HPS 时 `AV.needHPS`）。项目文件 `<model>_Calibration/<name>.avcal`（JSON：mapping、files、monitors、events、cleaning）+ `<name>.avobs`（二进制：'AVOBS1' + JSON 头 + 每条序列 Float64 时间 / Float32 值）。原始数据不改；清洗结果是一层（idx + 新值，Accept/Reject），`series(key)` 按已接受的结果生成清洗后数据（模型单位）。
 - 第 3–5 步（参数、准则与运行、结果）在 2.7.x 继续；按 v3.1 原型做，不删原型里的功能。
 - 测试数据：Riverside 改成 2025-05-01–07-01、5 分钟雨量后运行，用结果加噪声、比例、尖峰、缺测、平线生成的测流文件（见会话 scratchpad/survey）。
+
+## 19. 2.8.0：Auto Calibration 第 3–5 步（calib2.js）
+
+- `calib2.js` 给 `AV.Calib.prototype` 加方法：`renderParams` / `renderCriteria` / `renderResults`，参数表 `AV.CALIB_PARAMS`（get / put，factor 或 set），标准 `AV.CALIB_STD`。
+- 一次事件运行：`eventInp(ev, x)` 临时修改模型（参数组的值、[OPTIONS] 日期 = 雨前 12 h 到雨后 12 h、THREADS 1、[REPORT] 只报监测对象、映射的雨量站改为观测雨量 CAL_<gage> 时间序列、去掉 USE/SAVE HOTSTART），`m.toINP()` 后在 finally 里全部恢复；`runEvent` 在 `<model>_Calibration/runs` 运行、读出监测序列后删除（`fs:rmRun` 允许 `_Calibration/runs`）。
+- `pool(n)` 控制并行引擎进程数；`evaluate(xs, events)` 每个候选跑全部事件并 `scoreRuns` 评分（每项检查 1 = 在容差内，到 2 倍容差线性降到 0；监测点权重；"满足标准" = 2/3 事件全部检查通过）。
+- 搜索：`nsga2`（分数↑、改变量↓）、`sceua`、`dds`；`finalOptions` 从前沿选 A/B/C 并在全部事件（含验证）上重跑，序列存 `<name>.avres`。
+- 应用：`app.exec({ asUser: { user: 'System', role: 'system' }, ... })`，`history.js` 的 `record` 支持 `cmd.asUser`。
