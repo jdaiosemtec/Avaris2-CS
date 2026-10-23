@@ -17,7 +17,7 @@
           { name: 'Import', items: [{ id: 'import', label: 'Import', img: 'import', fn: () => this.showRightTab('catalog'), tip: 'Open the Catalog: browse and drag GIS data (SHP, GeoJSON, KML, CSV, DXF, GeoTIFF, GDB, .out results ...) onto the map' }] },
           { name: 'Export', items: [{ id: 'export', label: 'Export', img: 'export', fn: () => this.showRightTab('export'), tip: 'Export Wizard: network objects and results to Shapefile, File Geodatabase or CSV' }] },
           { name: 'Print', items: [{ id: 'layout', label: 'Print Layout', img: 'print', fn: () => AV.openLayout(this), tip: 'Print layout: map, title block, legend, scale bar and north arrow on a page; print or save as PDF / PNG' }] },
-          { name: 'User', items: [{ small: [{ id: 'usw', label: 'Switch User', svg: 'user', fn: () => this.auth.loginDialog(false) }, { id: 'umg', label: 'Manage Users', svg: 'user', fn: () => this.auth.manageUsers(), enabled: () => this.auth && this.auth.isAdmin }, { id: 'uhist', label: 'Change History', svg: 'history', fn: () => this.hist.openWindow() }] }] },
+          { name: 'User', items: [{ id: 'usw', label: 'Switch User', img: 'switchuser', fn: () => this.auth.loginDialog(false), tip: 'Sign in as another user' }, { id: 'umg', label: 'Manage Users', img: 'manageusers', fn: () => this.auth.manageUsers(), enabled: () => this.auth && this.auth.isAdmin, tip: 'Add, edit and remove user accounts and roles (Administrator only)' }] },
           { name: 'Settings', items: [{ id: 'default', label: 'Default', img: 'default', fn: () => this.defaultSettings(), tip: 'Default settings: overlapping-object selection, rainfall plot, selection colours' }] },
         ]
       },

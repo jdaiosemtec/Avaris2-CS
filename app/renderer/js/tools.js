@@ -315,7 +315,9 @@
     validate() {
       const m = this.m; const issues = [];
       const add = (sev, obj, msg) => issues.push({ sev, obj, msg });
-      for (const s of AV.validateQuick(m)) add('Error', null, s);
+      // the quick checks return text: find the object named at the start so the row can select / zoom to it
+      const objOf = (t) => { const r = /^(Link|Conduit|Pump|Subcatchment|Rain gage) (.+?):/.exec(t); if (!r) return null; return r[1] === 'Subcatchment' ? m.subcatchments.get(r[2]) || null : r[1] === 'Rain gage' ? m.gages.get(r[2]) || null : m.links.get(r[2]) || null; };
+      for (const s of AV.validateQuick(m)) add('Error', objOf(s), s);
       const deg = new Map(); for (const l of m.links.values()) { deg.set(l.from, (deg.get(l.from) || 0) + 1); deg.set(l.to, (deg.get(l.to) || 0) + 1); }
       const subOut = new Set([...m.subcatchments.values()].map(s => s.p.outlet));
       for (const n of m.nodes.values()) {

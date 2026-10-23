@@ -56,10 +56,12 @@
 <figure class="narrow"><img src="images/run_name.png" alt="Run Simulation dialog"></figure>
 <figure class="narrow"><img src="images/run_progress.png" alt="Running Simulation progress"></figure>
 <p>When the run finishes, the results are loaded automatically. The status bar shows the number of reporting steps, and a summary lists the continuity errors, flooding and warnings.</p>
-<h2>Several runs at the same time</h2>
-<p>From the <a href="#scenarios">Scenarios</a> panel, <span class="ui">Run Selected &amp; Compare</span> runs several scenarios in parallel, each with its own engine process, and then compares them. A panel shows the progress of each run, and <span class="ui">Stop All</span> cancels them.</p>
+<h2>Whole model or coupled parallel</h2>
+<p>When the model has been partitioned (<a href="#partition">Model partition</a>, HPS edition), the Run dialog has a <b>Run</b> section: <i>Whole model</i> runs the model as usual, <i>Coupled parallel</i> runs the sub-models at the same time on several processor cores. See <a href="#coupled-run">Coupled parallel simulation</a>.</p>
+<h2>Results and play mode</h2>
+<p>Loading results does not start the animation: the map shows the results at the current time, and statistic themes (max. depth, max. capacity) work straight away. Click <span class="ui">Simulation ▸ Results ▸ Play</span> to enter play mode and animate the run; click it again to leave play mode.</p>
 <h2>Convergence diagnostics</h2>
-<p>After a dynamic-wave run, <span class="ui">Simulation ▸ Results ▸ Convergence</span> lists the nodes where the engine most often failed to converge, with the share of steps not converged and any orifices next to them. It also shows the routing time step summary from the report.</p>
+<p>After a dynamic-wave run, <span class="ui">Simulation ▸ Analysis ▸ Convergence</span> lists the nodes where the engine most often failed to converge, with the share of steps not converged and any orifices next to them. It also shows the routing time step summary from the report.</p>
 <p><span class="ui">Color Map by Nonconvergence</span> shows on the map where the problem is concentrated, and <span class="ui">Select All Listed</span> selects those nodes.</p>
 <figure><img src="images/convergence.png" alt="Nonconvergence Diagnostics"></figure>
 <div class="callout tip"><b class="t">Reducing non-convergence</b><ul>
@@ -109,18 +111,101 @@
 
 <section class="topic" id="twod-results" data-ch="2D flood modelling" data-title="2D results">
 <h1>2D results</h1>
-<p>After a 1D-2D run, the 2D Meshes layer can show:</p>
+<p class="lead">After a 1D-2D run, the 2D Meshes layer shows the flooding on the surface. All 2D statistics (depths, velocities, hazard, times) are calculated from the results file when the results are loaded; you do not need to run again to see a new variable.</p>
+<h2>Choose what is shown</h2>
+<p>Double-click the <b>2D Meshes</b> layer in the Layer View (or use the Symbology tab on the right) and choose the <b>Variable</b>:</p>
 <div class="tablewrap"><table>
 <tr><th>Variable</th><th>Meaning</th></tr>
+<tr><td colspan="2"><b>Statistic results (whole run)</b> – available at any time</td></tr>
 <tr><td>Max. Depth</td><td>Greatest water depth on each cell during the run.</td></tr>
-<tr><td>Time Ponded (hr)</td><td>Time the cell was deeper than the Flood Depth Threshold.</td></tr>
-<tr><td>Time to Recede (hr)</td><td>Time from the peak until the depth fell back below the threshold (to the end of the run if it never did).</td></tr>
-<tr><td>Depth (current time)</td><td>Depth at the current time step, while playing.</td></tr>
-<tr><td>Water Surface Elev. (current time)</td><td>Water level at the current time step, while playing.</td></tr>
+<tr><td>Max. Water Surface Elev.</td><td>Greatest water level (ground + depth).</td></tr>
+<tr><td>Max. Velocity</td><td>Greatest flow speed over the cell (m/s or ft/s). The velocity of a cell is the average of the velocities through its faces in x and y, combined into one vector.</td></tr>
+<tr><td>Max. Hazard Rating</td><td>Flood hazard to people, HR = d × (v + 0.5) + DF; see <a href="#hazard">Hazard rating</a>.</td></tr>
+<tr><td>Max. Depth x Velocity</td><td>Greatest product of depth and velocity (m²/s or ft²/s), often used for vehicle and building stability.</td></tr>
+<tr><td>Flood Arrival Time (hr)</td><td>When the depth first exceeds the Flood Depth Threshold (Options ▸ 2D Flood).</td></tr>
+<tr><td>Time of Max. Depth (hr)</td><td>When the greatest depth occurs.</td></tr>
+<tr><td>Time Ponded (hr)</td><td>How long the cell is deeper than the Flood Depth Threshold.</td></tr>
+<tr><td>Time to Recede (hr)</td><td>Time from the peak until the depth falls back below the threshold (to the end of the run if it never does).</td></tr>
+<tr><td>Max. Depth Difference</td><td>This run minus the compared run, after a comparison (see <a href="#flood-analysis">2D Flood Analysis</a>).</td></tr>
+<tr><td colspan="2"><b>Current time step</b> – in play mode only</td></tr>
+<tr><td>Depth, Water Surface Elev., Velocity, Hazard Rating</td><td>The value at the time step shown, animated while playing.</td></tr>
+<tr><td colspan="2"><b>Static properties</b></td></tr>
 <tr><td>Ground Elevation</td><td>Cell elevation from the DEM.</td></tr>
 </table></div>
-<p>Double-click the 2D Meshes layer to choose the variable, the colour ramp (for example <i>Flood Depth</i>), the ranges and the transparency. Cells shallower than the first range are left uncoloured.</p>
-<figure><img src="images/mesh_results.png" alt="Maximum depth on the 2D mesh"><figcaption>Maximum water depth on the 2D surface, with ranges set by <span class="ui">Auto-Theme</span>.</figcaption></figure>
+<figure><img src="images/mesh_results.png" alt="Maximum depth on the 2D mesh"><figcaption>Maximum water depth on the 2D surface, drawn as mesh cells.</figcaption></figure>
+<h2>Mesh cells or heat map</h2>
+<p><b>Rendering</b> in the Symbology pane sets how the values are drawn:</p>
+<ul>
+<li><b>Mesh cells (ranges)</b>: each cell is filled with the colour of the range its value falls in. Exact, and best for reading values cell by cell. <i>Cell outlines</i> draws the cell borders.</li>
+<li><b>Heat map (smooth)</b>: a continuous surface in which the colours blend between the ranges and the edge of the flooded area is soft. Best for presentations and for seeing the overall pattern. The legend becomes a colour bar. The heat map also animates in play mode.</li>
+</ul>
+<figure><img src="images/mesh_heatmap.png" alt="Heat map rendering of the maximum depth"><figcaption>The same maximum depth drawn as a heat map.</figcaption></figure>
 <figure class="small"><img src="images/mesh_symbology.png" alt="Symbology of the 2D Meshes layer"></figure>
-<p>Hover over a cell to read its values. Click it for details and a depth graph. The mesh also has an attribute table, and it can be exported as a shapefile with its results from the layer's right-click menu.</p>
+<p>Both renderings use the same <b>ranges</b> and <b>colour ramp</b>: set the number of ranges and click <span class="ui">Auto-Theme</span>, or type the values and pick colours one by one; <span class="ui">Reset</span> returns to the defaults. Cells below the first value are left uncoloured (dry). <b>Transparency</b> lets the basemap show through.</p>
+<h2 id="hazard">Hazard rating</h2>
+<p>The hazard rating follows the UK Defra / Environment Agency method (FD2320): <b>HR = d × (v + 0.5) + DF</b>, with the depth d in metres and the velocity v in m/s (US models are converted). The classes are:</p>
+<div class="tablewrap"><table>
+<tr><th>HR</th><th>Class</th><th>Meaning</th></tr>
+<tr><td>&lt; 0.75</td><td>Low</td><td>Caution – flood zone with shallow or slow water.</td></tr>
+<tr><td>0.75 – 1.25</td><td>Danger for some</td><td>Dangerous for children, the elderly and the infirm.</td></tr>
+<tr><td>1.25 – 2.0</td><td>Danger for most</td><td>Dangerous for most people, including the general public.</td></tr>
+<tr><td>&gt; 2.0</td><td>Danger for all</td><td>Dangerous for everyone, including the emergency services.</td></tr>
+</table></div>
+<p>The <b>debris factor</b> DF is chosen in the Symbology pane when a hazard variable is shown, or in the 2D Flood Analysis: <i>Conservative</i> (0.5 up to 0.25 m depth, 1.0 above; the default), <i>Pasture / arable</i> (0 up to 0.25 m, 0.5 above) or <i>None</i>. Only cells deeper than the Flood Depth Threshold are rated.</p>
+<h2>Flow direction arrows</h2>
+<p>Tick <i>Flow direction arrows</i> in the Symbology pane (or right-click the 2D Meshes layer ▸ Flow Direction Arrows). Arrows point in the flow direction and grow with the speed. They are drawn on cells at least 12 pixels wide, so zoom in to see them. Outside play mode they show the direction at the maximum velocity; in play mode, the current flow.</p>
+<figure><img src="images/mesh_hazard.png" alt="Maximum hazard rating with flow arrows"><figcaption>Maximum hazard rating in the four Defra classes, with flow direction arrows.</figcaption></figure>
+<h2>Cell values and the 2D cell graph</h2>
+<p>Hover over a cell to read its values. Click a cell: Properties lists all its statistics (ground level, max. depth, velocity, hazard, arrival time…). Click <span class="ui">2D Cell Graph</span> there for three linked graphs over time – depth (with the flood threshold), velocity and hazard rating (with the 0.75 / 1.25 / 2.0 class lines). Drag to zoom, double-click to reset.</p>
+<figure class="narrow"><img src="images/cell_graph.png" alt="2D cell graph"></figure>
+<h2>Attribute table and exports</h2>
+<p>Right-click the 2D Meshes layer for:</p>
+<ul>
+<li><span class="ui">Attribute Table</span>: one row per cell with every result column; sort, filter and export it.</li>
+<li><span class="ui">Export as Shapefile…</span>: the cells as polygons with all results.</li>
+<li><span class="ui">Export Flood Extent (Shapefile)…</span> and <span class="ui">Export Hazard Classes (Shapefile)…</span>: merged polygons; see <a href="#flood-exports">Flood exports</a>.</li>
+<li><span class="ui">Export Max. Depth (GeoTIFF)…</span> and <span class="ui">Export Raster of a Field…</span>.</li>
+<li><span class="ui">2D Flood Analysis…</span> and <span class="ui">2D Cross Section</span>.</li>
+</ul>
+</section>
+
+<section class="topic" id="flood-analysis" data-ch="2D flood modelling" data-title="2D Flood Analysis">
+<h1>2D Flood Analysis</h1>
+<p class="lead"><span class="ui">Simulation ▸ Analysis ▸ 2D Flood Analysis</span> (1D-2D edition) summarises the flooding of the loaded 1D-2D run: how much area floods, how deep and how dangerous, where, and how it changes between two runs.</p>
+<figure><img src="images/flood_analysis.png" alt="2D Flood Analysis view"></figure>
+<h2>Key figures</h2>
+<p><b>Flooded at depth ≥</b> sets the depth from which a cell counts as flooded (default: the Flood Depth Threshold). The cards then show the flooded area (and the share of the mesh), flooded cells, max. depth, max. velocity, max. hazard rating with its class, the area with HR ≥ 0.75 and the earliest arrival time. <b>Debris factor</b> changes the hazard rating everywhere.</p>
+<h2>Area by class</h2>
+<p><b>Area by max. depth</b> uses the ranges of the 2D Meshes layer (change them in Symbology), and <b>Area by max. hazard rating</b> uses the four Defra classes. Each row gives the area and the share of the flooded area.</p>
+<h2>Statistics by zone or point</h2>
+<p>Use your own areas or assets to report the flooding: districts, land parcels, catchments, buildings, schools, roads.</p>
+<ol class="steps">
+<li>Load a polygon or point layer with <span class="ui">Add Layer…</span> (here or in the Layer View), or draw one (Layer View ▸ right-click ▸ New Layer). It must be in the coordinate system of the model and cover the 2D mesh.</li>
+<li>Choose it in <b>Layer</b>, and in <b>Name field</b> the attribute that names each feature.</li>
+<li>For polygons you get one row per polygon from the cells whose centre lies inside it: area, flooded area and %, max. and mean depth, max. velocity, max. hazard rating, earliest arrival and time ponded. For points you get the values of the cell under each point. The header counts the flooded and dangerous zones.</li>
+<li>Double-click a row to zoom to it. <span class="ui">Export ▸ Zone statistics (CSV)</span> writes the table.</li>
+</ol>
+<p>The table refreshes by itself when a layer is added or removed.</p>
+<h2>Compare two 1D-2D runs</h2>
+<ol class="steps">
+<li>Click <span class="ui">Compare…</span> and choose another 1D-2D run of the same mesh (or a <code>.fout</code> file). Cells are matched by ID.</li>
+<li>The <a href="#comparison">Scenario Comparison</a> opens with the other run as <b>Base</b>, this run as <b>Compare</b> and <b>2D Cells</b> as the object type. The 2D key figures are highlighted at the top: flooded area and cells, max. depth and velocity, area HR ≥ 0.75 and ≥ 2, earliest arrival – each with the change and the change in %.</li>
+<li>The table lists the cells that changed (<i>Worse</i>, <i>Better</i>, <i>New</i> = newly flooded, <i>Resolved</i> = no longer flooded). Choose another variable (max. velocity, hazard, depth × velocity, arrival, time ponded) in the variable list.</li>
+<li><span class="ui">Difference on Map</span> colours the mesh by the depth difference (variable <i>Max. Depth Difference</i>, green = shallower, red = deeper).</li>
+</ol>
+<figure class="narrow"><img src="images/flood_compare_dlg.png" alt="Compare 2D Results"></figure>
+<figure><img src="images/comparison_2d.png" alt="Scenario Comparison of two 1D-2D runs"><figcaption>Comparing a 1.5 × rainfall run (Base) with the design run (Compare): flooded area 988 → 791 ha.</figcaption></figure>
+<h2>2D cross section</h2>
+<p>Click <span class="ui">Cross Section</span> (or right-click the 2D Meshes layer ▸ 2D Cross Section), then click the vertices of a line on the map; double-click or press <kbd>Enter</kbd> to finish, <kbd>Esc</kbd> to cancel. The graph shows the ground and the max. water surface along the line (and of the compared run, if any); in play mode also the current water surface. Gaps are outside the mesh.</p>
+<figure><img src="images/cross_section_2d.png" alt="2D cross section"></figure>
+<h2 id="flood-exports">Flood exports</h2>
+<div class="tablewrap"><table>
+<tr><th>Export</th><th>Where</th><th>Result</th></tr>
+<tr><td>Flood extent</td><td><span class="ui">Export ▸ Flood extent (shapefile)</span>, or the 2D Meshes layer menu</td><td>Polygon shapefile: the flooded cells merged into polygons, with their area. Uses <i>Flooded at depth ≥</i>.</td></tr>
+<tr><td>Depth classes / Hazard classes</td><td><span class="ui">Export ▸ Depth classes</span> / <span class="ui">Hazard classes (shapefile)</span></td><td>One polygon feature per class, with class name and area.</td></tr>
+<tr><td>Max. depth grid</td><td>2D Meshes layer ▸ <span class="ui">Export Max. Depth (GeoTIFF)…</span></td><td>GeoTIFF, 32-bit float, no data = −9999, with <code>.tfw</code>, <code>.prj</code> and <code>.aux.xml</code> (coordinate system).</td></tr>
+<tr><td>Grid of any variable</td><td>2D Meshes layer ▸ <span class="ui">Export Raster of a Field…</span> (GeoTIFF), or <span class="ui">Export ▸ Raster grid of a field</span> (ESRI ASCII grid, <code>.asc</code>)</td><td>The variable shown on the 2D Meshes layer.</td></tr>
+<tr><td>Cell results</td><td><span class="ui">Export ▸ Cell results (CSV)</span></td><td>One row per cell with all statistics.</td></tr>
+</table></div>
+<p>Grids use the smallest cell size of the mesh as the pixel size; larger cells fill several pixels. All exports carry the model's coordinate system, so they line up in ArcGIS, QGIS or AutoCAD Map.</p>
 </section>

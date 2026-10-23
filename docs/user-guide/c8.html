@@ -1,7 +1,7 @@
 
 <section class="topic" id="play" data-ch="Results and analysis" data-title="Play results">
 <h1>Play results</h1>
-<p><span class="ui">Simulation ▸ Results ▸ Play</span> opens the playback bar below the map. The map then shows the results at the current time step, using the themes marked ▶ (time-varying).</p>
+<p>Results open on the map as soon as they are loaded. <span class="ui">Simulation ▸ Results ▸ Play</span> enters <b>play mode</b> and opens the playback bar below the map. The map then shows the results at the current time step, using the themes marked ▶ (time-varying).</p>
 <figure><img src="images/playbar.png" alt="Playback bar"></figure>
 <ul>
 <li><b>▶ / ❚❚</b> plays or pauses; <b>◀ / ▶</b> step back or forward by one reporting step. Drag the slider to jump to any time.</li>
@@ -105,7 +105,7 @@ Where: type = 'CONDUIT'</code></pre></li>
 
 <section class="topic" id="report" data-ch="Results and analysis" data-title="Report viewer">
 <h1>Report viewer</h1>
-<p><span class="ui">Simulation ▸ Results ▸ Report</span> opens the engine status report (<code>.rpt</code>) as a document with navigation, instead of plain text.</p>
+<p><span class="ui">Simulation ▸ Analysis ▸ Report</span> opens the engine status report (<code>.rpt</code>) as a document with navigation, instead of plain text.</p>
 <figure><img src="images/report_overview.png" alt="Report overview"></figure>
 <div class="tablewrap"><table>
 <tr><th>Page</th><th>Contents</th></tr>
@@ -140,6 +140,7 @@ Where: type = 'CONDUIT'</code></pre></li>
 <section class="topic" id="plot" data-ch="Results and analysis" data-title="Time series plots">
 <h1>Time series plots</h1>
 <p>Select one or more objects and click <span class="ui">Simulation ▸ Results ▸ Plot</span>. Choose the object type, the variable and the time axis (elapsed hours or date and time). You can tick <i>Overlay comparison run</i> to draw a second run as dashed lines.</p>
+<p>When more than one run is loaded, the graph window has a <b>Scenarios</b> list: tick the runs to draw. While the <a href="#comparison">Scenario Comparison</a> is open, the list holds only its Base and Compare runs and follows them when you change them.</p>
 <figure class="narrow"><img src="images/plot_dialog.png" alt="Time Series Plot dialog"></figure>
 <figure><img src="images/plot.png" alt="Time series plot"><figcaption>Depth at a junction. The vertical line marks the current time of the playback.</figcaption></figure>
 <p>Hover over the graph to read values. Drag to zoom in, and double-click to reset the zoom. <span class="ui">Export CSV</span> and <span class="ui">Save PNG</span> export the graph. The rainfall of a rain gage is drawn as an inverted bar chart; you can change this in Default Settings.</p>
@@ -147,13 +148,70 @@ Where: type = 'CONDUIT'</code></pre></li>
 
 <section class="topic" id="comparison" data-ch="Results and analysis" data-title="Scenario comparison">
 <h1>Scenario comparison</h1>
-<p><span class="ui">Simulation ▸ Results ▸ Comparison</span> compares two runs: two scenarios, or two runs of the same model. Load the second run from the <a href="#database">Database</a> (<i>Add to Comparison</i>), or use <span class="ui">Run Selected &amp; Compare</span> in the Scenarios panel.</p>
-<figure><img src="images/comparison.png" alt="Scenario Comparison"><figcaption>Comparing the base model with a scenario in which all pipes are 30 % larger.</figcaption></figure>
+<p class="lead"><span class="ui">Simulation ▸ Analysis ▸ Comparison</span> compares two runs of the model – for example the existing system and an upgrade, two design storms, or a whole-model run and a coupled parallel run. See <a href="#scenarios">Scenarios: runs of a model</a> for how to create the runs.</p>
+<figure><img src="images/comparison.png" alt="Scenario Comparison"><figcaption>Base 2yr against the coupled parallel run of the same model: the KPI cards include the run time.</figcaption></figure>
+<h2>Choose the two runs</h2>
 <ul>
-<li><b>Base</b> and <b>Compare</b> choose the two runs; <b>⇄</b> swaps them.</li>
-<li><b>KPI cards</b> compare the system totals: flood volume, flooded and surcharged nodes, surcharged conduits, outfall volume, surface runoff and continuity error.</li>
-<li>The <b>difference table</b> compares one variable (max HGL, max depth, freeboard, flood volume, hours flooded, max flow, capacity…) object by object, within a tolerance. Each object is marked <i>Worse</i>, <i>Better</i>, <i>New</i> (for example, newly flooding), <i>Resolved</i> or <i>No change</i>. Tick <i>Changed only</i> to hide the unchanged objects.</li>
-<li>The <b>scatter plot</b> draws base against compare. Points above the 1:1 line are higher in the compare run. Click a point to select the object.</li>
-<li><span class="ui">Difference on Map</span> colours the map by the change, and <span class="ui">Graph Selected</span> plots both runs for the selected objects.</li>
+<li><b>Base</b> lists every run of the model (from the <a href="#database">Database</a>), each marked <i>1D</i> or <i>1D-2D</i>; the run loaded on the map is marked <i>current</i>. The current run is the default Base.</li>
+<li><b>Compare</b> lists only runs of the <b>same kind</b> as the Base: a 1D run is compared with 1D runs, a 1D-2D run with 1D-2D runs. If you change the Base to another kind, Compare switches to a run of that kind; if there is none, the view says so.</li>
+<li>Runs are loaded when you choose them. <b>⇄</b> swaps Base and Compare.</li>
+<li>While the comparison is open, the <a href="#plot">graph windows</a> show exactly these two runs; change Base or Compare and the graphs follow. When you close the comparison, the graphs return to their own list of runs.</li>
 </ul>
+<h2>What it shows</h2>
+<ul>
+<li><b>KPI cards</b> compare the system totals: flood volume, flooded and surcharged nodes, surcharged conduits, outfall volume, surface runoff, continuity error and run time. Each card shows Base → Compare and the change; ▲ / ▼ in red or green shows whether it got worse or better.</li>
+<li>For 1D-2D runs a highlighted <b>2D flood</b> block comes first: flooded area and cells, max. depth and velocity, area with HR ≥ 0.75 and ≥ 2, and the earliest arrival. <span class="ui">Compare the 2D cells</span> switches the table to the cells.</li>
+<li>The <b>difference table</b> compares one variable object by object. Choose the object type (nodes, links, subcatchments, 2D cells) and the variable (max. HGL, max. depth, freeboard, flood volume, hours flooded, max. flow, capacity…; for cells max. depth, velocity, hazard, depth × velocity, arrival, time ponded). Differences smaller than the <b>Tolerance</b> count as no change. Each object is marked <i>Worse</i>, <i>Better</i>, <i>New</i> (for example newly flooding), <i>Resolved</i> or <i>No change</i>; click the chips above the table to filter, and tick <i>Changed only</i> to hide unchanged objects. Click a column header to sort.</li>
+<li>The <b>scatter plot</b> draws Base (x) against Compare (y). Points above the 1:1 line are higher in the Compare run. Click a point to select the object.</li>
+<li><span class="ui">Difference on Map</span> colours the map (or the 2D mesh) by the change, <span class="ui">Clear Map</span> removes it, <span class="ui">Graph Selected</span> plots both runs for the selected objects, and <span class="ui">Export CSV</span> writes the table.</li>
+</ul>
+<p>The view scrolls as a whole; scroll down for the full table and scatter plot.</p>
+<figure><img src="images/plot_compare.png" alt="Graph window showing the two compared runs"><figcaption>With the comparison open, the graph of junction J_3 shows the Base and the Compare run.</figcaption></figure>
+</section>
+
+<section class="topic" id="cso" data-ch="Results and analysis" data-title="CSO statistics">
+<h1>CSO statistics</h1>
+<p class="lead"><span class="ui">Simulation ▸ Analysis ▸ CSO Statistics</span> counts and measures the spills of combined sewer overflows in the loaded run: how often each overflow spills, for how long and how much. It works with any run, and is most useful with long (for example annual) simulations.</p>
+<figure><img src="images/cso.png" alt="CSO Statistics view"></figure>
+<h2>Settings</h2>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Meaning</th></tr>
+<tr><td>Outfalls / Weirs / Orifices / Outlets</td><td>Which objects are overflow points. Outfalls use their total inflow; weirs, orifices and outlets their flow. Default: outfalls and weirs.</td></tr>
+<tr><td>Selected only</td><td>Only the objects selected on the map.</td></tr>
+<tr><td>name / tag contains</td><td>Only objects whose name, tag or description contains this text, for example <code>CSO</code>.</td></tr>
+<tr><td>Spill above</td><td>A flow above this value (in the model's flow units) counts as spilling.</td></tr>
+<tr><td>Separation</td><td>Spills less than this time apart (default 12 h) belong to the same event.</td></tr>
+</table></div>
+<p>Click <span class="ui">Compute</span> after changing the settings.</p>
+<h2>Results</h2>
+<ul>
+<li><b>Cards</b>: overflow points, points spilling, spill events, spills counted by the 12/24 h method, total spill volume, simulated period.</li>
+<li><b>Overflow points</b> table, largest volume first: events, 12/24 h count, volume, hours spilling, longest event, peak flow and first spill. Click a row to see its events; double-click to zoom to it.</li>
+<li><b>Events</b> table of the selected point: start, end, duration, hours actually spilling, volume, peak flow and its time.</li>
+</ul>
+<p><b>12/24 h counting</b> (UK Environment Agency): the first spill opens a 12-hour block that counts as one spill; after that, every 24-hour block with a spill counts once more. <span class="ui">Show on Map</span> draws a circle at each overflow: size = volume, number = events. <span class="ui">Export Summary</span> and <span class="ui">Export Events</span> write the tables as CSV.</p>
+<div class="callout tip"><b class="t">Tip:</b><p>The accuracy depends on the reporting time step: use 5–15 minutes for CSO studies. For annual summaries of a multi-year run, export the events and pivot them by year in a spreadsheet.</p></div>
+</section>
+
+<section class="topic" id="print-layout" data-ch="Results and analysis" data-title="Print layout">
+<h1>Print layout</h1>
+<p class="lead"><span class="ui">Project ▸ Print ▸ Print Layout</span> puts the map on a page with a title block, legend, scale bar, north arrow and your logo, ready to save as PDF or PNG or to print. The page shows what the map shows: basemap, network, themes, 2D results and GIS layers.</p>
+<figure><img src="images/print_layout.png" alt="Print Layout"></figure>
+<h2>Steps</h2>
+<ol class="steps">
+<li>Set up the map first: the extent, the themes and symbology, and which layers are visible.</li>
+<li>Open <span class="ui">Print Layout</span>. Choose the page size, orientation and template, and fill in the title block.</li>
+<li>If you change the map afterwards, click <span class="ui">Refresh from Map</span>; <span class="ui">Go to Map</span> switches back to the map.</li>
+<li>Click <span class="ui">Save PDF…</span>, <span class="ui">Save PNG…</span> or <span class="ui">Print…</span>.</li>
+</ol>
+<h2>Settings</h2>
+<div class="tablewrap"><table>
+<tr><th>Group</th><th>Settings</th></tr>
+<tr><td>Page</td><td>Size A4 to A0, Letter, Legal, Tabloid, ANSI C and D; landscape or portrait; template <i>Title block at the bottom</i> or <i>Side panel on the right</i>; resolution (dpi) of the map.</td></tr>
+<tr><td>Map</td><td><i>Current map view</i>, or a fixed scale 1 : N (when the map units are metres or feet). The map scale and the size of the map frame are shown.</td></tr>
+<tr><td>Elements</td><td>Legend (and its position), scale bar, north arrow, page border.</td></tr>
+<tr><td>Title block</td><td>Title, subtitle, project, organisation, drawn by, date, sheet and notes.</td></tr>
+<tr><td>Logo</td><td><span class="ui">Choose…</span> an image file (PNG, JPG); <span class="ui">Remove</span> takes it off.</td></tr>
+</table></div>
+<p>The map is drawn at the <b>Resolution</b> set under Page (PDF at least 150 dpi); use 300 dpi for large-format prints. Graph windows have their own <span class="ui">Save PNG</span> and <span class="ui">Export CSV</span> buttons; profiles can be exported as CSV.</p>
 </section>

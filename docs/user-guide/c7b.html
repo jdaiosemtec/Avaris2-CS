@@ -1,0 +1,103 @@
+<section class="topic" id="partition" data-ch="High Performance Simulation" data-title="Model partition">
+<h1>Model partition</h1>
+<p class="lead">Large models take long to run because one processor core does most of the work. <span class="ui">Tools ▸ Partition ▸ Partition Model</span> splits the model into sub-models along the flow, so that the <a href="#coupled-run">coupled parallel simulation</a> can run them at the same time on several cores. You enter only the number of partitions; the cut points are found automatically. Model partition is part of the <b>HPS</b> (High Performance Simulation) edition.</p>
+<figure><img src="images/part_map.png" alt="Model partitioned into four sub-models"><figcaption>Riverside split into four partitions. ⊗ marks the five cut points; the legend explains the markings.</figcaption></figure>
+<h2>How the model is split</h2>
+<ul>
+<li><b>One direction of flow per partition.</b> The flow directions come from the <b>base results</b> (the results loaded when you partition). Every partition drains towards its own outfalls or towards one downstream partition; water never flows back and forth across a cut.</li>
+<li><b>Only conduits are cut, and only where it is safe.</b> Pumps, orifices, weirs, outlets and the links of flow dividers are never cut. Pipes with <b>oscillating flow</b> (flow that changes direction during the run) are not cut, and <b>ponding areas</b> – manholes that flood onto the same surface – stay in one partition.</li>
+<li><b>Balanced and few cuts.</b> The partitions get about the same size (within the size tolerance) with as few cut points as possible, because every cut point is exchanged in every iteration of the run.</li>
+</ul>
+<p>At a cut point the pipe stays in the upstream partition. In the upstream sub-model its downstream end becomes a boundary outfall; in the downstream sub-model the node receives the pipe's flow. During the coupled run the two sub-models exchange flow and water level at every iteration, so they behave like one model.</p>
+<h2>Before you start</h2>
+<ul>
+<li>Save the model. The sub-models are written next to it.</li>
+<li>Run the model once (the whole model) and keep these results loaded. Without results the pipe directions as drawn are used and oscillating flow is not checked.</li>
+<li>Choose the number of partitions: at most the number of <b>processor cores</b> of the computer that will run the model (the panel shows it), and enough work per partition – roughly at least 100 nodes each. More partitions than cores makes the run slower, not faster.</li>
+</ul>
+<h2>Partition the model</h2>
+<ol class="steps">
+<li>Click <span class="ui">Tools ▸ Partition ▸ Partition Model</span>. The Model Partition panel opens over the map with two tabs, <b>Partition</b> and <b>Regenerate</b>.</li>
+<li>In <b>1 Settings</b>, type the <b>Number of partitions</b>. <b>Base results</b> shows which results are used.</li>
+<li>Click <span class="ui">Partition</span>. After a moment the map shows the partitions in colour and the <b>2 Result</b> section shows the counts and one row per partition.</li>
+<li>Check <b>4 Checks</b>. ✓ = fine, ⚠ = warning (for example a ponding area larger than one partition, or more partitions than cores), ✗ = error that must be fixed before generating.</li>
+<li>Optionally adjust the boundaries (<b>3 Adjust</b>, below).</li>
+<li>In <b>5 Generate sub-models</b>, choose the folder and click <span class="ui">Generate N Sub-models</span>.</li>
+</ol>
+<figure class="narrow"><img src="images/part_panel.png" alt="Model Partition panel"><figcaption>The result: 4 partitions, 5 cut points, 101–215 nodes per partition, 94 pipes with oscillating flow kept whole, 260 ponding areas.</figcaption></figure>
+<h2>Reading the result</h2>
+<div class="tablewrap"><table>
+<tr><th>Item</th><th>Meaning</th></tr>
+<tr><td>partitions / cut points</td><td>Number of sub-models and of cut pipes.</td></tr>
+<tr><td>nodes per partition</td><td>Smallest and largest partition. Similar sizes give the best speed.</td></tr>
+<tr><td>oscillating pipes</td><td>Pipes with oscillating flow in the base results; not cut (purple dashed on the map).</td></tr>
+<tr><td>never cut</td><td>Pumps, orifices, weirs, outlets and divider links.</td></tr>
+<tr><td>ponding areas</td><td>Groups of flooded manholes kept together (blue dashed circles).</td></tr>
+<tr><td>Table</td><td>Per partition: nodes, links, subcatchments, couplings from upstream (In) and to downstream (Out), and outfalls (<i>→ coupled</i> = it drains into another partition). Click a row to highlight it, double-click to zoom.</td></tr>
+</table></div>
+<h2>Map markings and legend</h2>
+<p>While the panel is open the map shows the partition colours, the cut points (red ⊗), pipes that are not cut (purple dashed) and ponding areas (blue dashed circles), with a legend at the bottom right. These markings are shown whatever the layer visibility. The <b>eye button</b> at the top left of the map (or <kbd>T</kbd>) hides and shows them together.</p>
+<h2>Advanced settings</h2>
+<figure class="narrow"><img src="images/part_advanced.png" alt="Advanced settings of the partition"></figure>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Meaning (defaults in brackets)</th></tr>
+<tr><td>Flow counts</td><td>Flow counts only above this share of the pipe's own peak flow (2 %), and the pipe must carry flow for at least this long (60 min); smaller flows are treated as no flow.</td></tr>
+<tr><td>Oscillating flow</td><td>A pipe that flows backwards for at least this share of the time with flow (5 %) has oscillating flow and is not cut.</td></tr>
+<tr><td>Flows backwards</td><td>A pipe that flows backwards at least this share of the time (95 %) simply flows the other way (it is probably drawn reversed); it may be cut and is written turned round.</td></tr>
+<tr><td>Keep ponding areas whole</td><td>Manholes of one ponding area stay in the same partition.</td></tr>
+<tr><td>2D ponding depth</td><td>With 1D-2D base results: cells at least this deep form ponding areas (0 = the Flood Depth Threshold, else 0.3 m / 1 ft).</td></tr>
+<tr><td>1D ponding</td><td>Without 2D results: manholes flooded for at least this long that are closer than the given distance form one ponding area (0 = 50 m).</td></tr>
+<tr><td>Size tolerance</td><td>How far a partition may differ from the average size (± 25 %). A larger tolerance allows fewer cuts.</td></tr>
+</table></div>
+<p>The reverse-flow rule is the same rule as the flag <i>Reverse flow event</i> (<a href="#flags">Flags</a>), with its own values here. Click <span class="ui">Partition Again</span> after changing them.</p>
+<h2>Adjust the boundaries</h2>
+<p>The number of partitions never changes here; only the boundary between two neighbouring partitions moves.</p>
+<ul>
+<li><span class="ui">Move Cut…</span>: click a cut point ⊗; the conduits nearby where the cut may go blink; click one. Only the two partitions next to it change.</li>
+<li><span class="ui">Add Cut…</span>: click a conduit; its upstream branch joins the neighbouring partition. It is refused, with the reason, if it would create a new partition or cut a pump, weir or similar; you are warned for oscillating flow and ponding areas.</li>
+</ul>
+<p>Press <kbd>Esc</kbd> or click <span class="ui">Finish</span> when done. The checks update after each change.</p>
+<h2>Generate the sub-models</h2>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Meaning</th></tr>
+<tr><td>Folder</td><td>Where the sub-models are written (default: a <i>Partition</i> folder next to the model). Click <span class="ui">…</span> to choose or create a folder; it is remembered for this model.</td></tr>
+<tr><td>File names</td><td>Name pattern of the sub-models, for example <code>Riverside_P01.inp</code>.</td></tr>
+<tr><td>Standalone boundaries</td><td>Writes the base-run flows and water levels at the cut points into each sub-model, so every sub-model can also be run on its own (useful for checking).</td></tr>
+<tr><td>Partition areas</td><td>Calculates the surface area of each partition from the DEM (D8 flow directions) and writes it as the sub-model's 2D boundary.</td></tr>
+</table></div>
+<figure class="narrow"><img src="images/folder_dialog.png" alt="Folder dialog with New Folder"><figcaption>The folder dialog: <span class="ui">New Folder</span> creates a folder in the current location.</figcaption></figure>
+<p>Avaris2 CS writes the sub-models (<code>.inp</code> with <code>.prj</code>), and <code>&lt;model&gt;.partition.json</code> next to the model, which describes the partition. The Run dialog finds it there.</p>
+<h2>After the model changes: Regenerate</h2>
+<p>When you edit the master model after partitioning, the sub-models are out of date and the coupled run is blocked until they are updated. Open <span class="ui">Partition Model ▸ Regenerate</span>:</p>
+<ul>
+<li>the saved partition is applied to the changed model: existing nodes keep their partition, new nodes join the partition downstream of them (else upstream, else the nearest);</li>
+<li>the changes since the last generation are listed, with the sub-models that must be rewritten;</li>
+<li>only the changed sub-models are written again. Sub-models that were edited directly are detected, and you are asked before they are overwritten.</li>
+</ul>
+<p>If the network changed a lot (new trunk sewers, many new branches), partition again instead.</p>
+</section>
+
+<section class="topic" id="coupled-run" data-ch="High Performance Simulation" data-title="Coupled parallel simulation">
+<h1>Coupled parallel simulation</h1>
+<p class="lead">A coupled parallel run starts one engine process per sub-model. All sub-models take the same time step and exchange flow and water level at the cut points in every iteration, so the result is that of the whole model – computed on several processor cores at once. It works for 1D models and for 1D-2D models.</p>
+<h2>Run it</h2>
+<ol class="steps">
+<li>Partition the model and generate the sub-models (<a href="#partition">Model partition</a>).</li>
+<li>Click <span class="ui">Simulation ▸ Run</span>. In the <b>Run</b> section of the dialog choose <b>Coupled parallel</b>. It shows the number of sub-models and cut points, and a speed hint for this computer.</li>
+<li>Enter a name and click <span class="ui">Run</span>. The progress dialog shows the overall progress; <span class="ui">Stop</span> ends all sub-models.</li>
+</ol>
+<figure class="narrow"><img src="images/run_name.png" alt="Run dialog with the coupled parallel option"></figure>
+<p>The results of the sub-models are merged into one results file and one report of the <b>whole model</b>, under the run name. Everything works as after a normal run: map, themes, flags, profiles, graphs, report, CSO statistics, 2D analysis and comparison. In the <a href="#database">Database</a> the run type is <i>1D coupled</i> or <i>1D-2D coupled</i>, and the run summary shows the run time.</p>
+<h2>1D-2D models</h2>
+<p>When 2D flooding is enabled and the mesh exists, the coupled run is a 1D-2D run. The mesh is shared out over the sub-models when the run starts (cells inside a partition's area go to it, the others to the partition of their manholes or nearest neighbours), so you do not need to generate the sub-models again after rebuilding the mesh. 2D links that cross a partition boundary are exchanged in every iteration like cut pipes.</p>
+<h2>Speed</h2>
+<ul>
+<li>Use <b>at most one sub-model per processor core</b>. With more sub-models than cores the sub-models wait for each other and the run gets slower. The Run dialog and the partition checks warn about this.</li>
+<li>Each sub-model needs enough work: with very small sub-models the exchange costs more than it saves. Large models (tens of thousands of objects) gain the most.</li>
+<li>Close other heavy programs during the run.</li>
+</ul>
+<p>Example on a 2-core computer: Riverside (593 nodes) – whole model 12.9 s, 2 sub-models 8.6 s. Riverside 1D-2D (1,578 cells) – whole model 133 s, 2 sub-models 95 s. Gains grow with the model size and the number of cores.</p>
+<h2>Accuracy</h2>
+<p>The sub-models solve the same equations as the whole model and the convergence check is global, so the results match the whole model closely: on the Riverside example the largest difference in max. node depth was 1 cm (2D cells 3 mm), and the continuity error was the same. The remaining differences are of the size you also get from changing the routing step of the whole model slightly. To check a model of your own, run it once as a whole and once coupled, and compare the two runs in the <a href="#comparison">Scenario Comparison</a> – the KPI cards include the run time.</p>
+<div class="callout"><b class="t">Note:</b><p>If the master model was changed after partitioning, the Coupled parallel option is disabled and the dialog says why. Use <span class="ui">Regenerate</span> in the partition panel.</p></div>
+</section>

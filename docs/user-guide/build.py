@@ -1,7 +1,7 @@
 import re,os,shutil
 from PIL import Image
 B='build/'; shutil.rmtree(B,ignore_errors=True); os.makedirs(B+'images'); os.makedirs(B+'media')
-s=''.join(open(f).read() for f in ['shell_head.html','c1.html','c2.html','c3.html','c4.html','c5.html','c6.html','c7.html','c8.html','c9.html','shell_tail.html'])
+s=''.join(open(f).read() for f in ['shell_head.html','c1.html','c2.html','c3.html','c4.html','c5.html','c6.html','c7.html','c7b.html','c8.html','c9.html','shell_tail.html'])
 refs=sorted(set(re.findall(r'(?:src|poster)="((?:images|media)/[^"]+)"',s)))
 missing=[r for r in refs if not os.path.exists(r)]; print('refs',len(refs),'missing',missing)
 tot=0

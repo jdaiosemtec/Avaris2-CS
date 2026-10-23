@@ -24,9 +24,9 @@
 <figure><img src="images/ribbon_project.png" alt="Project tab"></figure>
 <ul>
 <li><b>File</b>: New, Open, Close.</li>
-<li><b>Scenario</b>: the <a href="#scenarios">Scenarios</a> panel.</li>
 <li><b>Import</b> and <b>Export</b>: open the <a href="#add-data">Catalog</a> and <a href="#export">Export</a> panes.</li>
-<li><b>User</b>: Switch User, Manage Users, Change History.</li>
+<li><b>Print</b>: <a href="#print-layout">Print Layout</a> – a printable map page with a title block, legend, scale bar and north arrow.</li>
+<li><b>User</b>: Switch User and Manage Users (see <a href="#signin">Sign in and user accounts</a>). The full change history of the model is opened from the Log window (<span class="ui">Operation ▸ Change Log</span>, see <a href="#history">Change log and history</a>).</li>
 <li><b>Settings</b>: Default Settings.</li>
 </ul>
 <h2>Operation tab</h2>
@@ -38,23 +38,26 @@
 <li><b>Edit</b>: Add, Remove, Edit Geometry, Split, Merge, Assign Outlet, Convert Type, Reverse.</li>
 <li><b>Display</b>: Theme.</li>
 <li><b>Flag</b>: the <a href="#flags">Flag</a> panel.</li>
-<li><b>Change Log</b>: Log Window, History.</li>
+<li><b>Change Log</b>: Log Window, History. The Log window's <span class="ui">Full Change History…</span> button opens the model change history.</li>
 </ul>
 <h2>Tools tab</h2>
 <figure><img src="images/ribbon_tools.png" alt="Tools tab"></figure>
 <ul>
 <li><b>Connectivity</b>: Upstream Trace, Downstream Trace, Path, Clear Trace.</li>
 <li><b>Network Geometry</b>: Batch Assign Outlet, Recalculate Subcatchment Area, Recalculate Conduit Length, Derive Elevations, Orifice to Conduit, Measure.</li>
-<li><b>Rainfall</b>: Design Storm.</li>
+<li><b>Model Data</b>: <a href="#infer">Infer &amp; Clean</a> (fill missing data, find data errors), <a href="#dwf">Dry Weather Flow</a> (generate foul flow and diurnal patterns) and <a href="#validate">Validate Model</a>.</li>
+<li><b>Partition</b>: <a href="#partition">Partition Model</a>, marked <i>HPS</i> – it belongs to the High Performance Simulation edition.</li>
+<li><b>Rainfall</b>: <a href="#design-storm">Design Storm</a>.</li>
 <li><b>Spatial Reference</b>: Reproject Raster, Convert Coordinates.</li>
-<li><b>Utilities</b>: Validate Model, Unit Converter.</li>
+<li><b>Utilities</b>: Unit Converter.</li>
 </ul>
 <h2>Simulation tab</h2>
 <figure><img src="images/ribbon_simulation.png" alt="Simulation tab"></figure>
 <ul>
 <li><b>Setup</b>: Options, Create Meshes. Create Meshes is marked <i>1D-2D</i> because it belongs to the 2D flood module.</li>
-<li><b>Run</b>.</li>
-<li><b>Results</b>: Play, Profile, Plot, Comparison, Report, Convergence.</li>
+<li><b>Run</b>: whole model, or <a href="#coupled-run">coupled parallel</a> when the model has been partitioned.</li>
+<li><b>Results</b>: <a href="#play">Play</a>, <a href="#profile">Profile</a>, <a href="#plot">Plot</a>.</li>
+<li><b>Analysis</b>: <a href="#flood-analysis">2D Flood Analysis</a> (1D-2D), <a href="#cso">CSO Statistics</a>, <a href="#comparison">Comparison</a>, <a href="#report">Report</a>, <a href="#run">Convergence</a>.</li>
 </ul>
 <h2>Help tab</h2>
 <figure><img src="images/ribbon_help.png" alt="Help tab"></figure>
@@ -111,7 +114,7 @@
 <li><b>Network layers</b>: colour, symbol size or line width, line style, transparency, and the flow direction symbol (style, size, fill). <span class="ui">Reset to Default</span> restores the original style. <span class="ui">Attribute Table</span> and <span class="ui">Theme…</span> open the table and the themes of the layer.</li>
 <li><b>Added GIS layers</b>: line and fill colours, fill and layer transparency, line width, point size, and whether the layer is drawn above or below the network. Rasters (GeoTIFF, grids) get a colour ramp.</li>
 <li><b>Basemap</b>: the source (OpenTopoMap or OpenStreetMap), transparency, and the model coordinate system (<span class="ui">Set…</span>).</li>
-<li><b>2D Meshes</b>: the variable, colour ramp, ranges and transparency; see <a href="#twod-results">2D results</a>.</li>
+<li><b>2D Meshes</b>: the variable, the rendering (mesh cells or heat map), colour ramp, ranges, transparency, cell outlines and flow arrows; see <a href="#twod-results">2D results</a>.</li>
 </ul>
 <p>The preview at the bottom shows the result. Styles are saved with your settings and used for every model.</p>
 </section>

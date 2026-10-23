@@ -32,23 +32,24 @@
 <ul>
 <li>Every run has a <b>name</b> that you choose when you start it. Running again under the same name replaces that run; a new name keeps the earlier results.</li>
 <li>Click a run to load its results onto the map, into the report and into graphs.</li>
-<li>Right-click a run for <span class="ui">Open Results</span>, <span class="ui">View Report</span>, <span class="ui">Add to Comparison (Scenario)</span>, <span class="ui">Rename…</span>, <span class="ui">Show in Explorer</span> and <span class="ui">Delete</span>. Right-click the base model to run a simulation, to close the results (<i>Base Model Only</i>) or to open another model.</li>
+<li>Right-click a run for <span class="ui">Open Results</span>, <span class="ui">View Report</span>, <span class="ui">Add to Comparison (Scenario)</span> (adds it to the graph windows as an extra run), <span class="ui">Rename…</span>, <span class="ui">Show in Explorer</span> and <span class="ui">Delete</span>. Right-click the base model to run a simulation, to close the results (<i>Base Model Only</i>) or to open another model.</li>
 </ul>
 </section>
 
-<section class="topic" id="scenarios" data-ch="Projects and data" data-title="Scenarios">
-<h1>Scenarios</h1>
-<p>A scenario is a variant of a model saved as its own <code>.inp</code> file, for example <i>Existing</i>, <i>Upgrade phase 1</i> or <i>Upgrade phase 2</i>. The <b>Scenarios</b> panel (<span class="ui">Project ▸ Scenario ▸ Scenarios</span>) keeps the scenarios of a project together.</p>
-<figure class="narrow"><img src="images/scenarios.png" alt="Scenarios panel"></figure>
-<div class="tablewrap"><table>
-<tr><th>Button</th><th>Action</th></tr>
-<tr><td>New from Current</td><td>Saves a copy of the open model as a new scenario and opens it.</td></tr>
-<tr><td>Open</td><td>Opens the selected scenario.</td></tr>
-<tr><td>Run Selected &amp; Compare</td><td>Runs every ticked scenario, several at the same time, then opens the <a href="#comparison">Scenario Comparison</a>.</td></tr>
-<tr><td>Compare</td><td>Compares the latest results of the ticked scenarios without running them again.</td></tr>
-<tr><td>Load Results</td><td>Loads the results of the selected scenario.</td></tr>
-<tr><td>Remove from List</td><td>Removes the scenario from the list. The files are not deleted.</td></tr>
-</table></div>
+<section class="topic" id="scenarios" data-ch="Projects and data" data-title="Scenarios: runs of a model">
+<h1>Scenarios: runs of a model</h1>
+<p class="lead">In Avaris2 CS a scenario is a <b>named run</b> of the model. Each run keeps its own results, so you can change the model, run it under a new name and compare the runs at any time.</p>
+<h2>Create scenarios</h2>
+<ol class="steps">
+<li>Run the existing system first, for example under the name <i>Existing 10yr</i> (<span class="ui">Simulation ▸ Run</span>, see <a href="#run">Run a simulation</a>).</li>
+<li>Change the model: larger pipes, a new storage tank, another design storm, different pump settings.</li>
+<li>Run again under a <b>new name</b>, for example <i>Upgrade phase 1</i>. A new name keeps the earlier results; using an existing name replaces that run.</li>
+<li>Repeat for every option. All runs are listed in the <a href="#database">Database</a> pane with their date, run type (1D, 1D-2D, coupled) and run time.</li>
+</ol>
+<h2>Compare scenarios</h2>
+<p>Open <span class="ui">Simulation ▸ Analysis ▸ Comparison</span> and choose the two runs in <b>Base</b> and <b>Compare</b>; see <a href="#comparison">Scenario comparison</a>. While the comparison is open, graph windows show exactly these two runs.</p>
+<div class="callout tip"><b class="t">Tip:</b><p>Write a short description for each run in the Run dialog (for example <i>pipes 30 % larger in Main Street</i>). It is shown in the Database pane and helps you remember what changed.</p></div>
+<div class="callout"><b class="t">Note:</b><p>To keep a variant of the model itself (not only its results), save a copy with <span class="ui">Save As</span> before you change it. Versions before 2.6.8 had a separate Scenarios panel on the Project tab; it was replaced by named runs and the Comparison view.</p></div>
 </section>
 
 <section class="topic" id="add-data" data-ch="Projects and data" data-title="Add GIS data (Catalog)">

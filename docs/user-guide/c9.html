@@ -70,7 +70,7 @@ ds_type = 'OUTFALL'</code></pre>
 <tr><td><kbd>Esc</kbd></td><td>Cancel the current tool, clear the selection</td></tr>
 <tr><td><kbd>F5</kbd></td><td>Run simulation</td></tr>
 <tr><td><kbd>Home</kbd></td><td>Zoom to the whole model</td></tr>
-<tr><td><kbd>T</kbd></td><td>Hide or show theme colouring</td></tr>
+<tr><td><kbd>T</kbd></td><td>Hide or show theme colouring (in the partition view: the partition markings)</td></tr>
 <tr><td>Mouse wheel</td><td>Zoom</td></tr>
 <tr><td><kbd>Space</kbd>+drag, or middle mouse button</td><td>Pan</td></tr>
 <tr><td><kbd>Ctrl</kbd>+click</td><td>Add to or remove from the selection</td></tr>
@@ -84,6 +84,7 @@ ds_type = 'OUTFALL'</code></pre>
 <h1>The Avaris engine</h1>
 <p>Avaris2 CS runs simulations with the Avaris hydraulic engine: a dynamic-wave, kinematic-wave and steady-flow solver for urban drainage networks, with rainfall-runoff, infiltration, groundwater, snowmelt, RDII, LID and water quality. Compared with standard solvers for the <code>.inp</code> format, it adds:</p>
 <ul>
+<li><b>Coupled parallel simulation</b> of a partitioned model (HPS edition): one engine process per sub-model, exchanging flow and water level at the cut points in every iteration; see <a href="#coupled-run">Coupled parallel simulation</a>.</li>
 <li><b>User-set under-relaxation</b> of the dynamic-wave iterations (<code>UNDER_RELAXATION</code>, 0.1–1.0; the standard value is 0.5).</li>
 <li><b>Parallel node-depth solution</b> with OpenMP, with per-node convergence flags. The results do not depend on the number of threads.</li>
 <li><b>Extended non-convergence report</b>: up to 500 nodes in "Most Frequent Nonconverging Nodes" (<code>NONCONV_REPORT_COUNT</code>). Outfalls are excluded from the statistics.</li>
@@ -152,6 +153,10 @@ ds_type = 'OUTFALL'</code></pre>
 <h1>Version history</h1>
 <div class="tablewrap"><table>
 <tr><th>Version</th><th>Highlights</th></tr>
+<tr><td>2.6</td><td>High Performance Simulation edition. 2D results: velocity, Defra hazard rating, depth × velocity, arrival time, flow arrows, heat-map rendering, 2D cell graph, 2D Flood Analysis (areas by class, statistics by zone, comparison of 1D-2D runs, cross section), flood extent shapefiles and GeoTIFF grids. Coupled parallel 1D-2D runs. Analysis group on the Simulation tab. Scenario Comparison lists every run of the model and drives the graphs. Scenarios panel replaced by named runs.</td></tr>
+<tr><td>2.5</td><td>Print Layout, Dry Weather Flow generator, Infer &amp; Clean, CSO Statistics.</td></tr>
+<tr><td>2.4</td><td>Coupled parallel simulation of a partitioned model, results merged into one run.</td></tr>
+<tr><td>2.3</td><td>Model partition with automatic cut points, adjustment and regeneration.</td></tr>
 <tr><td>2.2</td><td>Licences per computer (1D / 1D-2D; 30 days, 1 year or several years): request with your osemtec.com account by e-mail (Gmail, Outlook.com, Microsoft 365 or e-mail program), offline activation; read-only mode without a licence. Reverse flow flag based on the time with flow. Built-in flags can be edited (conditions, parameters) and reset.</td></tr>
 <tr><td>2.1</td><td>Renamed Avaris2 CS. Basemap tile cache and <i>Download for Offline Use</i>. Third-party notices in Help ▸ About. Attribute tables for imported GIS layers. Reverse-flow flag based on the share of the simulation time. The Flag panel keeps its scroll position. The change-log filter is cleared when another object is selected.</td></tr>
 <tr><td>2.0.14</td><td>Flag panel: 12 built-in rules plus custom flags, editable thresholds, units that follow the model, ▶ / Σ display, colours with <i>No fill</i>.</td></tr>
@@ -160,5 +165,5 @@ ds_type = 'OUTFALL'</code></pre>
 <tr><td>2.0.11</td><td>Time functions in expressions. Report viewer with an Insights page. Eye button and Locator.</td></tr>
 <tr><td>2.0</td><td>Ribbon interface, Layer Theme Editor, 2D flood module, scenario comparison, users and change history, Avaris engine settings.</td></tr>
 </table></div>
-<p class="updated">This guide describes Avaris2 CS 2.2. © 2026 OSEMTEC.</p>
+<p class="updated">This guide describes Avaris2 CS 2.6. © 2026 OSEMTEC.</p>
 </section>

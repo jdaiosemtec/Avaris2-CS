@@ -40,9 +40,97 @@
 <p>Click points on the map to measure a distance in map units. Double-click to finish.</p>
 </section>
 
+<section class="topic" id="infer" data-ch="Tools" data-title="Infer &amp; Clean: missing data and data errors">
+<h1>Infer &amp; Clean: missing data and data errors</h1>
+<p class="lead">Models built from GIS or asset records often have gaps: pipes without a diameter, manholes without an invert, zero lengths. <span class="ui">Tools ▸ Model Data ▸ Infer &amp; Clean</span> finds the missing values, proposes a value for each one from its neighbours, and lists data errors. Nothing is changed until you click <span class="ui">Apply Ticked</span>, and the whole change is one undo step.</p>
+<figure><img src="images/infer.png" alt="Infer &amp; Clean view"><figcaption>Infer &amp; Clean after <i>Analyse</i>: 55 values can be inferred (left), one data error was found (right).</figcaption></figure>
+<h2>Settings</h2>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Meaning</th></tr>
+<tr><td>0 is missing / and ≤</td><td>Which values count as missing. With <i>0 is missing</i> ticked, a zero counts as missing. Values at or below the second number (for example <code>-999</code>, a common “no data” code) also count as missing. An empty field is always missing.</td></tr>
+<tr><td>Min. slope (%)</td><td>Used when an invert is known on one side only: the invert is extended from the known end at this slope.</td></tr>
+<tr><td>Default n</td><td>Manning's n used when no connected conduit has a roughness.</td></tr>
+<tr><td>Tolerance</td><td>Tolerance of the checks, in model length units (for example how far a downstream invert may be above the upstream one before it is reported as an adverse slope).</td></tr>
+<tr><td>DEM (optional)</td><td>A ground model (GeoTIFF or ASCII grid). With a DEM, node inverts are inferred as <i>ground − manhole depth</i>, which is much more accurate than interpolation, and missing manhole depths can be filled in. Click <span class="ui">…</span> to choose the file.</td></tr>
+<tr><td>Tag changed objects</td><td>Optional. A tag (for example <code>INFERRED</code>) that is written to every object that gets an inferred value, so you can find, theme or review them later.</td></tr>
+</table></div>
+<h2>How values are inferred</h2>
+<div class="tablewrap"><table>
+<tr><th>Value</th><th>Rule</th></tr>
+<tr><td>Conduit length</td><td>Length of the conduit as drawn on the map (in map units; set <span class="ui">Map Units</span> in the status bar first).</td></tr>
+<tr><td>Conduit size (geom 1)</td><td>The largest upstream conduit; if there is none, the smallest downstream conduit. Repeated along chains, so a run of several pipes without size fills from its known ends. Irregular, street and dummy sections are skipped.</td></tr>
+<tr><td>Roughness</td><td>The most common value of the connected conduits, otherwise <i>Default n</i>.</td></tr>
+<tr><td>Node invert</td><td>With a DEM: ground − manhole depth. Without: interpolated by pipe length between the nearest known inverts upstream and downstream. If only one side is known, extended at <i>Min. slope</i>.</td></tr>
+<tr><td>Manhole depth (DEM)</td><td>DEM ground − invert, only where the depth is missing.</td></tr>
+</table></div>
+<h2>Steps</h2>
+<ol class="steps">
+<li>Save the model (or save a copy with <span class="ui">Save As</span>) so you can go back.</li>
+<li>Open <span class="ui">Tools ▸ Model Data ▸ Infer &amp; Clean</span>, check the settings and choose a DEM if you have one.</li>
+<li>Click <span class="ui">Analyse</span>. The left table lists every value that can be inferred: object, field, current value, inferred value and how it was found. The right table lists the issues. The status bar gives the counts.</li>
+<li>Review the values. Click a row to select the object; double-click to zoom to it on the map. Sort by a column by clicking its header.</li>
+<li>In the <b>Apply</b> row, tick the kinds of values you want to write (length, size, roughness, invert, depth). The number in brackets is how many values of that kind were found.</li>
+<li>Click <span class="ui">Apply Ticked</span>. All ticked values are written in one step, recorded in the change history, and can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
+<li>Use <span class="ui">Export CSV</span> to keep a record of the inferred values and the issues for your report.</li>
+</ol>
+<h2>Data errors found</h2>
+<p>The issues are reported only; they are not changed automatically, because the right fix depends on the cause. The buttons next to the <b>Issues</b> title select all objects of one kind at once, so you can review them in the attribute table or theme them.</p>
+<div class="tablewrap"><table>
+<tr><th>Issue</th><th>Meaning</th></tr>
+<tr><td>Adverse slope</td><td>The downstream invert is higher than the upstream invert (by more than the tolerance).</td></tr>
+<tr><td>Duplicate conduit</td><td>Two conduits connect the same pair of nodes.</td></tr>
+<tr><td>Orphan node</td><td>A node that is not connected to any link.</td></tr>
+<tr><td>Crown above rim / Invert above ground</td><td>The pipe crown is above the manhole rim, or the invert is above the ground.</td></tr>
+<tr><td>No outfall</td><td>A part of the network that does not drain to an outfall or a storage unit.</td></tr>
+<tr><td>Subcatchment outlet</td><td>A subcatchment whose outlet does not exist.</td></tr>
+<tr><td>Missing invert / size / Zero length</td><td>A missing value that could not be inferred (no known neighbour).</td></tr>
+</table></div>
+<div class="callout warn"><b class="t">Important:</b><p>Inferred values are estimates. Use them to get a model running and to find gaps, then confirm the important ones (trunk sewers, outfalls, structures) against survey or record drawings.</p></div>
+</section>
+
+<section class="topic" id="dwf" data-ch="Tools" data-title="Dry Weather Flow">
+<h1>Dry Weather Flow</h1>
+<p class="lead"><span class="ui">Tools ▸ Model Data ▸ Dry Weather Flow</span> generates the foul (sanitary) flow of the nodes from population or area loads, adds base infiltration, and writes a diurnal pattern. The result goes into the node's dry weather inflow and the time patterns, in one undoable step.</p>
+<figure><img src="images/dwf.png" alt="Dry Weather Flow dialog"><figcaption>Dry weather flow from the subcatchments: 40 persons/ha × 200 L/person/day, plus 10 % infiltration, with the residential pattern.</figcaption></figure>
+<h2>Where the loads come from</h2>
+<div class="tablewrap"><table>
+<tr><th>Loads from</th><th>How the flow is calculated</th><th>Node that receives it</th></tr>
+<tr><td>Subcatchments</td><td><b>Basis</b>: population density × per-capita flow (persons/ha × L/person/day, or the US equivalents), or area × unit flow (flow per hectare or acre).</td><td>The outlet node of the subcatchment. If the outlet is another subcatchment, it is followed until a node is reached.</td></tr>
+<tr><td>GIS layer (points / polygons)</td><td>A numeric attribute of the layer, read as population, households (× persons per household) or a flow directly.</td><td>The outlet of the subcatchment that contains the feature, otherwise the nearest junction; or always the nearest junction.</td></tr>
+</table></div>
+<h2>Other settings</h2>
+<ul>
+<li><b>Only subcatchments</b>: an expression that limits the subcatchments, for example <code>tag = 'RES'</code> or <code>imperv &gt; 30</code> (see <a href="#expressions">Expression language</a>). Empty = all.</li>
+<li><b>Infiltration</b>: a base infiltration added as a percentage of the foul flow.</li>
+<li><b>Existing DWF</b>: what happens to dry weather flow already in the model – replace it at the nodes that get a load, add to it, only fill nodes without dry weather flow, or clear all dry weather flow first.</li>
+</ul>
+<h2>Diurnal pattern</h2>
+<ul>
+<li><b>Template</b>: Residential, Commercial, Industrial, Flat or Custom. The 24 hourly multipliers can be edited directly in the table; the graph below shows the shape.</li>
+<li><b>weekend pattern</b>: adds a second row of multipliers for Saturday and Sunday.</li>
+<li><b>Pattern name</b>: the patterns are written as <code>&lt;name&gt;_HR</code> (hourly, used Monday to Friday) and <code>&lt;name&gt;_WE</code> (weekend). The multipliers are scaled to an average of 1, so the daily volume equals the average flow × 24 h. A pattern with the same name is replaced.</li>
+</ul>
+<p>The <b>Result</b> section at the bottom updates as you change the settings: subcatchments used, nodes that get dry weather flow, population, average flow and daily volume, and a table per node. Click <span class="ui">Apply</span> to write it.</p>
+<h2>Different land uses</h2>
+<p>Each node has one dry weather flow pattern. To give residential, commercial and industrial areas their own flow rates:</p>
+<ol class="steps">
+<li>Tag the subcatchments by land use, for example <code>RES</code>, <code>COM</code>, <code>IND</code> (attribute table or Properties).</li>
+<li>Run the tool with <i>Only subcatchments</i> = <code>tag = 'RES'</code>, the residential rates and template, pattern name <code>RES</code>, Existing DWF = replace.</li>
+<li>Run it again with <code>tag = 'COM'</code>, the commercial rates and template, pattern name <code>COM</code>, Existing DWF = add.</li>
+<li>Repeat for the other land uses. Where two land uses drain to the same node, the node keeps the pattern of the last run, so use land-use boundaries that follow the drainage where you can.</li>
+</ol>
+<h2>Check the result</h2>
+<ul>
+<li>Select a node and open <span class="ui">Inflows ▸ Dry Weather</span> in Properties to see the average flow and pattern names; the patterns are under <span class="ui">Hydrology ▸ Time Patterns</span> in the Parameter View.</li>
+<li>Run a dry period and check the <i>Dry Weather Inflow</i> line of the continuity table in the <a href="#report">report</a> against the daily volume shown in the dialog.</li>
+<li>Plot the total inflow of an outfall: it should show the daily cycle.</li>
+</ul>
+</section>
+
 <section class="topic" id="validate" data-ch="Tools" data-title="Validate the model">
 <h1>Validate the model</h1>
-<p><span class="ui">Tools ▸ Utilities ▸ Validate Model</span> checks the model and lists the problems in a Validation view.</p>
+<p><span class="ui">Tools ▸ Model Data ▸ Validate Model</span> checks the model and lists the problems in a Validation view. The counts of errors, warnings and notes are shown at the top.</p>
+<figure><img src="images/validate.png" alt="Validation view"><figcaption>Validation of a model with missing pipe sizes (errors) and adverse slopes (warnings).</figcaption></figure>
 <ul>
 <li><b>Errors</b>:
   <ul><li>links whose inlet or outlet node does not exist;</li>
@@ -58,5 +146,5 @@
   <li>very short conduits that can limit the time step;</li>
   <li>orifices in dynamic-wave models.</li></ul></li>
 </ul>
-<p>Click a row to select the object and zoom to it, and click <span class="ui">Re-check</span> after fixing problems. The quick checks also run automatically before each simulation.</p>
+<p>Click a row to select the object and zoom to it, and click <span class="ui">Re-check</span> after fixing problems. Errors stop a simulation; the quick checks also run automatically before each run. For missing values and more data checks, use <a href="#infer">Infer &amp; Clean</a>.</p>
 </section>

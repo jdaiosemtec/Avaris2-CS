@@ -11,7 +11,21 @@
   <a class="card" href="#flags"><b>Flags</b><span>One-click warnings for flooding, surcharge, capacity, velocity and more.</span></a>
   <a class="card" href="#theme"><b>Themes</b><span>Colour and size the network by any attribute or result.</span></a>
   <a class="card" href="#twod-overview"><b>2D flood modelling</b><span>Couple the pipe network to a 2D surface mesh.</span></a>
+  <a class="card" href="#flood-analysis"><b>2D flood analysis</b><span>Flooded areas, hazard rating, zone statistics, comparisons and GIS exports.</span></a>
+  <a class="card" href="#partition"><b>High Performance Simulation</b><span>Split a large model into sub-models and run them in parallel.</span></a>
+  <a class="card" href="#infer"><b>Model data tools</b><span>Fill missing data, generate dry weather flow, validate the model.</span></a>
 </div>
+<h2>New in versions 2.3 to 2.6</h2>
+<p>If you already know Avaris2 CS 2.2, these are the additions since then. Each item links to its topic.</p>
+<div class="tablewrap"><table>
+<tr><th>Area</th><th>What is new</th><th>Where</th></tr>
+<tr><td>High Performance Simulation (HPS edition)</td><td><a href="#partition">Model partition</a>: one click splits the model into sub-models along the flow; <a href="#coupled-run">coupled parallel simulation</a> runs them at the same time on several processor cores, for 1D and 1D-2D models, with results merged into one run of the whole model.</td><td><span class="ui">Tools ▸ Partition ▸ Partition Model</span>, <span class="ui">Simulation ▸ Run</span></td></tr>
+<tr><td>2D results (1D-2D edition)</td><td>Max. velocity, <a href="#hazard">hazard rating</a> (Defra FD2320), depth × velocity, flood arrival time, time of max. depth, flow direction arrows, <a href="#twod-results">heat-map rendering</a>, 2D cell graph, <a href="#flood-analysis">2D Flood Analysis</a> (flooded area, area by class, statistics by zone or point), comparison of two 1D-2D runs, 2D cross section, flood extent shapefiles and GeoTIFF grids.</td><td><span class="ui">Simulation ▸ Analysis ▸ 2D Flood Analysis</span>, 2D Meshes layer</td></tr>
+<tr><td>Model data</td><td><a href="#infer">Infer &amp; Clean</a> fills missing lengths, sizes, roughness, inverts and manhole depths and finds data errors; <a href="#dwf">Dry Weather Flow</a> generates foul flow and diurnal patterns from subcatchments or a GIS layer.</td><td><span class="ui">Tools ▸ Model Data</span></td></tr>
+<tr><td>Analysis</td><td><a href="#cso">CSO Statistics</a> (spill events, volumes, durations, 12/24 h counting); the <a href="#comparison">Scenario Comparison</a> lists every run of the model and keeps graphs on the two chosen runs.</td><td><span class="ui">Simulation ▸ Analysis</span></td></tr>
+<tr><td>Output</td><td><a href="#print-layout">Print Layout</a>: map pages with a title block, legend, scale bar, north arrow and logo, saved as PDF or PNG or printed.</td><td><span class="ui">Project ▸ Print ▸ Print Layout</span></td></tr>
+<tr><td>Interface</td><td>New Analysis group on the Simulation tab, Model Data group on the Tools tab, folder dialog with New Folder, results open outside play mode (click Play to animate).</td><td>Ribbon</td></tr>
+</table></div>
 <h2>What's new in Avaris2 CS</h2>
 <p>Avaris2 CS replaces Avaris CS 4.x. It opens the same <code>.inp</code> models, and also reads and writes EPA SWMM 5 and Avaris DS models. The main additions are:</p>
 <ul>
@@ -82,20 +96,24 @@
 <section class="topic" id="licensing" data-ch="Get started" data-title="Licensing and registration">
 <h1>Licensing and registration</h1>
 <p class="lead">Each Avaris2 CS licence is for one computer. Your licence is linked to your account on <a href="https://osemtec.com">osemtec.com</a>; the edition and the term follow your purchase.</p>
-<p>There are two editions, each available for 30 days, 1 year or several years:</p>
+<p>There are three editions, each available for 30 days, 1 year or several years. Each edition includes everything in the editions to its left:</p>
 <div class="tablewrap"><table>
-<tr><th>Function</th><th>Avaris2 CS 1D</th><th>Avaris2 CS 1D-2D</th></tr>
-<tr><td>Network modelling, editors, GIS, scenarios</td><td>✓</td><td>✓</td></tr>
-<tr><td>1D simulation, results, flags, reports, profiles</td><td>✓</td><td>✓</td></tr>
-<tr><td>2D options, Create Meshes, 1D-2D flood simulation and flood maps</td><td>–</td><td>✓</td></tr>
+<tr><th>Function</th><th>1D</th><th>1D-2D</th><th>HPS<br><small>High Performance Simulation</small></th></tr>
+<tr><td>Network modelling, editors, GIS, runs and comparison</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>1D simulation, results, flags, reports, profiles, plots</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>Infer &amp; Clean, Dry Weather Flow, CSO Statistics, Print Layout</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>2D options, Create Meshes, 1D-2D flood simulation</td><td>–</td><td>✓</td><td>✓</td></tr>
+<tr><td>2D results: velocity, hazard rating, arrival time, 2D Flood Analysis, flood exports</td><td>–</td><td>✓</td><td>✓</td></tr>
+<tr><td>Model partition and coupled parallel simulation (1D and 1D-2D)</td><td>–</td><td>–</td><td>✓</td></tr>
 </table></div>
+<p>Commands that need a higher edition carry a small badge on the ribbon (<i>1D-2D</i> or <i>HPS</i>). With a lower edition they show a lock; clicking them explains which edition is needed.</p>
 <h2>Read-only mode</h2>
 <p>Without a valid licence, Avaris2 CS runs in <b>read-only mode</b>: you can open and view models and results, but not change, save or run them. This also applies when the licence has expired, was issued for another computer, or when the computer clock has been set back. When you try to edit, save or run, Avaris2 CS tells you why and offers <span class="ui">Register…</span>.</p>
 <figure class="narrow"><img src="images/lic_readonly.png" alt="Read-only notice at start-up"></figure>
 <figure class="narrow"><img src="images/lic_gate.png" alt="Read-only mode message when editing"></figure>
 <p>To get a licence, see <a href="#lic-request">Request and activate a licence</a>.</p>
 <h2>Check your licence</h2>
-<p><span class="ui">Help ▸ Register</span> shows the licence of this computer at the top: edition, licensee, expiry date, days left and serial number. The window title shows the edition (1D or 1D-2D).</p>
+<p><span class="ui">Help ▸ Register</span> shows the licence of this computer at the top: edition, licensee, expiry date, days left and serial number. The window title shows the edition (1D, 1D-2D or HPS).</p>
 <figure><img src="images/lic_register_ok.png" alt="Register dialog with an active licence"></figure>
 <h2>Upgrades and reinstalling</h2>
 <p>The licence is stored with your Windows user settings, not in the installation folder. Installing a new version, uninstalling and reinstalling, or installing into another folder keeps the licence; you do not need to request a new one.</p>
@@ -114,7 +132,7 @@
 <p class="lead">You send a licence request for this computer from Avaris2 CS by e-mail. OSEMTEC checks your account and purchase and e-mails you a licence key, which you activate in Avaris2 CS. Activation works offline.</p>
 <h2>Before you start</h2>
 <ul>
-<li>Register an account on <a href="https://osemtec.com">osemtec.com</a> and purchase the edition (1D or 1D-2D) and the term you need.</li>
+<li>Register an account on <a href="https://osemtec.com">osemtec.com</a> and purchase the edition (1D, 1D-2D or HPS) and the term you need.</li>
 <li>Install Avaris2 CS on the computer that will use the licence, and sign in.</li>
 </ul>
 <h2>Step 1 – Send the licence request</h2>
@@ -162,7 +180,7 @@ ktZW5nLmNvbSIsImNvZGUiOiJBVjItRjdaQS1TR0dBLUtEN0wtU0pBRyIsImh3Ijp7ImciOiJkMz
 <p>Avaris2 CS confirms the edition, the licensee and the expiry date. All functions of the edition are available at once; no restart is needed.</p>
 <figure class="narrow"><img src="images/lic_activated.png" alt="Licence activated"></figure>
 <h2>Renew or upgrade a licence</h2>
-<p>From 30 days before the expiry date, Avaris2 CS reminds you at start-up. After you renew or upgrade (for example from 1D to 1D-2D) on osemtec.com, OSEMTEC sends you a new licence key; activate it in <span class="ui">Help ▸ Register</span> in the same way. If OSEMTEC asks for it, send a new request first.</p>
+<p>From 30 days before the expiry date, Avaris2 CS reminds you at start-up. After you renew or upgrade (for example from 1D to 1D-2D, or from 1D-2D to HPS) on osemtec.com, OSEMTEC sends you a new licence key; activate it in <span class="ui">Help ▸ Register</span> in the same way. If OSEMTEC asks for it, send a new request first.</p>
 <h2>If the licence is not accepted</h2>
 <div class="tablewrap"><table>
 <tr><th>Message</th><th>What to do</th></tr>
@@ -188,7 +206,7 @@ ktZW5nLmNvbSIsImNvZGUiOiJBVjItRjdaQS1TR0dBLUtEN0wtU0pBRyIsImh3Ijp7ImciOiJkMz
 <p>Click an object to see its properties in the <b>Properties</b> pane on the right. Edits you make there are applied immediately and can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
 <h2>3. Check and run</h2>
 <ol class="steps">
-<li>Click <span class="ui">Tools ▸ Utilities ▸ Validate Model</span> to check for missing references, disconnected nodes, zero lengths and similar problems.</li>
+<li>Click <span class="ui">Tools ▸ Model Data ▸ Validate Model</span> to check for missing references, disconnected nodes, zero lengths and similar problems.</li>
 <li>Review the settings in <span class="ui">Simulation ▸ Setup ▸ Options</span>: simulation dates, time steps and routing method.</li>
 <li>Click <span class="ui">Simulation ▸ Run ▸ Run</span> (or press <kbd>F5</kbd>) and give the run a name, for example <i>Design 10yr</i>.</li>
 </ol>
