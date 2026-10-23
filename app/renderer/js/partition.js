@@ -318,9 +318,11 @@
   };
   AV.partOverlay = function (map, ctx) {
     const app = map.app, V = app.partView; if (!V || !V.P) return; const P = V.P, m = app.model; ctx.save();
-    if (V.showNo && V.A && V.S.keepPonds !== false) for (const [k, g] of V.A.ponds.entries()) { if (P.splitPond && P.splitPond.has(k)) continue; for (const id of g) { const n = m.nodes.get(id); if (!n) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }
+    // the overlays follow the visibility of the layers (a hidden Conduits layer hides the not-cut pipes too)
+    const vis = (t) => { const sy = AV.symOf(app, t); return !sy || sy.visible !== false; };
+    if (V.showNo && V.A && V.S.keepPonds !== false) for (const [k, g] of V.A.ponds.entries()) { if (P.splitPond && P.splitPond.has(k)) continue; for (const id of g) { const n = m.nodes.get(id); if (!n || !vis(n.type)) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = 'rgba(30,136,229,.85)'; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]); } }
     if (V.showNo) { ctx.save(); ctx.strokeStyle = 'rgba(142,36,170,.9)'; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]); const vb = map.visibleBox();
-      for (const id of P.why.keys()) { const l = m.links.get(id); if (!l) continue; const a = m.nodes.get(l.from), b = m.nodes.get(l.to); if (!a || !b) continue;
+      for (const id of P.why.keys()) { const l = m.links.get(id); if (!l) continue; if (!vis(l.type)) continue; const a = m.nodes.get(l.from), b = m.nodes.get(l.to); if (!a || !b) continue;
         if (Math.max(a.x, b.x) < vb.x1 || Math.min(a.x, b.x) > vb.x2 || Math.max(a.y, b.y) < vb.y1 || Math.min(a.y, b.y) > vb.y2) continue;
         ctx.beginPath(); const p0 = map.toScreen(a.x, a.y); ctx.moveTo(p0[0], p0[1]); for (const v of l.verts) { const q = map.toScreen(v[0], v[1]); ctx.lineTo(q[0], q[1]); } const p1 = map.toScreen(b.x, b.y); ctx.lineTo(p1[0], p1[1]); ctx.stroke(); }
       ctx.restore(); }

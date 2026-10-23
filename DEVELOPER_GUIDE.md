@@ -435,3 +435,8 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 2D 对比 → Scenario Comparison：2D Flood Analysis 的 Compare… 选好另一个 1D-2D 方案后，把它作为方案载入（`sim.loadScenario`），直接打开 Scenario Comparison（`AV.openCompare2D`：基准 = 选的方案，对比 = 当前结果，对象 = 2D Cells）。`compare.js` 新增对象类型 `cell`（最大水深、最大流速、最大危险度、最大 水深×流速、到达时间、积水时间，数据来自 `AV.meshStatsFor`，按方案缓存在 `res._m2d`），顶部蓝框突出 2D 关键指标（淹没面积、淹没单元、最大水深、最大流速、HR ≥ 0.75 / ≥ 2 面积、最早到达）；Difference on Map 对 2D 单元把差值写进 `meshResults.cmp.diff` 并让 2D Meshes 显示 `ddepth`（图例写明变量和方案）。
 - 分区统计：图层变化时（`refreshLayers` 发出 `layers` 事件）视图自动刷新；面板内 Add Layer…；没有图层时显示用途和步骤；有结果时显示区域数、淹没数、HR ≥ 0.75 / ≥ 2 的数量。
 - CSO 统计：两张表上下排列（全宽），水量取整加千分位。旱流对话框：Pattern name 下写明会写出什么、在哪里看到、重名会替换。Help 页签 Quick Start / Shortcuts / Diagnostics 换成与其他按钮同风格的图标（`quickstart.png`、`shortcuts.png`、`diagnostics.png`）。
+
+## 16. 2.6.4
+- 往复流判定统一：分区（`partpanel.js` `syncRev`/`fnum`）直接读写 Flag 定义 `rev` 的参数（`app.flags.params(def('rev'))`：r 计入流量的峰值百分比、n 最短有流时间、w 往复下限、h 倒流上限），`partAnalyse` 的 `totdur(|Q| > max(eps, r% × rptMaxFlow))`、`totdur(Q < −阈值)` 与 Flag 条件（Σ 取全程）一致。验证：Riverside（r 5%、n 30 min、w 5%、h 95%）Flag 报警（不含 High）94 根 = 分区往复流 94 根，逐根相同。
+- 载入结果后不进入播放模式（`loadResults` 只建播放条）；点 Play 进入；没有结果时点 Play 先载入最近结果再进入播放。
+- 分区叠加层（不切的管道虚线、积水区圆圈）跟随图层可见性（`AV.symOf(app, type).visible`）。

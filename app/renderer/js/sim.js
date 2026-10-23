@@ -473,7 +473,8 @@
         // start at time of peak system total inflow
         const st = R.stats.system; const tPeak = st.tmax[9] || 0;
         await this.setPeriod(tPeak);
-        this.buildPlaybar(); this.togglePlaybar(true);
+        // results open outside play mode (statistics on the map); the Play button enters play mode
+        this.buildPlaybar(); if (this.app.playMode) this.setPlayMode(false);
         this.app.panels.showProps(); this.app.map.redraw();
         if (this.app.db) this.app.db.render();
         this.app.status('Results loaded' + (missing ? ' (' + missing + ' model nodes not found in results file)' : ''));
@@ -549,7 +550,7 @@
       return null;
     }
     async togglePlaybar(force) {
-      if (!this.results) { const f = await this.lastResultsFile(); if (f) { await this.loadResults(f.out, f.rpt, false); if (force === undefined && this.results) this.play(); return; }
+      if (!this.results) { const f = await this.lastResultsFile(); if (f) { await this.loadResults(f.out, f.rpt, false); if (this.results && force !== false) { this.setPlayMode(true); if (force === undefined) this.play(); } return; }
         AV.toast('Run a simulation (or load a results file) first.'); return; }
       // Play: enter play mode and start; a second click leaves play mode (same as Quit)
       const show = force === undefined ? !this.app.playMode : force;
