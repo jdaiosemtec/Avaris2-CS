@@ -27,3 +27,18 @@ graphs, reports, export, history, users.
 - `main.js` `license:verify`: offline Ed25519 key check (public key embedded).
 - `license-tools/keygen.js` + `private_key.pem` (private key not in git; copy in releases/license).
 - Ribbon items with `lic: '2D'` show a lock and ask for a licence when 2D is not licensed.
+
+## High Performance Simulation (edition `HPS`, 2.6.0)
+Licence editions: `1D` < `2D` (1D-2D) < `HPS`. `AV.has2D()` is true for `2D` and `HPS`; `AV.hasHPS()` only for `HPS`
+(`renderer/js/licence.js`); `AV.needHPS(app, what)` explains the edition. `main.js` accepts `ed` = 1D / 2D / HPS;
+the Licence Manager and `license-tools/keygen.js --edition HPS` issue it.
+
+| Function | Where in the UI | Code |
+|---|---|---|
+| Model partition (partition, adjust, generate sub-models, D8 areas, regenerate) | Tools → Partition → Partition Model (ribbon `lic: 'HPS'`) | `partition.js`, `partpanel.js` (`AV.openPartition` checks `AV.hasHPS`) |
+| Coupled parallel simulation (1D now, 1D-2D when the 2D coupling follows) | Run dialog → "Coupled parallel" | `database.js` askRunName, `sim.js` runCoupled, `main.js` engine:runCoupled, `cplmerge.js`, engine `couple.c` |
+| Real-time rolling simulation (phase 5) | – | not part of HPS: a later, separate tier |
+
+## 2D results analysis (part of `2D`, 2.6.0)
+Hazard rating, velocity, flood extents, arrival time, duration, depth × velocity, statistics by area, 2D cross-section,
+point time series, raster / shapefile export, scenario difference: see DEVELOPER_GUIDE section 13.

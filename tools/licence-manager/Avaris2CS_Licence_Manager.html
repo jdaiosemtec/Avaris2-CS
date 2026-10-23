@@ -83,7 +83,8 @@ td.notes { white-space:normal; max-width:240px; color:var(--muted); }
 'use strict';
 // ------------------------------------------------------------------ constants (must match app/main.js)
 const LIC_PUB_SPKI = 'MCowBQYDK2VwAyEAY6AEfM7kFpdG4rajIfIEUwJA7Iw7nGIgUovmv9x++2g=';
-const EDITIONS = { '1D': 'Avaris2 CS 1D', '2D': 'Avaris2 CS 1D-2D' };
+const EDITIONS = { '1D': 'Avaris2 CS 1D', '2D': 'Avaris2 CS 1D-2D', 'HPS': 'Avaris2 CS High Performance Simulation' };
+const ED_SHORT = { '1D': '1D', '2D': '1D-2D', 'HPS': 'HPS' };
 const LEDGER = 'licences.json';
 const MAILERS = [['gmail', 'Gmail'], ['outlook', 'Outlook.com'], ['o365', 'Outlook (Microsoft 365)'], ['app', 'E-mail program']];
 
@@ -374,7 +375,7 @@ async function render() {
     const { k, desc } = S.sort; rows.sort((a, b) => { const x = val(a, k), y = val(b, k); const c = typeof x === 'number' ? x - y : String(x).localeCompare(String(y)); return desc ? -c : c; });
     const tb = h('tbody', null, rows.map(r => { const s = status(r), dl = daysLeft(r.exp);
       return h('tr', { onclick: () => editLicence(r) }, h('td', null, h('b', null, r.ser), r.rev ? h('span', { class: 'sub' }, ' rev. ' + r.rev) : null), h('td', null, r.user),
-        h('td', null, r.name || '', r.company ? h('div', { class: 'sub' }, r.company) : null), h('td', null, r.email), h('td', null, r.ed === '2D' ? '1D-2D' : '1D'),
+        h('td', null, r.name || '', r.company ? h('div', { class: 'sub' }, r.company) : null), h('td', null, r.email), h('td', null, ED_SHORT[r.ed] || r.ed),
         h('td', null, r.iss), h('td', null, r.exp), h('td', { class: 'num' }, s === 'void' || s === 'released' ? '' : dl < 0 ? '—' : dl),
         h('td', null, h('span', { class: 'pill ' + s }, STATUS_LABEL[s])), h('td', null, h('span', { class: 'mono' }, r.mc), r.host ? h('div', { class: 'sub' }, r.host) : null), h('td', { class: 'notes' }, r.notes || '')); }));
     const th = h('tr', null, COLS.map(([k, l]) => h('th', { class: S.sort.k === k ? 'sorted' + (S.sort.desc ? ' desc' : '') : '', onclick: () => { S.sort = { k, desc: S.sort.k === k ? !S.sort.desc : false }; drawTable(); } }, l)));

@@ -66,7 +66,7 @@ Avaris2CS.exe (Electron)
 | `tools/peicon.py` | 把 PNG 图标写入 Windows exe 的图标资源（Linux 上没有 rcedit 时使用）。 |
 | `tools/iconnorm.py` | Ribbon 图标视觉尺寸统一工具（裁边、按内容面积缩放、居中到画布）。用法：`python3 iconnorm.py 源文件夹 输出文件夹 0.86 96`。 |
 | `tools/make_insights.py` | 旧版本用来生成 Insight Flag 主题 json 的脚本，已被 Flag 面板取代，仅作参考。 |
-| `license-tools/keygen.js` | 命令行版许可证签发：`node keygen.js --request "<申请邮件全文或 AVREQ-…>" [--edition 1D\|2D] [--term 30d\|1y\|3y] [--start YYYY-MM-DD]`。日常签发和管理请用 `tools/licence-manager/Avaris2CS_Licence_Manager.html`（见第 9 节）。 |
+| `license-tools/keygen.js` | 命令行版许可证签发：`node keygen.js --request "<申请邮件全文或 AVREQ-…>" [--edition 1D\|2D\|HPS] [--term 30d\|1y\|3y] [--start YYYY-MM-DD]`。日常签发和管理请用 `tools/licence-manager/Avaris2CS_Licence_Manager.html`（见第 9 节）。 |
 | `license-tools/public_key.pem` | 公钥，已嵌入 `main.js` 用于离线验证。 |
 | `license-tools/private_key.pem` | **私钥，务必保密，不能随软件发布**，也不进 git。源码包里如果附带，要单独妥善保管。 |
 | `installer/avaris.nsi` | NSIS 安装脚本：安装目录、开始菜单和桌面快捷方式、可选的 .inp 关联、卸载；安装前会自动卸载旧名称 "Avaris2" 的版本。 |
@@ -141,7 +141,7 @@ Avaris2CS.exe (Electron)
 | `history.js` | 485 | 用户登录和角色（Administrator 管理员、Modeler 建模员、Viewer 只读），**修改记录**（谁在什么时候改了哪个对象的哪个变量，旧值和新值），保存在 `<模型>.osemhist.json`。 |
 | `partition.js` | **模型分区（算法与文件）**：`AV.partAnalyse`（基准结果：每根管有流量时长、反向流时长、峰值流量；1D 溢流点或 2D 积水区）、`AV.partGlue`（不能切的管：反向流、泵/孔口/堰/出口、分流井、积水区）、`AV.partCompute`（块→汇水树→自下而上切分→小区合并→搜索目标大小，精确得到指定分区数）、`AV.partRecut`、`AV.partChecks`、`AV.partBuild`（子模型 .inp：切口上游端点在上游分区变成 outfall（TIMESERIES 水位或 FIXED），下游分区的节点加 INFLOWS 入流；控制规则按对象过滤）、`AV.partBoundary`（基准结果的切口流量和水位序列）、`AV.partDefinition`（`<模型>.partition.json`：分配、耦合关系、层级、对象签名、文件哈希）、`AV.partSurface`（DEM：管网烧入 + 优先淹没法（等价于填洼后的 D8），在 2D 边界内，按分区追踪成多边形）、`AV.partWriteSurface`。 |
 | `partpanel.js` | 分区面板（Tools ▸ Partition Model / Regenerate）：设置、结果表、手动移动支线、检查、生成；Regenerate 读取 partition.json，按连通关系分配新节点，列出改动并只重写变化的子模型。地图显示通过 `theme.style` 和 `map.drawOverlay` 的钩子（`app.partView`）。 |
-| `licence.js` | 230 | **许可证**：<br>• 版本分 1D / 1D-2D，期限 30 天、1 年或 N 年，许可证绑定机器码；<br>• 没有有效许可证时（未激活、过期、换了电脑、系统时间被回调）进入只读模式：`AV.licenceGate`，由 `canModify`、`save`、`sim.run` 和方案批量运行调用；<br>• Help ▸ Register 对话框：生成激活申请（发邮件 / 复制 / 保存 .avreq）、导入许可证（粘贴或 .avlic 文件）、释放本机；<br>• 申请只含 osemtec.com 账号、邮箱和机器码；发送方式：Gmail / Outlook.com / Microsoft 365 网页邮箱（`AV.mailUrl`，浏览器里已登录即可一键发送）、本机邮件程序、复制、保存；如果 `main.js` 里填了 `LIC_FORM_KEY`（Web3Forms），还会出现 *Send Request to OSEMTEC*，直接发到 info@osemtec.com。<br>• 软件里不再有签发功能，签发只在 Licence Manager 里做。 |
+| `licence.js` | 230 | **许可证**：<br>• 版本分 1D / 1D-2D / HPS（High Performance Simulation = 1D-2D 全部功能 + 模型分区 + 耦合并行计算；`AV.has2D` 对 2D 和 HPS 都为真，`AV.hasHPS`、`AV.needHPS`），期限 30 天、1 年或 N 年，许可证绑定机器码；<br>• 没有有效许可证时（未激活、过期、换了电脑、系统时间被回调）进入只读模式：`AV.licenceGate`，由 `canModify`、`save`、`sim.run` 和方案批量运行调用；<br>• Help ▸ Register 对话框：生成激活申请（发邮件 / 复制 / 保存 .avreq）、导入许可证（粘贴或 .avlic 文件）、释放本机；<br>• 申请只含 osemtec.com 账号、邮箱和机器码；发送方式：Gmail / Outlook.com / Microsoft 365 网页邮箱（`AV.mailUrl`，浏览器里已登录即可一键发送）、本机邮件程序、复制、保存；如果 `main.js` 里填了 `LIC_FORM_KEY`（Web3Forms），还会出现 *Send Request to OSEMTEC*，直接发到 info@osemtec.com。<br>• 软件里不再有签发功能，签发只在 Licence Manager 里做。 |
 | `clip.js` | 95 | 复制粘贴对象（连同它们用到的曲线、时间序列等），可以跨模型、跨窗口。 |
 
 ### 2.4 `engine/src/`：计算引擎（C）
@@ -404,3 +404,17 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 | 旱流污水生成 | Tools ▸ Model Data ▸ Dry Weather Flow | `dwf.js` | 负荷来源：汇水区（面积 × 单位流量，或人口密度 × 人均排放），或 GIS 点 / 面图层（人口、户数或流量字段）。负荷进入汇水区出口节点（沿汇水区出口链追到节点）；图层要素先找包含它的汇水区，否则最近的检查井。可加入渗入量（%）。日变化模式：住宅 / 商业 / 工业 / 平稳模板，可编辑，可加周末模式，写出时归一化到平均 1。写 `[DWF] FLOW` 和 `[PATTERNS]`（`<名称>_HR` HOURLY、`<名称>_WE` WEEKEND），一步可撤销。验证：Riverside 预览 9421 m³/d，引擎报告 Dry Weather Inflow 9.420 ×10⁶ L/d。 |
 | 数据推断与清理 | Tools ▸ Model Data ▸ Infer & Clean | `infer.js` | 视图标签页。缺失值：0（可选）或 ≤ 给定值。推断：管长（按绘制长度）、管径（上游最大，否则下游最小，沿链重复）、糙率（相邻管最常见值，否则默认值）、井底标高（有 DEM：地面 − 记录井深，或地面 − 上下游井深插值；没有 DEM：沿管道按长度在上下游已知井底之间插值，单侧按最小坡度外推；用多源 Dijkstra 找最近的已知点）、井深（DEM 地面 − 井底，仅缺失时）。检查（只列出）：逆坡、重复管、孤立节点、管顶高于井口、不连到排口/调蓄池的管网、汇水区出口无效、无法推断的缺失值。勾选后一次写入（`tools.bulk`，可撤销），可给改过的对象加 Tag；CSV 导出。验证（Riverside，40 个井底置 0）：有 DEM 时误差中位数 0.004 m、90% 分位 0.16 m；没有 DEM 时中位数约 1 m（地形起伏大）。30 根管径置 0，24 根推断值与原值相同。 |
 | CSO 统计 | Simulation ▸ Results ▸ CSO Statistics | `cso.js`；`map.js` 通用叠加层 `AV.mapOverlays` | 溢流点：排口（总入流）和 / 或堰、孔口、出流口（管流），可只算选中对象或名称 / Tag 包含某文字的对象。阈值以上为溢流；间隔小于分隔时间（默认 12 h）的溢流属于同一事件；另给出 12/24 h 计数（英国环境署方法）。每个溢流点：事件数、溢流量（m³ 或百万加仑）、溢流小时、最长事件、峰值、首次溢流；事件表；CSV 导出（汇总 / 事件）；地图圆圈（大小 = 溢流量，数字 = 事件数）。精度为报告步长。 |
+
+## 13. 2D 结果深化（2.6.0 起，属于 1D-2D 许可；HPS 也包含）
+
+| 内容 | 入口 | 文件 | 要点 |
+|---|---|---|---|
+| 一次扫描的 2D 统计 | 载入 1D-2D 结果时自动计算 | `outreader.js` `mesh2d()` / `cellSeries()`（IPC `out:mesh2d`、`out:cellSeries`），`mesh2d.js` `AV.computeMeshResults` | 对每个网格单元一次读完全部时间步：最大水深、最大流速及其 x/y 分量、最大危险度、最大 水深×流速、淹没到达时间（水深首次超过 Options → 2D Flood 的 Flood Depth 阈值）、最大水深出现时间、积水时间、退水时间。单元流速 = 其 x 向、y 向各面（2D 链接 `2DL_*`）的流速 Q/(w·y) 分别平均后合成，w 为链接宽度（与引擎写出的链接流速一致，已逐值核对）。`MR.faces` 保存 [链接号, 单元 a, 单元 b, 轴, 符号] 与宽度。 |
+| 危险度 | — | `mesh2d.js` `AV.HAZARD_DF`、`AV.hazardClass` | Defra/EA FD2320：HR = d·(v+0.5)+DF，d 用 m、v 用 m/s（美制单位先换算）。DF 三种：保守（≤0.25 m 取 0.5，以上 1.0，默认）、草地/耕地（>0.25 m 取 0.5）、不计。只对超过 Flood Depth 阈值的单元评级。分级 <0.75 低、0.75–1.25 对部分人危险、1.25–2.0 对多数人危险、>2.0 对所有人危险。DF 设置存在 `prefs.mesh2d.df`，改后重新计算。 |
+| 新的网格变量 | Symbology ▸ 2D Meshes、属性表、单元属性 | `mesh2d.js` `FIELDS`、`AV.MESH_GROUPS`、`AV.meshUnit`；`sym.js`；`table.js` | 当前时刻（播放模式）：水深、水面、流速、危险度（`AV.meshDynamic` 由当前时刻的链接快照算出，按快照缓存）。统计：最大水深、最大水面、最大流速、最大危险度、最大 水深×流速、到达时间、最大水深时间、积水时间、退水时间、与对比方案的最大水深差。默认分级与色带：危险度 4 级固定色、流速 m/s 或 ft/s、时间按模拟时长 6 等分、水深差为发散色带（低于第一级取第一级颜色）。流向箭头 `prefs.mesh2d.arrows`（单元 ≥ 12 像素时画）。网格 Shapefile 导出含全部统计字段和危险等级。 |
+| 单元时程图 | 单元属性 ▸ 2D Cell Graph | `mesh2d.js` `AV.cellGraph` | 浮动面板三张联动图：水深（含阈值线）、流速、危险度（含 0.75/1.25/2.0 参考线）。 |
+| 2D Flood Analysis | Simulation ▸ Results ▸ 2D Flood Analysis（`lic: '2D'`） | `flood.js` | 视图标签页。顶部：淹没判定水深（默认 = Flood Depth 阈值，0 时取第一级水深）、DF、Cross Section、Compare、Export。指标卡：淹没面积（ha / ac）与比例、淹没单元数、最大水深、最大流速、最大危险度、HR≥0.75 面积、最早到达。按最大水深分级面积（用 Symbology 的水深分级）与按危险度分级面积。按区域 / 点统计：任选面图层（单元中心在面内）或点图层（点所在单元），名称字段可选，CSV 导出，双击缩放。对比：选同一网格的另一个 1D-2D 方案（`AV.listRuns` 或任意 .fout），按单元 ID 匹配，给出新增淹没、不再淹没、两者都淹没、加深 / 变浅超过阈值的面积、最大增减，并可在地图上显示水深差。 |
+| 导出 | 2D Flood Analysis ▸ Export | `flood.js` `AV.cellsToRings`、`AV.meshGrid` | 淹没范围 / 水深分级 / 危险分级面 Shapefile：单元四条边逆时针，共享边相互抵消，剩余边连成环再反向（外环顺时针、内环逆时针），面积与单元面积之和一致；ESRI ASCII 栅格（.asc + .prj），像元 = 最小单元尺寸，干单元 -9999；单元结果 CSV。 |
+| 2D 横断面 | 2D Flood Analysis ▸ Cross Section | `flood.js` `AV.crossSection2D`；`features.js` `onDrawHook` | 在地图上画折线（双击或 Enter 结束），按最小单元尺寸的 1/4 采样：地面、最大水面、当前时刻水面（播放模式，随时间步更新，`app.emit('period')`）、对比方案最大水面。线保留在地图上直到关闭面板。 |
+
+验证（Riverside Demo，Design 10yr，1578 个单元、3036 个 2D 链接）：单元流速与引擎链接流速逐值一致（-0.28349 vs -0.28346 m/s）；淹没范围面积 = 1179 个湿单元面积之和；按区域统计两个半区的淹没面积之和等于全区。

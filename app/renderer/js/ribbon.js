@@ -75,7 +75,7 @@
           { name: 'Model Data', items: [
             { id: 'infer', label: 'Infer & Clean', img: 'infer', fn: () => AV.openInference(this), tip: 'Data inference and cleaning: fill missing inverts, diameters, lengths, depths; find adverse slopes, duplicates, orphans …' },
             { id: 'dwf', label: 'Dry\u00a0Weather Flow', img: 'dwf', fn: () => AV.openDWF(this), tip: 'Generate the dry weather (foul) flow of the nodes from subcatchments or a point layer, with diurnal patterns' }] },
-          { name: 'Partition', items: [{ id: 'part', label: 'Partition Model', img: 'partition', fn: () => AV.openPartition(this, 'part'), active: () => !!this.partView, tip: 'Split the model into sub-models for coupled parallel simulation (one direction of flow per partition, as few cut points as possible); the panel also regenerates the sub-models after the master model changed' }] },
+          { name: 'Partition', items: [{ id: 'part', label: 'Partition Model', img: 'partition', lic: 'HPS', badge: 'HPS', fn: () => AV.openPartition(this, 'part'), active: () => !!this.partView, tip: 'Split the model into sub-models for coupled parallel simulation (one direction of flow per partition, as few cut points as possible); the panel also regenerates the sub-models after the master model changed' }] },
           { name: 'Rainfall', items: [{ id: 'gen', label: 'Design Storm', img: 'hyetograph', fn: () => AV.hyetographDialog(this), tip: 'Design storm / hyetograph generator (Chicago, SCS, triangular, uniform, custom pattern)' }] },
           { name: 'Spatial Reference', items: [{ small: [{ id: 'rr', label: 'Reproject Raster', img: 'reprojraster', fn: () => F().reprojectRaster() }, { id: 'csr', label: 'Convert Coordinates', img: 'convertsr', fn: () => F().convertSR() }] }] },
           { name: 'Utilities', items: [
@@ -93,6 +93,7 @@
             { id: 'play', label: 'Play', img: 'play', fn: () => S().togglePlaybar(), active: () => !!this.playMode, tip: 'Play mode: animate the results over time (click again to leave play mode)' },
             { id: 'profile', label: 'Profile', img: 'profile', fn: () => F().profileTool() },
             { id: 'plot', label: 'Plot', img: 'plot', fn: () => F().graphTool() },
+            { id: 'flood2d', label: '2D Flood Analysis', img: 'flood2d', lic: '2D', badge: '1D-2D', fn: () => AV.openFlood2D(this), tip: 'Flooded area, depth / velocity / hazard classes, statistics by zone, comparison of runs, flood extent and grid exports, 2D cross section' },
             { id: 'csostat', label: 'CSO Statistics', img: 'cso', fn: () => AV.openCSO(this), tip: 'Spill events, volumes and durations of the overflow points (outfalls, weirs …) of the loaded results' },
             { id: 'comparison', label: 'Comparison', img: 'summary', fn: () => this.toggleComparison(), active: () => this.views && this.views.has('cmp'), tip: 'Open / close the Scenario Comparison window' },
             { small: [
@@ -130,9 +131,10 @@
       const icon = it.img ? h('img', { src: IMG(it.img), draggable: 'false' }) : h('span', { class: 'svgi' }, AV.icon(it.svg || 'select'));
       const b = h('button', { class: (small ? 'rsmall' : 'rbig') + (it.hero ? ' hero' : ''), title: typeof it.tip === 'function' ? '' : (it.tip || it.label) }, icon, h('span', { class: 'rl' }, it.label, it.caret ? h('span', { class: 'rcar' }, ' ▾') : null));
       if (it.badge && !small) b.appendChild(h('span', { class: 'rbadge' }, it.badge));
-      if (it.lic) b.appendChild(h('span', { class: 'rlock', title: 'Requires an Avaris2 CS 1D-2D licence' }, '🔒'));
+      if (it.lic) b.appendChild(h('span', { class: 'rlock', title: it.lic === 'HPS' ? 'Requires an Avaris2 CS High Performance Simulation licence' : 'Requires an Avaris2 CS 1D-2D licence' }, '🔒'));
       b.addEventListener('click', (e) => {
         if (it.lic === '2D' && !AV.has2D(this)) { AV.need2D(this, it.label); return; }
+        if (it.lic === 'HPS' && !AV.hasHPS(this)) { AV.needHPS(this, it.label); return; }
         if (it.menu) { const r = b.getBoundingClientRect(); this.contextMenu(r.left, r.bottom + 2, it.menu()); return; }
         if (it.mode) this.setTool(it.mode); else if (it.fn) it.fn(e);
         this.refreshRibbon();
@@ -162,7 +164,7 @@
     if (!this.ribbonButtons) return;
     for (const { b, it } of this.ribbonButtons) {
       if (it.enabled) b.classList.toggle('disabled', !it.enabled());
-      if (it.lic) b.classList.toggle('locked', it.lic === '2D' && !AV.has2D(this));
+      if (it.lic) b.classList.toggle('locked', (it.lic === '2D' && !AV.has2D(this)) || (it.lic === 'HPS' && !AV.hasHPS(this)));
       if (typeof it.tip === 'function') b.title = it.tip();
       if (it.active) b.classList.toggle('active', !!it.active());
     }

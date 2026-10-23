@@ -10,6 +10,7 @@
   const getCores = async () => { if (cores) return cores; try { const c = await window.host.cpuInfo(); cores = c.physical || c.logical || 4; } catch (e) { cores = 4; } return cores; };
 
   AV.openPartition = async function (app, tab) {
+    if (!AV.hasHPS(app)) { AV.needHPS(app, 'Model Partition'); return; }
     if (!app.model || !app.model.nodes.size) { AV.toast('Open a model first.', true); return; }
     if (!app.filePath) { AV.toast('Save the model first: the sub-models are written next to it.', true); return; }
     const C = await getCores();

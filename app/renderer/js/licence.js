@@ -1,6 +1,8 @@
 // Avaris2 CS licensing: editions, read-only mode, licence request / activation.
 //   1D    = Avaris2 CS 1D     : network modelling, simulation, results, GIS
-//   2D    = Avaris2 CS 1D-2D  : everything in 1D + the 2D surface flood module
+//   2D    = Avaris2 CS 1D-2D  : everything in 1D + the 2D surface flood module (incl. 2D results analysis)
+//   HPS   = Avaris2 CS High Performance Simulation: everything in 1D-2D + model partition and coupled parallel
+//           simulation (1D and 2D); the real-time rolling simulation (phase 5) will be a separate tier
 // A licence is bound to one computer (machine code) and has an expiry date (30 days, 1 year or N years). Without a valid
 // licence (none, expired, other computer, clock set back) Avaris2 CS runs read-only: models and results can be opened
 // and viewed, but not changed, saved or simulated.
@@ -11,11 +13,12 @@
   const h = AV.h;
   AV.LICENSING = true;
   AV.LIC_EMAIL = 'info@osemtec.com';
-  AV.EDITIONS = { '1D': 'Avaris2 CS 1D', '2D': 'Avaris2 CS 1D-2D' };
+  AV.EDITIONS = { '1D': 'Avaris2 CS 1D', '2D': 'Avaris2 CS 1D-2D', HPS: 'Avaris2 CS High Performance Simulation' };
   const termLabel = (t) => { if (!t) return ''; if (t === '30d') return '30 days'; const m = /^(\d+)y$/.exec(t); return m ? (m[1] === '1' ? '1 year' : m[1] + ' years') : t; };
   AV.licValid = (app) => !AV.LICENSING || !!(app && app.license && app.license.valid);
-  AV.has2D = (app) => !AV.LICENSING || !!(app && app.license && app.license.valid && app.license.edition === '2D');
-  AV.editionLabel = (app) => { if (!AV.LICENSING) return ''; const L = app && app.license; if (!L || !L.valid) return '(read-only)'; return L.edition === '2D' ? '1D-2D' : '1D'; };
+  AV.has2D = (app) => !AV.LICENSING || !!(app && app.license && app.license.valid && (app.license.edition === '2D' || app.license.edition === 'HPS'));
+  AV.hasHPS = (app) => !AV.LICENSING || !!(app && app.license && app.license.valid && app.license.edition === 'HPS');
+  AV.editionLabel = (app) => { if (!AV.LICENSING) return ''; const L = app && app.license; if (!L || !L.valid) return '(read-only)'; return L.edition === 'HPS' ? 'HPS' : L.edition === '2D' ? '1D-2D' : '1D'; };
   const reason = (L) => !L || !L.error || L.error === 'No licence.' ? 'No licence is activated on this computer.' : L.error;
 
   // read-only gate for editing, saving and running; returns true when allowed
@@ -37,6 +40,16 @@
       h('div', { style: { fontWeight: 600, marginBottom: '6px' } }, (what || 'The 2D flood module') + ' is part of Avaris2 CS 1D-2D.'),
       h('div', null, 'Your licence: ' + AV.EDITIONS[app.license.edition] + ' (' + (app.license.licensee || app.license.user) + ').'),
       h('div', { style: { marginTop: '6px', color: 'var(--muted)' } }, 'Request a 1D-2D licence in Help ▸ Register to enable 2D Options, Create Meshes, 1D-2D simulation and flood maps.')),
+      buttons: [{ label: 'Close', value: null }, { label: 'Register...', primary: true, value: 'reg' }] }).done.then(v => { if (v === 'reg') app.registerDialog(); return false; });
+  };
+
+  // shown when partition / coupled parallel simulation is used without a High Performance Simulation licence
+  AV.needHPS = function (app, what) {
+    if (!AV.licValid(app)) return AV.licenceGate(app, what || 'High Performance Simulation');
+    return AV.modal({ title: 'High Performance Simulation licence required', width: 500, body: h('div', { style: { lineHeight: 1.55 } },
+      h('div', { style: { fontWeight: 600, marginBottom: '6px' } }, (what || 'This function') + ' is part of Avaris2 CS High Performance Simulation.'),
+      h('div', null, 'Your licence: ' + AV.EDITIONS[app.license.edition] + ' (' + (app.license.licensee || app.license.user) + ').'),
+      h('div', { style: { marginTop: '6px', color: 'var(--muted)' } }, 'High Performance Simulation adds model partition (sub-models, regenerate) and the coupled parallel simulation of 1D and 1D-2D models to everything in 1D-2D. Request it in Help ▸ Register.')),
       buttons: [{ label: 'Close', value: null }, { label: 'Register...', primary: true, value: 'reg' }] }).done.then(v => { if (v === 'reg') app.registerDialog(); return false; });
   };
 
@@ -133,7 +146,7 @@
     if (r === 'release') return this.releaseLicence();
     if (!r || !r.k) return;
     this.settings.license = { key: r.k, activated: new Date().toISOString() }; window.host.setSettings(this.settings); this.license = r.v; await this.applyLicence();
-    AV.alert('Licence activated: ' + AV.EDITIONS[r.v.edition] + '\nLicensed to: ' + (r.v.licensee || r.v.user) + (r.v.company ? ', ' + r.v.company : '') + '\nValid until: ' + r.v.expiry + (r.v.edition === '2D' ? '\n\nThe 2D flood functions are enabled.' : ''), 'Register Avaris2 CS');
+    AV.alert('Licence activated: ' + AV.EDITIONS[r.v.edition] + '\nLicensed to: ' + (r.v.licensee || r.v.user) + (r.v.company ? ', ' + r.v.company : '') + '\nValid until: ' + r.v.expiry + (r.v.edition === 'HPS' ? '\n\nThe 2D flood functions, model partition and the coupled parallel simulation are enabled.' : r.v.edition === '2D' ? '\n\nThe 2D flood functions are enabled.' : ''), 'Register Avaris2 CS');
   };
   // move a licence to another computer: remove it here and give OSEMTEC a release code to quote
   AV.App.prototype.releaseLicence = async function () {

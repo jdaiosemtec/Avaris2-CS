@@ -934,6 +934,13 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .csopane .ptwrap { flex: 1; max-height: none; min-height: 120px; margin-top: 0; background: #fff; }
 .csotbl tr.sel td { background: #e3f2fd; } .csotbl tr.dim td { color: #90a4ae; } .csotbl tr { cursor: pointer; }
 .csotbl th { position: sticky; top: 0; background: #f5f7f9; z-index: 1; }
+/* 2D flood analysis */
+.fldview .csobody { grid-template-columns: minmax(400px, 1fr) minmax(360px, 1fr); overflow: auto; }
+.fldview .ptwrap { overflow: auto; }
+.fldview .ptbl { width: 100%; } .fldview td .fldbar { min-width: 40px; }
+.fldview .csopane .csopane { flex: none; }
+.fldbar { height: 10px; background: #eceff1; border-radius: 2px; overflow: hidden; } .fldbar span { display: block; height: 100%; }
+.fldsw { display: inline-block; width: 14px; height: 11px; border: 1px solid rgba(0,0,0,.25); vertical-align: middle; }
 /* dry weather flow */
 .dwfdlg { width: 900px; max-height: 72vh; overflow: auto; }
 .dwfdlg .psec2 { font-weight: 600; margin: 10px 0 4px; }

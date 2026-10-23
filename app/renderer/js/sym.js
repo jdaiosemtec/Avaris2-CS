@@ -289,9 +289,11 @@
             if (AV.MESH_DYNAMIC[v]) { if (!app.playMode) { AV.toast(AV.MESH_FIELDS[v] + ' is a current-time result: click Play (play mode) to show it. Statistic and static variables can be shown at any time.', true, 6000); fSel.value = F; return; } P.playField = v; }
             else { P.field = v; if (app.playMode) { P.lastPlay = P.playField || P.lastPlay; P.playField = null; } }
             redraw(); this.render(); } },
-          [['Current time step (play mode)', ['depth', 'wse']], ['Statistic results (whole run)', ['maxdepth', 'tpond', 'trecede']], ['Static properties', ['elev']]].map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k].replace(' (current time)', '') + (AV.MESH_DYNAMIC[k] && !app.playMode ? '  (play mode only)' : ''))))));
+          AV.MESH_GROUPS.map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k].replace(' (current time)', '') + (AV.MESH_DYNAMIC[k] && !app.playMode ? '  (play mode only)' : ''))))));
         fSel.value = F; rowE('Variable', fSel);
-        rowE('Transparency', opac(P, 'opacity')); rowE('', check(P, 'outline', 'Cell outlines')); rowE('', check(P, 'visible', 'Visible'));
+        rowE('Transparency', opac(P, 'opacity')); rowE('', check(P, 'outline', 'Cell outlines')); rowE('', check(P, 'arrows', 'Flow direction arrows (cells ≥ 12 px)')); rowE('', check(P, 'visible', 'Visible'));
+        if (F === 'hazard' || F === 'hzd') { const dfs = h('select', { onchange: async () => { P.df = dfs.value; if (app.meshResults) { await AV.computeMeshResults(app); } redraw(); this.render(); } },
+            Object.entries(AV.HAZARD_DF).map(([k, o]) => h('option', { value: k, title: o.label }, o.short))); dfs.value = AV.HAZARD_DF[P.df] ? P.df : 'conservative'; rowE('Debris factor', dfs); }
         sec(cont ? 'Colour ramp (continuous)' : 'Ranges');
         const setRamp = (v) => { P.ramp = P.ramp || {}; P.ramp[F] = v; if (!cont) { const cls = (P.classes && P.classes[F]) || S.breaks.map(b => ({ v: b })); const c = AV.rampColors(v, cls.length, !!(P.invert && P.invert[F])); P.classes = P.classes || {}; P.classes[F] = cls.map((x, i) => ({ v: x.v, color: c[i] })); } redraw(); this.render(); };
         const ramp = AV.rampPicker(S.ramp, S.invert, setRamp);
@@ -315,7 +317,10 @@
           });
           tb.appendChild(h('tr', null, h('td', { colspan: 5 }, h('button', { class: 'btn small', onclick: () => { const last = C[C.length - 1]; C.push({ v: +(last.v * 1.5 || 1).toPrecision(3), color: last.color }); redraw(); this.render(); } }, '+ Add range'))));
           form.appendChild(h('div', { class: 'symranges' }, h('table', null, tb)));
-          form.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, 'Cells below the first value are left uncoloured (dry). ' + (F === 'tpond' ? 'Time Ponded counts the hours the depth is above the Flood Depth Threshold (Simulation Options → 2D Flood).' : F === 'depth' ? 'Depth follows the current time step: use Play to animate the flooding.' : '')));
+          form.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, (F === 'ddepth' ? 'Difference = this run − the compared run (2D Flood Analysis ▸ Compare); values below the first range take its colour. ' : 'Cells below the first value are left uncoloured (dry). ') + (F === 'tpond' ? 'Time Ponded counts the hours the depth is above the Flood Depth Threshold (Simulation Options → 2D Flood).' : F === 'depth' ? 'Depth follows the current time step: use Play to animate the flooding.'
+            : F === 'hazard' || F === 'hzd' ? 'Hazard rating HR = d × (v + 0.5) + DF (Defra/EA FD2320, d in m, v in m/s). Classes: < 0.75 low, 0.75–1.25 danger for some, 1.25–2.0 danger for most, > 2.0 danger for all. Cells are rated only above the Flood Depth Threshold.'
+            : F === 'arrival' ? 'Flood Arrival Time: first time the depth exceeds the Flood Depth Threshold (hours from the start of the run).'
+            : F === 'vel' || F === 'maxvel' ? 'Cell velocity = velocity of its faces (2D links, Q / (width × depth)), averaged per direction (x, y) and combined.' : '')));
         } else form.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, 'The ramp is stretched between the smallest and the largest value' + (F === 'wse' ? ' of the current time step.' : '.')));
         if (!app.meshResults && F !== 'elev') form.appendChild(h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'This is a results field: it is shown after a 1D-2D run or when a .fout results file is loaded.'));
         return;

@@ -448,10 +448,11 @@
       this.startDraw(L);
     }
     startDraw(L) {
-      this.drawLayer = L; this.app.setTool('draw-ext'); this.app.map.drawGeom = L.kind;
+      this.onDrawHook = null; this.drawLayer = L; this.app.setTool('draw-ext'); this.app.map.drawGeom = L.kind;
       this.app.map.setHint('Drawing on layer "' + L.name + '": click to add ' + (L.kind === 'point' ? 'points' : 'vertices; double-click or Enter to finish') + '. Esc to stop.');
     }
     onDraw(pts) {
+      if (this.onDrawHook) { const f = this.onDrawHook; this.onDrawHook = null; this.app.setTool('select'); f(pts); return; }
       const L = this.drawLayer; if (!L) return;
       const f = { type: L.kind, coords: L.kind === 'point' ? pts : [L.kind === 'polygon' ? pts.concat([pts[0]]) : pts], props: { ID: L.features.length + 1 } };
       let b = [Infinity, Infinity, -Infinity, -Infinity]; for (const p of pts) { b[0] = Math.min(b[0], p[0]); b[1] = Math.min(b[1], p[1]); b[2] = Math.max(b[2], p[0]); b[3] = Math.max(b[3], p[1]); }

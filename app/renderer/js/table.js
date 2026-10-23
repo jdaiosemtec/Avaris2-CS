@@ -12,10 +12,9 @@
     const cols = [{ k: 'id', l: 'ID', get: (c) => c.id, ro: true }, { k: 'x', l: 'X', get: (c) => +c.x.toFixed(3), num: true, ro: true }, { k: 'y', l: 'Y', get: (c) => +c.y.toFixed(3), num: true, ro: true },
       { k: 'elev', l: 'Ground Elev. (' + L + ')', get: (c) => c.elev, num: true, mesh: true }, { k: 'n', l: 'Roughness', get: (c) => c.n, num: true, mesh: true },
       { k: 's', l: 'Cell Size', get: (c) => c.s, num: true, ro: true }, { k: 'deg', l: 'Neighbours', get: (c) => c.deg, num: true, ro: true }];
-    if (app.meshResults) cols.push({ k: '_maxdepth', l: 'Max. Depth (' + L + ') (result)', get: (c) => r4(AV.cellValue(app, K(c), 'maxdepth')), num: true, ro: true, res: true },
-      { k: '_tpond', l: 'Time Ponded (hr) (result)', get: (c) => r4(AV.cellValue(app, K(c), 'tpond')), num: true, ro: true, res: true },
-      { k: '_trecede', l: 'Time to Recede (hr) (result)', get: (c) => r4(AV.cellValue(app, K(c), 'trecede')), num: true, ro: true, res: true });
-    if (app.meshResults && app.playMode) cols.push({ k: '_depth', l: 'Depth (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'depth')), num: true, ro: true, res: true }, { k: '_wse', l: 'Water Surface (' + L + ') at current time', get: (c) => r4(AV.cellValue(app, K(c), 'wse')), num: true, ro: true, res: true });
+    const RC = (f) => ({ k: '_' + f, l: AV.MESH_FIELDS[f].replace(/ \(hr\)$/, '') + ' (' + AV.meshUnit(app, f) + ') (result)', get: (c) => r4(AV.cellValue(app, K(c), f)), num: true, ro: true, res: true });
+    if (app.meshResults) cols.push(...['maxdepth', 'maxwse', 'maxvel', 'hazard', 'dv', 'arrival', 'tmax', 'tpond', 'trecede'].map(RC));
+    if (app.meshResults && app.playMode) cols.push(...['depth', 'wse', 'vel', 'hzd'].map(f => Object.assign(RC(f), { l: AV.MESH_FIELDS[f].replace(' (current time)', '') + ' (' + AV.meshUnit(app, f) + ') at current time' })));
     return { kind: 'MESH', cols, objs };
   }
   // imported (external) vector layers: one row per feature, columns = the layer's attribute fields
@@ -195,7 +194,7 @@
       this.app.contextMenu(e.clientX, e.clientY, items);
     }
     themeBy(c) {
-      if (this.mesh()) { const f = { elev: 'elev', _maxdepth: 'maxdepth', _tpond: 'tpond', _trecede: 'trecede', _depth: 'depth', _wse: 'wse' }[c.k]; if (!f) { AV.toast('This field is not available for map rendering.', true); return; }
+      if (this.mesh()) { const f = c.k === 'elev' ? 'elev' : AV.MESH_FIELDS[c.k.replace(/^_/, '')] ? c.k.replace(/^_/, '') : null; if (!f) { AV.toast('This field is not available for map rendering.', true); return; }
         const P = this.app.prefs.mesh2d || (this.app.prefs.mesh2d = {}); if (AV.MESH_DYNAMIC[f]) P.playField = f; else P.field = f; this.app.savePrefs(); this.app._meshRange = null; this.app.activateView('map'); this.app.map.redraw(); this.app.symPane.open({ mesh: true }); return; }
       const layer = this.rows.kind === 'NODE' ? 'node' : this.rows.kind === 'LINK' ? 'link' : this.rows.kind === 'SUBCATCH' ? 'sub' : null; if (!layer) return;
       const map = { elev: 'elev', maxDepth: 'maxDepth', _rim: 'rim', g1: 'diam', length: 'length', rough: 'rough', _slope: 'slope', area: 'area', imperv: 'imperv', width: 'width', slope: 'slope', _r0: 'm:0', _r1: 'm:1', _r2: 'm:2', _r4: 'm:4', _r5: 'm:5', _nc: 'nc' };

@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld('host', {
   outStats: (h, type, v) => ipcRenderer.invoke('out:stats', h, type, v),
   outSnapshotAll: (h, per, type) => ipcRenderer.invoke('out:snapshotAll', h, per, type),
   outColumns: (h, p0, np, type, vars) => ipcRenderer.invoke('out:columns', h, p0, np, type, vars),
+  outMesh2d: (h, cells, links, width, thr, siK, df) => ipcRenderer.invoke('out:mesh2d', h, cells, links, width, thr, siK, df),
+  outCellSeries: (h, node, links, width, thr, siK, df) => ipcRenderer.invoke('out:cellSeries', h, node, links, width, thr, siK, df),
   outStatsAll: (h) => ipcRenderer.invoke('out:statsAll', h),
   outPondStats: (h, idx, thr) => ipcRenderer.invoke('out:pondStats', h, idx, thr),
 });

@@ -26,10 +26,11 @@
     // run mode: whole model, or coupled parallel when the model has been partitioned (Tools > Partition Model)
     const ci = opts.coupled; let modeEl = null; const rWhole = h('input', { type: 'radio', name: 'runmode', checked: true }), rCpl = h('input', { type: 'radio', name: 'runmode' });
     if (ci) {
-      const ok = !ci.stale && !ci.missing.length; if (ok && app._lastCoupled) { rCpl.checked = true; rWhole.checked = false; } if (!ok) rCpl.disabled = true;
+      const hps = AV.hasHPS(app); const ok = hps && !ci.stale && !ci.missing.length; if (ok && app._lastCoupled) { rCpl.checked = true; rWhole.checked = false; } if (!ok) rCpl.disabled = true;
       modeEl = h('div', { class: 'runmode' },
         h('label', null, rWhole, ' Whole model'),
         h('label', { style: { opacity: ok ? 1 : 0.55 } }, rCpl, ' Coupled parallel – ' + ci.parts.length + ' sub-models, ' + ci.def.couplings.length + ' cut points'),
+        !hps ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'The coupled parallel simulation is part of Avaris2 CS High Performance Simulation (Help ▸ Register).') : null,
         ci.stale ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'The model changed after it was partitioned (' + ci.stale + ' change' + (ci.stale === 1 ? '' : 's') + '). Update the sub-models first: Tools ▸ Partition Model ▸ Regenerate.') : null,
         ci.missing.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'Sub-model file(s) missing: ' + ci.missing.slice(0, 3).join(', ') + '. Generate the sub-models again (Tools ▸ Partition Model).') : null,
         ok && ci.edited.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, ci.edited.length + ' sub-model file(s) were edited directly after they were generated (' + ci.edited.slice(0, 3).join(', ') + '); the coupled run uses them as they are.') : null,

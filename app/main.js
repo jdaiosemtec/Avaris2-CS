@@ -209,7 +209,7 @@ function verifyLicence(raw) {
   try { ok = crypto.verify(null, payload, crypto.createPublicKey(LIC_PUB), unb64u(m[2])); } catch (e) { ok = false; }
   if (!ok) { out.error = 'The licence key is not valid (signature check failed).'; return out; }
   let L; try { L = JSON.parse(payload.toString('utf8')); } catch (e) { out.error = 'The licence key is damaged.'; return out; }
-  if (L.v !== 2 || !['1D', '2D'].includes(L.ed)) { out.error = 'Unsupported licence version.'; return out; }
+  if (L.v !== 2 || !['1D', '2D', 'HPS'].includes(L.ed)) { out.error = 'Unsupported licence version.'; return out; }
   Object.assign(out, { edition: L.ed, licensee: L.name || '', user: L.user || '', company: L.company || '', expiry: L.exp || '', serial: L.ser || '', issued: L.iss || '', term: L.term || '', licMachine: L.mc || '' });
   if (hwMatches(L.hw || {}, machineInfo().hw) < 2) { out.error = 'This licence was issued for another computer (' + (L.mc || '?') + '). This computer: ' + machineInfo().code + '.'; out.wrongMachine = true; return out; }
   const ck = clockCheck(); if (ck.back) { out.error = 'The computer clock is set earlier than the last time Avaris2 CS was used. Correct the date and time, then restart.'; out.clock = true; return out; }
@@ -448,6 +448,8 @@ ipcMain.handle('out:close', async (e, h) => { const r = outFiles.get(h); if (r) 
 ipcMain.handle('out:series', async (e, h, type, index, v) => outFiles.get(h).series(type, index, v));
 ipcMain.handle('out:snapshot', async (e, h, period, type, v) => outFiles.get(h).snapshot(period, type, v));
 ipcMain.handle('out:stats', async (e, h, type, v) => outFiles.get(h).stats(type, v));
+ipcMain.handle('out:mesh2d', async (e, h, cells, links, width, thr, siK, df) => outFiles.get(h).mesh2d(Int32Array.from(cells), Int32Array.from(links), Float32Array.from(width), thr, siK, df));
+ipcMain.handle('out:cellSeries', async (e, h, node, links, width, thr, siK, df) => outFiles.get(h).cellSeries(node, Int32Array.from(links), Float32Array.from(width), thr, siK, df));
 ipcMain.handle('out:columns', async (e, h, p0, np, type, vars) => outFiles.get(h).columns(p0, np, type, vars));
 ipcMain.handle('out:snapshotAll', async (e, h, period, type) => outFiles.get(h).snapshotAll(period, type));
 ipcMain.handle('out:statsAll', async (e, h) => outFiles.get(h).statsAll());

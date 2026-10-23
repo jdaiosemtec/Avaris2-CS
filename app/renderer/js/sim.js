@@ -373,7 +373,7 @@
     // the sub-models exchange flows and levels at the cut points in every iteration; the results are merged into one
     // run of the master model (Database, Comparison, map and graphs work as for a normal run)
     async runCoupled(rn, ci) {
-      const m = this.model, app = this.app;
+      const m = this.model, app = this.app; if (!AV.hasHPS(app)) { AV.needHPS(app, 'Coupled parallel simulation'); return; }
       const dir = AV.resultsDir(app.filePath); try { await window.host.mkdir(dir); } catch (e) { }
       const base = rn.name; if (this.results) await this.clearResults(true);
       let threads = 1; try { const c = await window.host.cpuInfo(); threads = Math.max(1, Math.floor((c.logical || 1) / ci.parts.length)); } catch (e) { }
@@ -553,7 +553,7 @@
       this._busy = true;
       const _t = performance.now(); try { await R.setPeriod(p); } finally { this._busy = false; AV.perf.rec('Results: read one time step', performance.now() - _t); }
       if (this.slider) { this.slider.value = R.period; this.timeEl.textContent = R.timeLabel(R.period); }
-      this.app._meshRange = null; this.app.map.redraw(); this.updatePropsResults(); if (this.app.timeStep) this.app.timeStep.refresh();
+      this.app._meshRange = null; this.app.map.redraw(); this.updatePropsResults(); if (this.app.timeStep) this.app.timeStep.refresh(); this.app.emit('period', R.period);
       for (const pv of this.profileViews) pv.draw();
       for (const c of AV.openCharts || []) { c.markerX = c.dateMode ? R.meta.startDate + (R.period + 1) * R.meta.reportStep / 86400 : R.times[R.period]; c.draw(); }
       if (this._pending !== undefined) { const q = this._pending; this._pending = undefined; if (q !== R.period) this.setPeriod(q); }
