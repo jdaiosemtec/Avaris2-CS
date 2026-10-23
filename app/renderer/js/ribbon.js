@@ -14,7 +14,6 @@
             { id: 'new', label: 'New', img: 'new', fn: () => this.newProject(), tip: 'New project (Ctrl+N)' },
             { id: 'open', label: 'Open', img: 'open', fn: () => this.openDialog(), tip: 'Open an Avaris / SWMM .inp model (Ctrl+O)' },
             { id: 'close', label: 'Close', img: 'close', fn: () => this.closeProject() }] },
-          { name: 'Scenario', items: [{ id: 'scen', label: 'Scenarios', img: 'scenarios', fn: () => F().scenarios() }] },
           { name: 'Import', items: [{ id: 'import', label: 'Import', img: 'import', fn: () => this.showRightTab('catalog'), tip: 'Open the Catalog: browse and drag GIS data (SHP, GeoJSON, KML, CSV, DXF, GeoTIFF, GDB, .out results ...) onto the map' }] },
           { name: 'Export', items: [{ id: 'export', label: 'Export', img: 'export', fn: () => this.showRightTab('export'), tip: 'Export Wizard: network objects and results to Shapefile, File Geodatabase or CSV' }] },
           { name: 'Print', items: [{ id: 'layout', label: 'Print Layout', img: 'print', fn: () => AV.openLayout(this), tip: 'Print layout: map, title block, legend, scale bar and north arrow on a page; print or save as PDF / PNG' }] },
@@ -74,12 +73,12 @@
               { id: 'measure', label: 'Measure', img: 'ruler', mode: 'measure' }] }] },
           { name: 'Model Data', items: [
             { id: 'infer', label: 'Infer & Clean', img: 'infer', fn: () => AV.openInference(this), tip: 'Data inference and cleaning: fill missing inverts, diameters, lengths, depths; find adverse slopes, duplicates, orphans …' },
-            { id: 'dwf', label: 'Dry\u00a0Weather Flow', img: 'dwf', fn: () => AV.openDWF(this), tip: 'Generate the dry weather (foul) flow of the nodes from subcatchments or a point layer, with diurnal patterns' }] },
+            { id: 'dwf', label: 'Dry\u00a0Weather Flow', img: 'dwf', fn: () => AV.openDWF(this), tip: 'Generate the dry weather (foul) flow of the nodes from subcatchments or a point layer, with diurnal patterns' },
+            { id: 'valid', label: 'Validate Model', img: 'validate', fn: () => T().validate(), tip: 'Check the model for errors and warnings (missing data, invalid references, adverse slopes …)' }] },
           { name: 'Partition', items: [{ id: 'part', label: 'Partition Model', img: 'partition', lic: 'HPS', badge: 'HPS', fn: () => AV.openPartition(this, 'part'), active: () => !!this.partView, tip: 'Split the model into sub-models for coupled parallel simulation (one direction of flow per partition, as few cut points as possible); the panel also regenerates the sub-models after the master model changed' }] },
-          { name: 'Rainfall', items: [{ id: 'gen', label: 'Design Storm', img: 'hyetograph', fn: () => AV.hyetographDialog(this), tip: 'Design storm / hyetograph generator (Chicago, SCS, triangular, uniform, custom pattern)' }] },
+          { name: 'Rainfall', items: [{ id: 'gen', label: 'Design Storm', img: 'designstorm', fn: () => AV.hyetographDialog(this), tip: 'Design storm / hyetograph generator (Chicago, SCS, triangular, uniform, custom pattern)' }] },
           { name: 'Spatial Reference', items: [{ small: [{ id: 'rr', label: 'Reproject Raster', img: 'reprojraster', fn: () => F().reprojectRaster() }, { id: 'csr', label: 'Convert Coordinates', img: 'convertsr', fn: () => F().convertSR() }] }] },
           { name: 'Utilities', items: [
-            { id: 'valid', label: 'Validate Model', svg: 'validate', fn: () => T().validate() },
             { id: 'conv', label: 'Unit Converter', img: 'converter', fn: () => F().unitConverter() }] },
         ]
       },

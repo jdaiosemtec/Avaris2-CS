@@ -185,7 +185,7 @@
       const mesh = app.mesh2d; const S = AV.meshStyle(app);
       const meshBox = () => { const c = mesh.cells; let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const q of c) { x1 = Math.min(x1, q.x - q.s / 2); y1 = Math.min(y1, q.y - q.s / 2); x2 = Math.max(x2, q.x + q.s / 2); y2 = Math.max(y2, q.y + q.s / 2); } return { x1, y1, x2, y2 }; };
       if (!mesh) { row(1, [sp(), h('span', { class: 'lwarn', onclick: () => AV.createMeshes(app) }, '2D Meshes: not created — click to Create Meshes')], { drag: 'mesh', menu: () => [{ label: 'Create Meshes', fn: () => AV.createMeshes(app) }, { label: '2D Flood Settings...', fn: () => app.sim.optionsDialog('2D Flood') }] }); return; }
-      const ic = h('canvas', { class: 'symicon', width: 56, height: 32, title: 'Symbology' }); { const g = ic.getContext('2d'); g.scale(2, 2); const C = S.breaks ? [S.colors[0], S.colors[Math.floor(S.colors.length / 2)], S.colors[S.colors.length - 1]] : ['#2e7d32', '#fff176', '#bc8c5c']; for (let i = 0; i < 3; i++) { g.fillStyle = C[i]; g.fillRect(4 + i * 7, 3, 6, 10); } g.strokeStyle = '#78909c'; g.strokeRect(4.5, 3.5, 20, 10); }
+      const ic = h('canvas', { class: 'symicon', width: 56, height: 32, title: 'Symbology' }); { const g = ic.getContext('2d'); g.scale(2, 2); const C = S.breaks ? [S.colors[0], S.colors[Math.floor(S.colors.length / 2)], S.colors[S.colors.length - 1]] : ['#2e7d32', '#fff176', '#bc8c5c']; if (S.heat) { const gr = g.createLinearGradient(4, 0, 24, 0); C.forEach((c, i) => gr.addColorStop(i / 2, c)); g.fillStyle = gr; g.fillRect(4, 3, 21, 10); } else for (let i = 0; i < 3; i++) { g.fillStyle = C[i]; g.fillRect(4 + i * 7, 3, 6, 10); } g.strokeStyle = '#78909c'; g.strokeRect(4.5, 3.5, 20, 10); }
       ic.addEventListener('click', (e) => { e.stopPropagation(); app.symPane.open({ mesh: true }); });
       row(1, [sp(), chk(S.visible, v => { app.prefs.mesh2d.visible = v; app.savePrefs(); }), ic, h('span', { class: 'lname', title: '2D flood surface, coloured by ' + AV.MESH_FIELDS[S.field] }, '2D Meshes'), h('span', { class: 'lcnt' }, String(mesh.cells.length))], {
         drag: 'mesh', dbl: () => app.symPane.open({ mesh: true }),
@@ -288,7 +288,7 @@
         // 2D mesh flood map: variable, ranges with colours (theme style), ramp, transparency, outlines
         const P = app.prefs.mesh2d || (app.prefs.mesh2d = {}); if (P.outline === undefined) P.outline = true; if (P.visible === undefined) P.visible = true; if (P.opacity === undefined) P.opacity = 0.8;
         const S = AV.meshStyle(app); const F = S.field; const cont = !!AV.MESH_CONTINUOUS[F];
-        const redraw = () => { app._meshRange = null; this.changed(); };
+        const redraw = () => { app._meshRange = null; app._meshHeat = null; this.changed(); };
         sec('Display');
         // one variable list: current-time variables (depth, water surface) need play mode; the others always show
         const fSel = h('select', { onchange: () => { const v = fSel.value;
@@ -297,7 +297,9 @@
             redraw(); this.render(); } },
           AV.MESH_GROUPS.map(([g, ks]) => h('optgroup', { label: g }, ks.map(k => h('option', { value: k }, AV.MESH_FIELDS[k].replace(' (current time)', '') + (AV.MESH_DYNAMIC[k] && !app.playMode ? '  (play mode only)' : ''))))));
         fSel.value = F; rowE('Variable', fSel);
-        rowE('Transparency', opac(P, 'opacity')); rowE('', check(P, 'outline', 'Cell outlines')); rowE('', check(P, 'arrows', 'Flow direction arrows (cells ≥ 12 px)')); rowE('', check(P, 'visible', 'Visible'));
+        const rnd = h('select', { title: 'Mesh cells: each cell filled with the colour of its range. Heat map: a smooth surface with colours blended between the ranges (cell outlines are not drawn).', onchange: () => { P.render = rnd.value; redraw(); this.render(); } },
+          h('option', { value: 'cells' }, 'Mesh cells (ranges)'), h('option', { value: 'heatmap' }, 'Heat map (smooth)')); rnd.value = P.render === 'heatmap' ? 'heatmap' : 'cells'; rowE('Rendering', rnd);
+        rowE('Transparency', opac(P, 'opacity')); if (P.render !== 'heatmap') rowE('', check(P, 'outline', 'Cell outlines')); rowE('', check(P, 'arrows', 'Flow direction arrows (cells ≥ 12 px)')); rowE('', check(P, 'visible', 'Visible'));
         if (F === 'hazard' || F === 'hzd') { const dfs = h('select', { onchange: async () => { P.df = dfs.value; if (app.meshResults) { await AV.computeMeshResults(app); } redraw(); this.render(); } },
             Object.entries(AV.HAZARD_DF).map(([k, o]) => h('option', { value: k, title: o.label }, o.short))); dfs.value = AV.HAZARD_DF[P.df] ? P.df : 'conservative'; rowE('Debris factor', dfs); }
         sec(cont ? 'Colour ramp (continuous)' : 'Ranges');

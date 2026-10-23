@@ -320,7 +320,7 @@
     let breaks = null, colors = null;
     if (!AV.MESH_CONTINUOUS[field]) { const cls = P.classes && P.classes[field];
       if (cls && cls.length) { breaks = cls.map(c => +c.v); colors = cls.map(c => c.color); } else { breaks = AV.meshDefaultBreaks(app, field); colors = AV.rampColors(ramp, breaks.length, invert); } }
-    return { field, breaks, colors, ramp, invert, opacity: P.opacity === undefined ? 0.8 : P.opacity, outline: P.outline !== false, visible: P.visible !== false, arrows: !!P.arrows };
+    return { field, breaks, colors, ramp, invert, opacity: P.opacity === undefined ? 0.8 : P.opacity, outline: P.outline !== false, visible: P.visible !== false, arrows: !!P.arrows, heat: P.render === 'heatmap' };
   };
   const rampAt = (name, t, inv) => { const R = AV.RAMPS[name] || AV.RAMPS['Terrain']; if (inv) t = 1 - t; t = Math.max(0, Math.min(1, t)); const x = t * (R.length - 1), k = Math.min(R.length - 2, Math.floor(x)), f = x - k;
     const c1 = R[k], c2 = R[k + 1]; const g = (c, i) => parseInt(c.slice(1 + 2 * i, 3 + 2 * i), 16); return 'rgb(' + [0, 1, 2].map(i => Math.round(g(c1, i) + (g(c2, i) - g(c1, i)) * f)).join(',') + ')'; };
@@ -333,9 +333,46 @@
     let c = S.colors[S.colors.length - 1]; for (let i = 1; i < S.breaks.length; i++) if (v < S.breaks[i]) { c = S.colors[i - 1]; break; }
     return c;
   };
+  // ---- heat map rendering: the cell values on a raster at the finest cell size, coloured continuously through the
+  // class colours (colour i at break i), drawn with bilinear smoothing and a slight blur -> smooth surface, soft wet edge
+  const rgbOf = (c) => { c = String(c).trim(); let m = /^#([0-9a-f]{3})$/i.exec(c); if (m) return [...m[1]].map(x => parseInt(x + x, 16));
+    m = /^#([0-9a-f]{6})/i.exec(c); if (m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)); m = /rgba?\(([^)]+)\)/i.exec(c); if (m) return m[1].split(',').slice(0, 3).map(x => Math.round(+x)); return [128, 128, 128]; };
+  AV.meshHeatColor = function (app, S, v, cache) {
+    if (v === null || !isFinite(v)) return null;
+    if (!S.breaks) { const [a, b] = AV.meshRange(app, S.field); return rgbOf(rampAt(S.ramp, b > a ? (v - a) / (b - a) : 0.5, S.invert)); }
+    const B = S.breaks, C = cache || S.colors.map(rgbOf); if (v < B[0]) return S.field === 'ddepth' ? C[0] : null;
+    if (v >= B[B.length - 1]) return C[C.length - 1];
+    for (let i = 1; i < B.length; i++) if (v < B[i]) { const f = B[i] > B[i - 1] ? (v - B[i - 1]) / (B[i] - B[i - 1]) : 0; return [0, 1, 2].map(j => Math.round(C[i - 1][j] + (C[i][j] - C[i - 1][j]) * f)); }
+    return C[C.length - 1];
+  };
+  function heatImage(app, S) {
+    const mesh = app.mesh2d, cells = mesh.cells, R = app.results;
+    const key = [S.field, JSON.stringify(S.breaks), JSON.stringify(S.colors), S.ramp, S.invert, app.meshResults && app.meshResults.cmp ? app.meshResults.cmp.name + ':' + app.meshResults.cmp.label : ''].join('|');
+    const H = app._meshHeat; if (H && H.key === key && H.mesh === mesh && H.MR === app.meshResults && (!AV.MESH_DYNAMIC[S.field] || H.snap === (R && R.snap && R.snap.node))) return H;
+    let s0 = Infinity, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const c of cells) { s0 = Math.min(s0, c.s); x0 = Math.min(x0, c.x - c.s / 2); y0 = Math.min(y0, c.y - c.s / 2); x1 = Math.max(x1, c.x + c.s / 2); y1 = Math.max(y1, c.y + c.s / 2); }
+    const cap = AV.MESH_DYNAMIC[S.field] ? 1.5e6 : 4e6; let px = s0; const n0 = ((x1 - x0) / s0) * ((y1 - y0) / s0); if (n0 > cap) px = s0 * Math.ceil(Math.sqrt(n0 / cap));
+    const pad = 2; const nc = Math.max(1, Math.round((x1 - x0) / px)) + 2 * pad, nr = Math.max(1, Math.round((y1 - y0) / px)) + 2 * pad;
+    const cv = document.createElement('canvas'); cv.width = nc; cv.height = nr; const g = cv.getContext('2d'); const img = g.createImageData(nc, nr); const D = img.data;
+    const Cc = S.breaks ? S.colors.map(rgbOf) : null;
+    for (let k = 0; k < cells.length; k++) { const c = cells[k]; const col = AV.meshHeatColor(app, S, AV.cellValue(app, k, S.field), Cc); if (!col) continue;
+      const i0 = pad + Math.round((c.x - c.s / 2 - x0) / px), j0 = pad + Math.round((y1 - (c.y + c.s / 2)) / px), n = Math.max(1, Math.round(c.s / px));
+      for (let j = j0; j < j0 + n && j < nr; j++) for (let i = i0; i < i0 + n && i < nc; i++) { const o = (j * nc + i) * 4; D[o] = col[0]; D[o + 1] = col[1]; D[o + 2] = col[2]; D[o + 3] = 255; } }
+    g.putImageData(img, 0, 0);
+    // slight blur (about half a cell) so the blocks blend into a continuous surface
+    const out = document.createElement('canvas'); out.width = nc; out.height = nr; const go = out.getContext('2d'); try { go.filter = 'blur(' + (0.75) + 'px)'; } catch (e) { /* no filter */ } go.drawImage(cv, 0, 0);
+    return (app._meshHeat = { key, mesh, MR: app.meshResults, snap: R && R.snap && R.snap.node, canvas: out, x0: x0 - pad * px, y1: y1 + pad * px, w: nc * px, h: nr * px });
+  }
   AV.drawMesh = function (map, ctx) {
     const app = map.app, mesh = app.mesh2d; if (!mesh || !mesh.cells.length || (app.partView && app.partView.P)) return; const S = AV.meshStyle(app); if (!S.visible) return;
     const vb = map.visibleBox(); const sc = map.scale; const cells = mesh.cells; const big = cells.length > 60000;
+    if (S.heat && !app.themeHidden && (app.meshResults || S.field === 'elev')) {
+      const Hm = heatImage(app, S); const [sx, sy] = map.toScreen(Hm.x0, Hm.y1);
+      ctx.save(); ctx.globalAlpha = S.opacity; ctx.imageSmoothingEnabled = true; try { ctx.imageSmoothingQuality = 'high'; } catch (e) { /* old */ }
+      ctx.drawImage(Hm.canvas, sx, sy, Hm.w * sc, Hm.h * sc); ctx.restore();
+      if (S.arrows && app.meshResults) drawArrows(map, ctx, vb);
+      return;
+    }
     const groups = new Map(); const outline = new Path2D(); let nOut = 0;
     for (let k = 0; k < cells.length; k++) { const c = cells[k], hs = c.s / 2; if (c.x + hs < vb.x1 || c.x - hs > vb.x2 || c.y + hs < vb.y1 || c.y - hs > vb.y2) continue;
       const [x, y] = map.toScreen(c.x - hs, c.y + hs); const w = c.s * sc; const col = app.themeHidden ? null : AV.meshColor(app, k, S);
@@ -375,6 +412,14 @@
     const u = AV.meshUnit(app, S.field); const hz = (S.field === 'hazard' || S.field === 'hzd') && AV.HAZARD_CLASSES.every(([b], i) => i === 0 || Math.abs(S.breaks[i] - AV.HAZARD_CLASSES[i - 1][0]) < 1e-9) && S.breaks.length === 4;
     let rows; if (S.breaks) rows = S.breaks.map((b, i) => [S.colors[i], (i === 0 && S.field === 'ddepth' ? '< ' + AV.fmt(S.breaks[1]) : i < S.breaks.length - 1 ? AV.fmt(b) + ' – ' + AV.fmt(S.breaks[i + 1]) : '> ' + AV.fmt(b)) + (hz ? '  ' + AV.HAZARD_CLASSES[i][1] : '')]);
     else { const [a, b] = AV.meshRange(app, S.field); if (!isFinite(a)) return; rows = [0, 0.25, 0.5, 0.75, 1].map(t => [rampAt(S.ramp, t, S.invert), AV.fmt(a + (b - a) * t, 2)]).reverse(); }
+    if (S.heat && S.breaks) { const C = S.colors.map(rgbOf), B = S.breaks; const n = B.length; const hb = Math.max(90, n * 22); ctx.font = '11px Segoe UI'; const tw = Math.max(...B.map(b => ctx.measureText('≥ ' + AV.fmt(b)).width)); ctx.font = 'bold 11px Segoe UI'; const W2 = Math.max(tw + 42, ctx.measureText('2D: ' + FIELDS[S.field].replace(/ \(.*\)/, '') + ' (' + u + ')').width + 16), H2 = hb + 30, x = 10, y = map.hgt - H2 - 34;
+      ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.strokeStyle = '#b0bec5'; ctx.fillRect(x, y, W2, H2); ctx.strokeRect(x + .5, y + .5, W2, H2);
+      ctx.font = 'bold 11px Segoe UI'; ctx.fillStyle = '#263238'; ctx.textBaseline = 'middle'; const C2 = S.field === 'ddepth' && app.meshResults && app.meshResults.cmp && app.meshResults.cmp.label ? app.meshResults.cmp : null;
+      ctx.fillText('2D: ' + (C2 ? C2.label : FIELDS[S.field].replace(/ \(.*\)/, '') + (u === '-' ? '' : ' (' + u + ')')), x + 7, y + 11);
+      const gy0 = y + 22, gy1 = gy0 + hb - 8; const gr = ctx.createLinearGradient(0, gy1, 0, gy0); C.forEach((c, i) => gr.addColorStop(n > 1 ? i / (n - 1) : 0, 'rgb(' + c.join(',') + ')'));
+      ctx.fillStyle = gr; ctx.fillRect(x + 7, gy0, 16, gy1 - gy0); ctx.strokeStyle = '#90a4ae'; ctx.strokeRect(x + 7.5, gy0 + .5, 15, gy1 - gy0 - 1);
+      ctx.font = '11px Segoe UI'; ctx.fillStyle = '#37474f'; B.forEach((b, i) => { const yy = gy1 - (n > 1 ? i / (n - 1) : 0) * (gy1 - gy0); ctx.fillRect(x + 23, yy - .5, 4, 1); ctx.fillText((i === n - 1 ? '≥ ' : '') + AV.fmt(b), x + 31, yy); });
+      ctx.restore(); return; }
     const W = hz ? 210 : (S.field === 'ddepth' && app.meshResults && app.meshResults.cmp && app.meshResults.cmp.label ? Math.max(160, 7 * app.meshResults.cmp.label.length + 20) : 160), H = 22 + rows.length * 16, x = 10, y = map.hgt - H - 34;
     ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.strokeStyle = '#b0bec5'; ctx.fillRect(x, y, W, H); ctx.strokeRect(x + .5, y + .5, W, H);
     ctx.font = 'bold 11px Segoe UI'; ctx.fillStyle = '#263238'; ctx.textBaseline = 'middle'; const C = S.field === 'ddepth' && app.meshResults && app.meshResults.cmp && app.meshResults.cmp.label ? app.meshResults.cmp : null; ctx.fillText('2D: ' + (C ? C.label : FIELDS[S.field].replace(/ \(.*\)/, '') + (u === '-' ? '' : ' (' + u + ')')), x + 7, y + 11);
