@@ -99,6 +99,8 @@
             { small: [
               { id: 'report', label: 'Report', img: 'report', fn: () => S().showReport() },
               { id: 'conv2', label: 'Convergence', img: 'convergence', fn: () => S().convergenceDiagnostics(), tip: 'Nonconvergence diagnostics' }] } ] },
+          { name: 'Calibration', items: [
+            { id: 'calib', label: 'Auto Calibration', img: 'calibration', lic: 'HPS', badge: 'HPS', fn: () => AV.openCalibration(this), active: () => this.views && this.views.has('calib'), tip: 'Calibrate the model against flow-survey data: map the monitors to model objects, read and clean the observed data, rainfall events (later versions: parameters, automatic calibration, results)' }] },
         ]
       },
       {

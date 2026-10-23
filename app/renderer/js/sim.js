@@ -205,6 +205,7 @@
           { k: 'VARIABLE_STEP', l: 'Variable Step Safety Factor (0 = off)', t: 'text' }, { k: 'MINIMUM_STEP', l: 'Minimum Variable Step (sec)', t: 'text' },
           { k: 'LENGTHENING_STEP', l: 'Conduit Lengthening Step (sec)', t: 'text' }, { k: 'MIN_SURFAREA', l: 'Minimum Nodal Surface Area', t: 'text' },
           { k: 'MAX_TRIALS', l: 'Maximum Trials per Step', t: 'text' }, { k: 'HEAD_TOLERANCE', l: 'Head Convergence Tolerance', t: 'text' }],
+        Files: [{ t: 'files' }],
         'Avaris Engine': [
           { k: 'THREADS', l: 'Number of Threads (0 = all cores)', t: 'threads', note: 'Conduit flows and node depths are solved in parallel (OpenMP); results are identical for any number of threads. The engine uses 1 thread when the model has fewer than 4 links per thread.' },
           { k: 'UNDER_RELAXATION', l: 'Under-Relaxation Factor (0.1 - 1.0)', t: 'text', note: 'Weight given to the new iterate in the dynamic-wave Picard iterations (the standard value is 0.5). Lower values damp oscillation at hard-to-converge nodes; higher values converge faster on well-behaved networks.' },
@@ -234,13 +235,14 @@
       };
       if (only2D) { for (const k of Object.keys(tabs)) if (k !== '2D Flood') delete tabs[k]; } else if (!AV.has2D(this.app)) delete tabs['2D Flood'];
       const body = h('div', { style: { width: only2D ? '600px' : '560px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
-      const inputs = {}; const pages = [];
+      const inputs = {}; const pages = []; let filesUI = null; tb.style.flexWrap = 'wrap';
       const t0 = Math.max(0, Object.keys(tabs).indexOf(startTab));
       Object.keys(tabs).forEach((name, ti) => {
         const form = h('div', { class: 'form', style: { display: ti !== t0 ? 'none' : 'grid' } });
         for (const f of tabs[name]) {
           if (f.t === 'h') { form.appendChild(h('h4', null, f.l)); continue; }
           if (f.t === 'note') { form.appendChild(h('div', { class: 'note' }, f.l)); continue; }
+          if (f.t === 'files') { filesUI = AV.filesTab(this.app); form.appendChild(filesUI.el); continue; }
           let inp;
           if (f.t === 'choice') { inp = h('select', null, f.o.map(x => h('option', { value: x }, x))); inp.value = String(v[f.k]).toUpperCase(); }
           else if (f.t === 'check') inp = h('input', { type: 'checkbox', checked: !!v[f.k] });
@@ -295,6 +297,7 @@
       this.detailReport = r.detail; delete r.detail;
       // flow units: changed through the units switch (asks whether the values are converted)
       const newFU = r.FLOW_UNITS; delete r.FLOW_UNITS; if (newFU && newFU !== this.model.flowUnits) setTimeout(() => AV.changeFlowUnits(this.app, newFU), 50);
+      if (filesUI) filesUI.apply();
       const old = Object.assign({}, this.model.options); const nw = Object.assign({}, this.model.options);
       for (const k in r) {
         if (k === 'UNDER_RELAXATION' && +r[k] === 0.5 && old[k] === undefined) continue;
@@ -349,9 +352,9 @@
           const a = await AV.modal({ title: 'Run Simulation - files not found', width: 640, body: h('div', { style: { lineHeight: 1.55 } },
               h('div', null, 'The model uses these files, but they were not found on this computer:'),
               h('ul', { style: { margin: '6px 0 8px 18px', padding: 0 } }, miss.map(x => h('li', null, h('b', null, x.what), ': ', h('code', { style: { wordBreak: 'break-all' } }, x.abs)))),
-              h('div', { class: 'note' }, 'Copy the file to that place, or change the path: interface files (hot start, rainfall) in Parameter View ▸ Options ▸ Interface Files; rain gage and time-series files in their editors.' + (onlyOpt ? ' Or run without them: the missing interface files are left out of this run only (a run without its hot start file starts dry).' : ''))),
+              h('div', { class: 'note' }, 'Copy the file to that place, or change the path: interface files (hot start, rainfall) in Simulation Options ▸ Files; rain gage and time-series files in their editors.' + (onlyOpt ? ' Or run without them: the missing interface files are left out of this run only (a run without its hot start file starts dry).' : ''))),
             buttons: [{ label: 'Cancel', value: null }, { label: 'Open Interface Files', value: 'files' }].concat(onlyOpt ? [{ label: 'Run Without Them', primary: true, value: 'skip' }] : []) }).done;
-          if (a === 'files') { AV.openSectionEditor(app, 'FILES', 'Interface Files (hot start, rainfall)'); return; }
+          if (a === 'files') { this.optionsDialog('Files'); return; }
           if (a !== 'skip') return;
           const L = inpText.split('\n'); for (const x of miss) L[x.line] = ';' + L[x.line] + ' ;; left out: file not found'; inpText = L.join('\n');
           this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false }); }
@@ -917,5 +920,58 @@
     }
     if (![...m.nodes.values()].some(n => n.type === 'OUTFALL') && m.links.size) out.push('The network has no outfall');
     return out;
+  };
+  // Simulation Options ▸ Files: the [FILES] section (hot start, rainfall, runoff, RDII, inflows, outflows) as a list, as in Avaris DS
+  const FILE_TYPES = ['HOTSTART', 'RAINFALL', 'RUNOFF', 'RDII', 'INFLOWS', 'OUTFLOWS'];
+  const FILE_LABEL = { HOTSTART: 'Hotstart', RAINFALL: 'Rainfall', RUNOFF: 'Runoff', RDII: 'RDII', INFLOWS: 'Inflows', OUTFLOWS: 'Outflows' };
+  const FILE_EXT = { HOTSTART: ['hsf'], RAINFALL: ['dat', 'rff'], RUNOFF: ['rof', 'dat'], RDII: ['rdi', 'txt', 'dat'], INFLOWS: ['txt', 'dat'], OUTFLOWS: ['txt', 'dat'] };
+  AV.parseFilesSection = function (rows) {
+    const out = [], other = [];
+    for (const r of rows || []) { const t = r.trim(); if (!t || t[0] === ';') { other.push(r); continue; }
+      const k = AV.tokenize(r); const u = String(k[0] || '').toUpperCase(), ty = String(k[1] || '').toUpperCase();
+      if ((u === 'USE' || u === 'SAVE') && FILE_TYPES.includes(ty) && k.length >= 3) out.push({ use: u, type: ty, path: k.slice(2).join(' ') }); else other.push(r); }
+    return { files: out, other };
+  };
+  AV.filesLine = (f) => f.use + ' ' + f.type + ' ' + (/\s/.test(f.path) ? '"' + f.path + '"' : f.path);
+  AV.filesTab = function (app) {
+    const m = app.model; const old = (m.raw.FILES || []).slice(); const P = AV.parseFilesSection(old);
+    const files = P.files.map(f => Object.assign({}, f)); let cur = files.length ? 0 : -1;
+    const list = h('select', { size: 7, class: 'fileslist', style: { width: '100%', font: '12px var(--mono)' }, onchange: () => { cur = list.selectedIndex; showProp(); } });
+    const selType = h('select', null, FILE_TYPES.map(x => h('option', { value: x }, FILE_LABEL[x])));
+    const selUse = h('select', null, [h('option', { value: 'USE' }, 'Use'), h('option', { value: 'SAVE' }, 'Save')]);
+    const path = h('input', { type: 'text', placeholder: '(file name, relative to the model folder)', style: { width: '100%' } });
+    const label = (f) => (f.use === 'USE' ? 'Use  ' : 'Save ') + FILE_LABEL[f.type].padEnd(9) + ' ' + (f.path || '(no file)');
+    const renderList = () => { list.innerHTML = ''; files.forEach(f => list.appendChild(h('option', null, label(f)))); if (cur >= 0) list.selectedIndex = cur; };
+    const prop = h('div', { class: 'form', style: { marginTop: '8px' } });
+    const showProp = () => { const f = files[cur]; [selType, selUse, path, browse].forEach(e => e.disabled = !f); selType.value = f ? f.type : 'HOTSTART'; selUse.value = f ? f.use : 'USE'; path.value = f ? f.path : ''; path.title = path.value; };
+    const upd = () => { const f = files[cur]; if (!f) return; f.type = selType.value; f.use = selUse.value; f.path = path.value.trim(); renderList(); };
+    selType.onchange = upd; selUse.onchange = upd; path.oninput = upd;
+    const browse = h('button', { class: 'btn small', title: 'Browse', onclick: async () => { const f = files[cur]; if (!f) return;
+      const flt = [{ name: FILE_LABEL[f.type] + ' file', extensions: FILE_EXT[f.type] }, { name: 'All files', extensions: ['*'] }];
+      const p = f.use === 'SAVE' ? await window.host.saveDialog({ title: 'Save ' + FILE_LABEL[f.type] + ' file', defaultPath: f.path || (f.type === 'HOTSTART' ? 'hotstart.hsf' : f.type.toLowerCase() + '.' + FILE_EXT[f.type][0]), filters: flt })
+        : await window.host.openDialog({ title: 'Use ' + FILE_LABEL[f.type] + ' file', filters: flt });
+      if (p) { path.value = AV.f2dRelative(app, p); upd(); } } }, '...');
+    const add = () => { files.push({ use: 'USE', type: 'HOTSTART', path: '' }); cur = files.length - 1; renderList(); showProp(); path.focus(); };
+    const del = () => { if (cur < 0) return; files.splice(cur, 1); cur = Math.min(cur, files.length - 1); renderList(); showProp(); };
+    const clr = async () => { if (!files.length) return; if (!await AV.confirm('Remove all ' + files.length + ' interface file(s) from the list?', 'Files', 'Remove All')) return; files.length = 0; cur = -1; renderList(); showProp(); };
+    const tools = h('div', { style: { display: 'flex', gap: '4px', margin: '4px 0' } },
+      h('button', { class: 'btn small', title: 'Add a file', onclick: add }, '+'), h('button', { class: 'btn small', title: 'Remove the selected file', onclick: del }, '−'),
+      h('button', { class: 'btn small', title: 'Remove all files', onclick: clr }, 'Clear All'));
+    prop.append(h('h4', null, 'File Property'), h('label', null, 'File Type'), selType, h('label', null, 'Usage Type'), selUse, h('label', null, 'File Path'), h('div', { class: 'fpick', style: { maxWidth: 'none' } }, path, browse),
+      h('div', { class: 'note' }, 'Use = read the file at the start of the run (e.g. a hot start file with the initial state). Save = write it during the run (e.g. a hot start file of the state at the end, for the next run). A file name without a folder is in the model folder; paths are stored relative to the model folder, so the model can be moved with its files.'));
+    const el = h('div', { class: 'full filestab' }, h('h4', { style: { marginTop: 0 } }, 'Interface Files'), tools, list, prop);
+    renderList(); showProp();
+    const apply = () => {
+      const bad = files.find(f => !f.path); if (bad) AV.toast('Interface files without a file name were left out.', true);
+      const lines = P.other.concat(files.filter(f => f.path).map(AV.filesLine));
+      if (JSON.stringify(lines) === JSON.stringify(old)) return false;
+      const had = m.rawOrder.includes('FILES');
+      app.exec({ label: 'Interface files', do: () => { m.raw.FILES = lines.slice(); if (!m.rawOrder.includes('FILES')) m.rawOrder.push('FILES'); },
+        undo: () => { if (had || old.length) m.raw.FILES = old.slice(); else { delete m.raw.FILES; const i = m.rawOrder.indexOf('FILES'); if (i >= 0) m.rawOrder.splice(i, 1); } },
+        changes: [{ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: 'FILES', old: old.filter(r => r.trim() && r.trim()[0] !== ';').join(' | '), nw: lines.filter(r => r.trim() && r.trim()[0] !== ';').join(' | ') }] });
+      if (app.panels && app.panels.refreshTree) app.panels.refreshTree();
+      return true;
+    };
+    return { el, apply, files };
   };
 })(window.AV);

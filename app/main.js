@@ -233,6 +233,13 @@ ipcMain.handle('license:submit', async (e, q) => {
 });
 ipcMain.handle('app:settings:get', async () => loadSettings());
 // ---- file browsing for the Catalog pane
+// ---- calibration: observed data files (flow survey, rain gauges), any size, layout recognised automatically
+ipcMain.handle('obs:read', async (e, file, opts) => require('./obsread').readObserved(file, opts || {}));
+ipcMain.handle('obs:table', async (e, file) => require('./obsread').readTable(file));
+ipcMain.handle('obs:findFiles', async (e, dir) => { const out = []; const walk = async (d, depth) => { let ents = []; try { ents = await fs.promises.readdir(d, { withFileTypes: true }); } catch (er) { return; }
+  for (const en of ents) { const p = path.join(d, en.name); if (en.isDirectory()) { if (depth < 3) await walk(p, depth + 1); } else if (/\.(csv|txt|dat|tsv|prn|xlsx|xlsm)$/i.test(en.name)) { const st = await fs.promises.stat(p); out.push({ path: p, size: st.size }); } } };
+  await walk(dir, 0); return out; });
+ipcMain.handle('fs:size', async (e, p) => { try { return (await fs.promises.stat(p)).size; } catch (er) { return -1; } });
 ipcMain.handle('fs:list', async (e, dir) => {
   const out = [];
   for (const d of await fs.promises.readdir(dir, { withFileTypes: true })) {

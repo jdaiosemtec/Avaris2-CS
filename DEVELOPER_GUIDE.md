@@ -446,3 +446,11 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 ## 17. 2.6.7
 - Scenario Comparison（`compare.js`）：`listRuns()` 列出模型 Database 里的全部运行（加上已载入但不在结果文件夹的结果），标明 1D / 1D-2D；Compare 只列与 Base 同类的运行（`fixPair`）；选中时才载入（`loadPair` → `sim.loadScenario`）。选中的一对写入 `app.sim.pick`，比较窗口打开时 `sim.sources()` 只返回这一对，图表窗口（Graph 的 Scenarios 勾选）随之更新；关闭比较窗口后恢复。整个视图可滚动，下方表格 + 散点图区域高度 max(560 px, 视窗 − 330 px)。
 - Licence Manager：许可证对话框左下角 Delete…，可删这一条或该账户全部许可证（`S.ledger.deleted` 留简要记录，当天备份在 backups/）。许可证离线验证：已激活的 key 在那台电脑上仍可用到到期或用户 Release。
+
+## 18. 2.7.0：Simulation Options ▸ Files 与 Auto Calibration（HPS）
+
+- `sim.js`：`AV.filesTab(app)` 生成 Files 页（列表 + / − / Clear All，File Type / Usage / File Path）；`AV.parseFilesSection`、`AV.filesLine`；OK 时 `filesUI.apply()` 以一个撤销步骤写 `m.raw.FILES`，注释行保留。
+- `app/obsread.js`（主进程，IPC `obs:read` / `obs:table` / `obs:findFiles`）：流式读取任意大小的 CSV/TXT/DAT，以及 .xlsx（自带解压 + XML 解析）。自动识别：分隔符、表头/单位行、日期列（ISO、dd/MM 与 MM/dd 按哪个字段变化更频繁判断、Excel 日期、AM/PM、SWMM 雨量站格式）、布局（wide / single / long / gage）、监测点 ID（已知 ID 优先，其次表头、文件名、文件开头说明行）、变量（Flow/Depth/Velocity/Rainfall）与单位。时间统一用 SWMM 日期数（1899-12-30 起的天数）。可以直接用 node 测试，不需要 Electron。
+- `renderer/js/calib.js`：`AV.Calib`，`AV.openCalibration(app)`（无 HPS 时 `AV.needHPS`）。项目文件 `<model>_Calibration/<name>.avcal`（JSON：mapping、files、monitors、events、cleaning）+ `<name>.avobs`（二进制：'AVOBS1' + JSON 头 + 每条序列 Float64 时间 / Float32 值）。原始数据不改；清洗结果是一层（idx + 新值，Accept/Reject），`series(key)` 按已接受的结果生成清洗后数据（模型单位）。
+- 第 3–5 步（参数、准则与运行、结果）在 2.7.x 继续；按 v3.1 原型做，不删原型里的功能。
+- 测试数据：Riverside 改成 2025-05-01–07-01、5 分钟雨量后运行，用结果加噪声、比例、尖峰、缺测、平线生成的测流文件（见会话 scratchpad/survey）。

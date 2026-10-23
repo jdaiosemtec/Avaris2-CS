@@ -40,7 +40,7 @@
         if (this.xr && (x < this.xr[0] || x > this.xr[1])) continue;
         if (x < x1) x1 = x; if (x > x2) x2 = x; if (y < y1) y1 = y; if (y > y2) y2 = y;
       }
-      if (this.xr) { x1 = this.xr[0]; x2 = this.xr[1]; }
+      if (this.xr) { x1 = this.xr[0]; x2 = this.xr[1]; } else if (this.xFix && x1 !== Infinity) { x1 = this.xFix[0]; x2 = this.xFix[1]; }
       if (x1 === Infinity) return null;
       if (y1 === y2) { y1 -= 1; y2 += 1; }
       if (y1 > 0 && (y1 < (y2 - y1) * 0.6 || this.series.some(s => s.bars))) y1 = 0;
@@ -56,7 +56,7 @@
       if (!this.w) return;
       const ctx = this.ctx; ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.w, this.hh);
-      const L = 68, R = 18, T = this.title ? 34 : 16, B = 46 + Math.ceil(this.series.length / 3) * 16;
+      const L = 68, R = 18, T = this.title ? 34 : 16, B = this.compact ? 22 : 46 + Math.ceil(this.series.length / 3) * 16;
       this.plot = { L, R, T, B, W: this.w - L - R, H: this.hh - T - B };
       const e = this.extent(); this.e = e;
       ctx.font = '12px Segoe UI, Arial'; ctx.fillStyle = '#263238';
@@ -68,12 +68,12 @@
       this.sx = sx; this.sy = sy;
       // grid
       ctx.strokeStyle = '#eceff1'; ctx.lineWidth = 1; ctx.fillStyle = '#546e7a'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-      for (const t of this.ticks(e.y1, e.y2, 6)) { const y = Math.round(sy(t)) + .5; ctx.beginPath(); ctx.moveTo(P.L, y); ctx.lineTo(P.L + P.W, y); ctx.stroke(); ctx.fillText(AV.fmt(t), P.L - 6, y); }
+      for (const t of this.ticks(e.y1, e.y2, Math.max(2, Math.min(6, Math.floor(P.H / 26))))) { const y = Math.round(sy(t)) + .5; ctx.beginPath(); ctx.moveTo(P.L, y); ctx.lineTo(P.L + P.W, y); ctx.stroke(); ctx.fillText(e.y2 - e.y1 < 0.05 ? String(+t.toPrecision(3)) : AV.fmt(t), P.L - 6, y); }
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       for (const t of this.ticks(e.x1, e.x2, Math.max(3, Math.floor(P.W / 90)))) { const x = Math.round(sx(t)) + .5; ctx.beginPath(); ctx.moveTo(x, P.T); ctx.lineTo(x, P.T + P.H); ctx.stroke(); ctx.fillText(this.xFmt ? this.xFmt(t) : AV.fmt(t), x, P.T + P.H + 5); }
       ctx.strokeStyle = '#90a4ae'; ctx.strokeRect(P.L + .5, P.T + .5, P.W, P.H);
       // labels
-      ctx.fillStyle = '#37474f'; ctx.fillText(this.xLabel, P.L + P.W / 2, P.T + P.H + 22);
+      ctx.fillStyle = '#37474f'; if (!this.compact) ctx.fillText(this.xLabel, P.L + P.W / 2, P.T + P.H + 22);
       ctx.save(); ctx.translate(14, P.T + P.H / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = 'middle'; ctx.fillText(this.yLabel, 0, 0); ctx.restore();
       // series
       ctx.save(); ctx.beginPath(); ctx.rect(P.L, P.T, P.W, P.H); ctx.clip();
@@ -106,7 +106,7 @@
       ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '12px Segoe UI';
       const colW = Math.max(160, P.W / 3);
       this._leg = [];
-      this.series.forEach((s, i) => {
+      if (!this.compact) this.series.forEach((s, i) => {
         const x = P.L + (i % 3) * colW, y = P.T + P.H + 40 + Math.floor(i / 3) * 16;
         ctx.globalAlpha = s.hidden ? 0.35 : 1;
         if (s.bars) { ctx.fillStyle = s.color; ctx.fillRect(x, y - 5, 22, 10); } else { ctx.strokeStyle = s.color; ctx.lineWidth = Math.min(4, (s.width || 1.8) + 0.7); ctx.setLineDash(s.dash || []); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 22, y); ctx.stroke(); ctx.setLineDash([]); if (s.marker && s.marker !== 'none') { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(x + 11, y, 3, 0, 7); ctx.fill(); } }
