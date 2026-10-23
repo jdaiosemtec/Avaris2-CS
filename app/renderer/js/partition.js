@@ -43,10 +43,15 @@
     const mesh = app.mesh2d, MR = app.meshResults;
     if (mesh && MR && mesh.cells && mesh.couplings) {
       const thr = S.pondDepth > 0 ? S.pondDepth : MR.thr > 0 ? MR.thr : (SI ? 0.3 : 1.0); A.pondDepth = thr; const wet = new Map(); const key = (x, y, s) => Math.round(x / s) + ',' + Math.round(y / s);
-      mesh.cells.forEach((c, k) => { if (MR.maxd[k] >= thr) wet.set(key(c.x, c.y, c.s), k); });
+      mesh.cells.forEach((c, k) => { if (MR.maxd[k] >= thr) wet.set(mesh.verts ? 'k' + k : key(c.x, c.y, c.s), k); });
       const comp = new Map(); let nc = 0;
+      // neighbours: square grid by position; unstructured mesh by its 2D links
+      let adj = null; if (mesh.verts) { const ck = new Map(mesh.cells.map((c, k) => [c.id, k])); adj = mesh.cells.map(() => []); for (const l of mesh.links) { const a = ck.get(l.a), b = ck.get(l.b); if (a !== undefined && b !== undefined) { adj[a].push(b); adj[b].push(a); } } }
+      const wetK = new Set(wet.values());
       for (const [kk, k] of wet) { if (comp.has(k)) continue; const id = nc++; const st = [k]; comp.set(k, id);
-        while (st.length) { const j = st.pop(); const c = mesh.cells[j]; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const o = wet.get(key(c.x + dx * c.s, c.y + dy * c.s, c.s)); if (o !== undefined && !comp.has(o)) { comp.set(o, id); st.push(o); } } } }
+        while (st.length) { const j = st.pop(); const c = mesh.cells[j];
+          if (adj) { for (const o of adj[j]) if (wetK.has(o) && !comp.has(o)) { comp.set(o, id); st.push(o); } continue; }
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const o = wet.get(key(c.x + dx * c.s, c.y + dy * c.s, c.s)); if (o !== undefined && !comp.has(o)) { comp.set(o, id); st.push(o); } } } }
       const cellIdx = new Map(mesh.cells.map((c, k) => [c.id, k])); const groups = new Map();
       for (const x of mesh.couplings) { const k = cellIdx.get(x.cell); if (k === undefined || !comp.has(k)) continue; const g = comp.get(k); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(x.node); }
       A.ponds = [...groups.values()].filter(a => a.length); A.pondSource = '2D';

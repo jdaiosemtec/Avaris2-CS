@@ -179,7 +179,7 @@
         UNDER_RELAXATION: g('UNDER_RELAXATION', '0.5'), NONCONV_REPORT_COUNT: g('NONCONV_REPORT_COUNT', '100'), detail: !!this.detailReport,
       };
       const D = this.app.defaults; for (const k in D) v['def_' + k] = D[k];
-      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false; if (!/^(MODEL|CONVERT)$/i.test(v.f2d_UNITS)) v.f2d_UNITS = 'MODEL';
+      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false; if (!/^(MODEL|CONVERT)$/i.test(v.f2d_UNITS)) v.f2d_UNITS = 'MODEL'; v.f2d_MESH_TYPE = /^UNSTR/i.test(v.f2d_MESH_TYPE) ? 'UNSTRUCTURED' : 'SQUARE'; v.f2d_EXCL_TYPE = /^(RAISED|POROUS)$/i.test(v.f2d_EXCL_TYPE) ? v.f2d_EXCL_TYPE.toUpperCase() : 'VOID';
       const YN = ['NO', 'YES'];
       const tabs = {
         General: [
@@ -226,8 +226,13 @@
           { k: 'f2d_DEM', l: 'Digital Elevation Model', t: 'file', ext: ['tif', 'tiff', 'asc'], note: 'GeoTIFF or ASCII grid in the map coordinate system; cell elevations are read at the cell centres.' },
           { k: 'f2d_WATERFRONT', l: 'Water Front (line)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Lines where surface water leaves the model (river bank, coast); attribute "elev" = outlet elevation.' },
           { k: 'f2d_CUTOFF', l: 'Cut-off Lines', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Walls / embankments: no surface flow across them.' },
-          { k: 'f2d_EXCLUSION', l: 'Exclusion Polygons', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Buildings and other areas without cells.' },
+          { k: 'f2d_EXCLUSION', l: 'Exclusion Polygons', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Buildings and other areas. Attribute "type" per polygon: VOID (no cells, water flows around), RAISED (cells raised by "height") or POROUS (cells keep "porosity" × their area and flow width). Polygons without these attributes use the values below.' },
+          { k: 'f2d_EXCL_TYPE', l: 'Exclusion Type (default)', t: 'choice', o: ['VOID', 'RAISED', 'POROUS'] },
+          { k: 'f2d_EXCL_HEIGHT', l: 'Raised Height (default)', t: 'text', note: 'In the DEM elevation units; blank = 0.3 m / 1 ft.' }, { k: 'f2d_EXCL_POROSITY', l: 'Porosity (default, 0–1)', t: 'text', note: 'Blank = 0.5.' },
+          { k: 'f2d_MESH_ZONES', l: 'Mesh Zones (polygon)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional, unstructured mesh only. Attribute "size" = cell size inside the polygon: finer along streets and streams, coarser in open land.' },
+          { k: 'f2d_BREAK_LINES', l: 'Break Lines (line)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional, unstructured mesh only. Cell edges follow these lines (road centre lines, kerbs, ridges); water can cross them. Optional attribute "size" = cell size along the line.' },
           { t: 'h', l: 'Mesh and run' },
+          { k: 'f2d_MESH_TYPE', l: 'Mesh Type', t: 'choice', o: ['SQUARE', 'UNSTRUCTURED'], note: 'SQUARE: square grid as Avaris DS. UNSTRUCTURED: triangles that follow the boundary, buildings, cut-off and break lines, with finer cells in mesh zones. Also chosen in Create Meshes.' },
           { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
           { k: 'f2d_UNITS', l: 'Mesh Units', t: 'choice', o: ['MODEL', 'CONVERT'], note: 'MODEL (as Avaris DS): cell size and DEM / water-front elevations are used as they are, read in the model units. CONVERT: they are converted from the map units to the model units when the mesh is built (e.g. map and DEM in metres, model in US units: 100 m cells become 328 ft, DEM elevations in m become ft). Rebuild the mesh after changing. To run in other flow units, change the Flow Units in the status bar.' },
           { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec, blank = model)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
@@ -281,13 +286,14 @@
       delete r.f2d_TAGALL;
       if (Object.keys(r).some(k => k.startsWith('f2d_'))) { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
         n2.ENABLED = n2.ENABLED ? 'YES' : 'NO';
-        for (const k of ['ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS']) if (n2[k] !== '' && !(parseFloat(n2[k]) >= 0)) { AV.alert('2D Flood: "' + k.replace('_', ' ').toLowerCase() + '" must be a number.'); return; }
+        for (const k of ['ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS', 'EXCL_HEIGHT']) if (n2[k] !== '' && !(parseFloat(n2[k]) >= 0)) { AV.alert('2D Flood: "' + k.replace('_', ' ').toLowerCase() + '" must be a number.'); return; }
+        if (n2.EXCL_POROSITY !== '' && n2.EXCL_POROSITY !== undefined && !(parseFloat(n2.EXCL_POROSITY) > 0 && parseFloat(n2.EXCL_POROSITY) <= 1)) { AV.alert('2D Flood: the porosity must be a number above 0 and up to 1.'); return; }
         const m = this.model; const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = {}; for (const k of AV.F2D_KEYS) if (n2[k] !== '' && n2[k] !== undefined) nw2[k] = String(n2[k]);
         if (JSON.stringify(AV.f2d(m)) !== JSON.stringify(AV.f2d({ osem2d: nw2 }))) {
           const ch = AV.F2D_KEYS.filter(k => AV.f2d(m)[k] !== AV.f2d({ osem2d: nw2 })[k]).map(k => ({ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: '2D ' + k, old: AV.f2d(m)[k], nw: AV.f2d({ osem2d: nw2 })[k] }));
           this.app.exec({ label: '2D flood settings', do: () => { m.osem2d = Object.assign({}, nw2); }, undo: () => { m.osem2d = old2 ? Object.assign({}, old2) : undefined; }, changes: ch });
           this.app.panels.refreshLayers();
-          const geo = ['BOUNDARY', 'DEM', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'CELL_SIZE', 'ROUGHNESS'].some(k => ch.some(c => c.key === '2D ' + k));
+          const geo = ['BOUNDARY', 'DEM', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'CELL_SIZE', 'ROUGHNESS', 'MESH_TYPE', 'MESH_ZONES', 'BREAK_LINES', 'EXCL_TYPE', 'EXCL_HEIGHT', 'EXCL_POROSITY'].some(k => ch.some(c => c.key === '2D ' + k));
           if (AV.f2dEnabled(m) && geo && nw2.BOUNDARY && nw2.DEM) setTimeout(async () => { if (await AV.confirm((this.app.mesh2d ? 'The 2D input layers changed. Rebuild the mesh now?' : 'Create the 2D mesh now?'), 'Create Meshes', 'Create Meshes', 'Later')) AV.createMeshes(this.app); }, 50);
         } }
       if (only2D) return;

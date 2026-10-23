@@ -10,8 +10,14 @@
 'use strict';
 (function (AV) {
   const h = AV.h;
-  const KEYS = ['ENABLED', 'BOUNDARY', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'DEM', 'ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS', 'UNITS'];
-  const DEF = { ENABLED: 'NO', BOUNDARY: '', WATERFRONT: '', CUTOFF: '', EXCLUSION: '', DEM: '', ROUTING_STEP: '', FLOOD_DEPTH: '0', CELL_SIZE: '', ROUGHNESS: '', UNITS: 'MODEL' };
+  const KEYS = ['ENABLED', 'BOUNDARY', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'DEM', 'ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS', 'UNITS', 'MESH_TYPE', 'MESH_ZONES', 'BREAK_LINES', 'EXCL_TYPE', 'EXCL_HEIGHT', 'EXCL_POROSITY'];
+  // MESH_TYPE: SQUARE (Avaris DS grid) or UNSTRUCTURED (triangles, umesh.js), chosen in Create Meshes.
+  // MESH_ZONES / BREAK_LINES: optional layers for the unstructured mesh: polygons with "size" = finer / coarser cells
+  //   inside; lines = break lines (cell edges follow them; optional "size" = cell size along the line).
+  // EXCL_TYPE / EXCL_HEIGHT / EXCL_POROSITY: how exclusion polygons (buildings) are modelled when the polygon has no
+  //   "type" / "height" / "porosity" attribute: VOID (no cells, water flows around), RAISED (cells raised by the
+  //   height), POROUS (cells keep porosity x their area and porosity x the width of their links).
+  const DEF = { ENABLED: 'NO', BOUNDARY: '', WATERFRONT: '', CUTOFF: '', EXCLUSION: '', DEM: '', ROUTING_STEP: '', FLOOD_DEPTH: '0', CELL_SIZE: '', ROUGHNESS: '', UNITS: 'MODEL', MESH_TYPE: 'SQUARE', MESH_ZONES: '', BREAK_LINES: '', EXCL_TYPE: 'VOID', EXCL_HEIGHT: '', EXCL_POROSITY: '' };
   const MAXD2D = 30; // depth of the 2D surface "channels" and cells (as in Avaris DS)
   AV.F2D_KEYS = KEYS;
   AV.f2d = (m) => Object.assign({}, DEF, (m && m.osem2d) || {});
@@ -25,6 +31,24 @@
     if (u === 'CONVERT') return { flow: null, lenFactor: mapU === 'METERS' && !m.isSI ? 3.28084 : mapU === 'FEET' && m.isSI ? 0.3048 : 1, si: !!m.isSI };
     return { flow: null, lenFactor: 1, si: !!m.isSI }; };
   AV.f2dEnabled = (m) => /^(YES|TRUE|1)$/i.test(AV.f2d(m).ENABLED);
+
+  // ------------------------------------------------------------------ cell geometry (square grid or unstructured)
+  // Unstructured cells keep vertex indexes into mesh.verts; prepMesh gives every cell its polygon (_p, counter-
+  // clockwise, not saved) and its bounding box (_b), so the drawing / hit test / export code works for both types.
+  AV.prepMesh = function (mesh) {
+    if (!mesh || !mesh.cells) return mesh; const V = mesh.verts;
+    for (const c of mesh.cells) { let p;
+      if (c.v && V) p = c.v.map(i => [V[2 * i], V[2 * i + 1]]); else { const hs = c.s / 2; p = [[c.x - hs, c.y - hs], [c.x + hs, c.y - hs], [c.x + hs, c.y + hs], [c.x - hs, c.y + hs]]; }
+      let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const q of p) { if (q[0] < x1) x1 = q[0]; if (q[0] > x2) x2 = q[0]; if (q[1] < y1) y1 = q[1]; if (q[1] > y2) y2 = q[1]; }
+      Object.defineProperty(c, '_p', { value: p, enumerable: false, writable: true, configurable: true }); Object.defineProperty(c, '_b', { value: [x1, y1, x2, y2], enumerable: false, writable: true, configurable: true }); }
+    Object.defineProperty(mesh, '_ix', { value: null, enumerable: false, writable: true, configurable: true });
+    return mesh;
+  };
+  const ensure = (c) => { if (!c._p) { const hs = c.s / 2; Object.defineProperty(c, '_p', { value: [[c.x - hs, c.y - hs], [c.x + hs, c.y - hs], [c.x + hs, c.y + hs], [c.x - hs, c.y + hs]], enumerable: false, writable: true, configurable: true }); Object.defineProperty(c, '_b', { value: [c.x - hs, c.y - hs, c.x + hs, c.y + hs], enumerable: false, writable: true, configurable: true }); } return c; };
+  AV.cellPoly = (c) => ensure(c)._p;               // [[x, y] ...] counter-clockwise, not closed
+  AV.cellBox = (c) => ensure(c)._b;                // [x1, y1, x2, y2]
+  AV.cellArea = (c) => c.a > 0 ? c.a : c.s * c.s;  // map units²
+  AV.meshIsTri = (mesh) => !!(mesh && mesh.type === 'tri');
 
   // ------------------------------------------------------------------ geometry helpers
   const pip = (x, y, ring) => { let ins = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > y) !== (yj > y) && x < xi + (y - yi) * (xj - xi) / (yj - yi)) ins = !ins; } return ins; };
@@ -40,8 +64,8 @@
   // opt: boundary [{rings, size, n}], exclusion [rings[]], cutoff [[pt...]], coast [{pts, elev}], sample(x,y) -> elev|null,
   //      nodes [{id, x, y, rim}] (1D nodes to couple), lenFactor (map units -> model length units)
   AV.buildMesh2D = function (opt) {
-    const cells = [], links = [], outfalls = [], couplings = []; const lf = opt.lenFactor || 1; let skippedNoData = 0, skippedExcl = 0;
-    const grids = [];
+    const cells = [], links = [], outfalls = [], couplings = []; const lf = opt.lenFactor || 1; let skippedNoData = 0, skippedExcl = 0, nRaised = 0, nPorous = 0;
+    const grids = []; const EX = (opt.exclusion || []).map(e => Array.isArray(e) ? { rings: e, type: 'VOID' } : e);
     opt.boundary.forEach((B, bi) => {
       const s = B.size; const xs = B.rings.flat().map(p => p[0]), ys = B.rings.flat().map(p => p[1]);
       const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
@@ -49,9 +73,10 @@
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
         const cx = x0 + s / 2 + i * s, cy = y0 + s / 2 + j * s;
         if (!inPoly(cx, cy, B.rings)) continue;
-        if (opt.exclusion.some(r => inPoly(cx, cy, r))) { skippedExcl++; continue; }
+        const E = EX.find(e => inPoly(cx, cy, e.rings)); if (E && E.type === 'VOID') { skippedExcl++; continue; }
         const z = opt.sample(cx, cy); if (z === null || !isFinite(z)) { skippedNoData++; continue; }
-        const c = { k: cells.length, id: '', x: cx, y: cy, s, n: B.n, elev: +(z * lf).toFixed(4), bi, i, j, deg: 0 };
+        const c = { k: cells.length, id: '', x: cx, y: cy, s, n: B.n, elev: +(z * lf).toFixed(4), bi, i, j, deg: 0, por: 1 };
+        if (E && E.type === 'RAISED') { c.elev = +((z + (E.height > 0 ? E.height : 0)) * lf).toFixed(4); c.bt = 1; nRaised++; } else if (E && E.type === 'POROUS') { c.por = E.porosity > 0 && E.porosity <= 1 ? E.porosity : 0.5; c.bt = 2; nPorous++; }
         idx.set(i + ',' + j, c); cells.push(c);
       }
       grids.push({ x0, y0, s, idx });
@@ -65,7 +90,7 @@
     });
     // ids: 2D_<n> in creation order (stable for a given input)
     cells.forEach((c, k) => { c.id = '2D_' + (k + 1); });
-    const L2 = links.map((l, k) => ({ id: '2DL_' + (k + 1), a: l.a.id, b: l.b.id, len: +(l.a.s / 2 * (4 / l.a.deg + 4 / l.b.deg) * lf).toFixed(4), w: +(l.a.s / 2 * lf).toFixed(4), n: Math.max(l.a.n, l.b.n) }));
+    const L2 = links.map((l, k) => ({ id: '2DL_' + (k + 1), a: l.a.id, b: l.b.id, len: +(l.a.s / 2 * (4 / l.a.deg + 4 / l.b.deg) * lf).toFixed(4), w: +(l.a.s / 2 * lf * Math.min(l.a.por, l.b.por)).toFixed(4), n: Math.max(l.a.n, l.b.n) }));
     const cellAt = (x, y) => { for (const g of grids) { const i = Math.floor((x - g.x0) / g.s), j = Math.floor((y - g.y0) / g.s); const c = g.idx.get(i + ',' + j); if (c) return c; } return null; };
     // water front (as Avaris DS): points every cell size along each line (at 1, 2, 3 ... cell sizes from its start);
     // each point that lies in a cell becomes a free outfall joined to that cell
@@ -78,8 +103,8 @@
         ch += L; } }
     // 1D-2D coupling: an orifice at the rim of every 1D node that lies in a cell
     for (const nd of opt.nodes) { const c = cellAt(nd.x, nd.y); if (!c) continue; couplings.push({ id: '2DX_' + nd.id, node: nd.id, cell: c.id, offset: nd.offset, w: +(c.s * lf).toFixed(4) }); }
-    return { version: 1, created: new Date().toISOString(), lenFactor: lf, cells: cells.map(c => ({ id: c.id, x: +c.x.toFixed(4), y: +c.y.toFixed(4), s: c.s, elev: c.elev, n: c.n, deg: c.deg })), links: L2, outfalls, couplings,
-      stats: { cells: cells.length, links: L2.length, outfalls: outfalls.length, couplings: couplings.length, skippedNoData, skippedExcl } };
+    return { version: 1, created: new Date().toISOString(), lenFactor: lf, cells: cells.map(c => { const o = { id: c.id, x: +c.x.toFixed(4), y: +c.y.toFixed(4), s: c.s, elev: c.elev, n: c.n, deg: c.deg }; if (c.bt) o.bt = c.bt; if (c.por < 1) o.por = c.por; return o; }), links: L2, outfalls, couplings,
+      stats: { cells: cells.length, links: L2.length, outfalls: outfalls.length, couplings: couplings.length, skippedNoData, skippedExcl, raised: nRaised, porous: nPorous } };
   };
 
   // ------------------------------------------------------------------ .finp: model + 2D elements
@@ -137,11 +162,41 @@
   const numProp = (props, names) => { if (!props) return NaN; for (const k of Object.keys(props)) if (names.includes(k.toLowerCase())) { const v = parseFloat(props[k]); if (isFinite(v)) return v; } return NaN; };
 
   // ------------------------------------------------------------------ Create Meshes
+  // exclusion polygon type / height / porosity: attributes "type" (VOID | RAISED | POROUS or 0 | 1 | 2), "height",
+  // "porosity"; polygons without them take the defaults of Options → 2D Flood
+  const strProp = (props, names) => { if (!props) return ''; for (const k of Object.keys(props)) if (names.includes(k.toLowerCase())) { const v = String(props[k] ?? '').trim(); if (v) return v; } return ''; };
+  AV.exclusionType = (v, def) => { const t = String(v || '').trim().toUpperCase(); if (/^(0|VOID|NONE|BUILDING|空|不进水)$/.test(t)) return 'VOID'; if (/^(1|RAISED|RAISE|STUBBY|抬高)$/.test(t)) return 'RAISED'; if (/^(2|POROUS|POROSITY|多孔)$/.test(t)) return 'POROUS'; return def; };
+  // mesh type chosen when the mesh is created (SQUARE / UNSTRUCTURED); resolves to null when cancelled
+  AV.chooseMeshType = function (app) {
+    const f = AV.f2d(app.model); let cur = /^UNSTR/i.test(f.MESH_TYPE) ? 'UNSTRUCTURED' : 'SQUARE';
+    const opt = (v, t, d) => h('label', { class: 'mtype' + (cur === v ? ' on' : ''), style: { display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', border: '1px solid var(--line, #cfd8dc)', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer' } },
+      h('input', { type: 'radio', name: 'mtype', value: v, checked: cur === v, onchange: () => { cur = v; } }), h('div', null, h('b', null, t), h('div', { class: 'note', style: { marginTop: '3px', lineHeight: 1.45 } }, d)));
+    const body = h('div', { style: { width: '470px' } },
+      opt('SQUARE', 'Square grid', 'Square cells of the boundary cell size, as Avaris DS. Building and boundary edges follow the cell centres.'),
+      opt('UNSTRUCTURED', 'Unstructured mesh (triangles)', 'Cells follow the boundary, buildings, cut-off lines, water front and break lines exactly; finer or coarser cells in mesh zones (Options → 2D Flood → Mesh Zones). About the same number of cells as the square grid for the same cell size.'));
+    return AV.modal({ title: 'Create Meshes', body, buttons: [{ label: 'Cancel', value: null }, { label: 'Create Meshes', primary: true, onClick: () => cur }] }).done;
+  };
+
+  // recommended 2D routing step: half the time a shallow-water wave (1 m / 3.3 ft deep) needs to cross the shorter
+  // surface links (5th percentile of the link lengths); { len, step } or null
+  AV.meshRecStep = function (m, mesh) {
+    const L = (mesh.links || []).map(l => +l.len).filter(x => x > 0).sort((a, b) => a - b); if (!L.length) return null;
+    const len = L[Math.floor(L.length * 0.05)]; const si = AV.f2dRun(m).si; const c = Math.sqrt(si ? 9.81 * 1 : 32.2 * 3.28);
+    const raw = 0.5 * len / c; const steps = [0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 5, 10, 15, 20, 30]; let st = steps[0]; for (const x of steps) if (x <= raw) st = x;
+    return { len, step: st };
+  };
+
+  // ------------------------------------------------------------------ Create Meshes
   AV.createMeshes = async function (app, quiet) {
     if (!AV.has2D(app)) { if (!quiet) AV.need2D(app, 'Create Meshes'); return; }
-    const m = app.model, f = AV.f2d(m);
+    const m = app.model; let f = AV.f2d(m);
     if (!f.BOUNDARY || !f.DEM) { if (quiet) return; AV.alert('Set the 2D boundary and the DEM first (Simulation Options → 2D Flood).', 'Create Meshes'); app.sim.optionsDialog('2D Flood'); return; }
+    if (!quiet) { const t = await AV.chooseMeshType(app); if (!t) return;
+      if (t !== (/^UNSTR/i.test(f.MESH_TYPE) ? 'UNSTRUCTURED' : 'SQUARE')) { const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = Object.assign({}, m.osem2d || {}, { MESH_TYPE: t });
+        app.exec({ label: '2D mesh type', do: () => { m.osem2d = Object.assign({}, nw2); }, undo: () => { m.osem2d = old2 ? Object.assign({}, old2) : undefined; }, changes: [{ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: '2D MESH_TYPE', old: f.MESH_TYPE, nw: t }] }); f = AV.f2d(m); } }
+    const tri = /^UNSTR/i.test(f.MESH_TYPE);
     const dlg = quiet ? { body: {}, close() {} } : AV.modal({ title: 'Create Meshes', width: 420, body: h('div', null, 'Reading boundary, DEM and lines...'), noFooter: true });
+    const say = async (t) => { dlg.body.textContent = t; await new Promise(r => setTimeout(r, 20)); };
     try {
       const B = await readVector(app, f.BOUNDARY, 'Boundary');
       const polys = B.features.filter(x => x.type === 'polygon');
@@ -152,9 +207,9 @@
         return { rings: p.coords, size: size > 0 ? size : NaN, n: n > 0 ? n : 0.03 }; });
       const bad = boundary.find(b => !(b.size > 0));
       if (bad) throw new Error('The boundary polygon has no cell size. Add a numeric field "length" (cell size in map units) and "roughness" (Manning n) to its attribute table, or enter a cell size in Simulation Options → 2D Flood.');
-      const area = boundary.reduce((a, b) => { const xs = b.rings.flat(); let A = 0; for (const r of b.rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) A += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return a + Math.abs(A / 2) / (b.size * b.size); }, 0);
+      const area = boundary.reduce((a, b) => { let A = 0; for (const r of b.rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) A += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return a + Math.abs(A / 2) / (b.size * b.size); }, 0);
       if (area > 400000 && (quiet || !await AV.confirm('About ' + Math.round(area).toLocaleString() + ' cells would be created. Large meshes run slowly; a larger cell size ("length") is recommended. Continue?', 'Create Meshes', 'Continue'))) { dlg.close(); return; }
-      dlg.body.textContent = 'Reading DEM...';
+      await say('Reading DEM...');
       const dem = await AV.readRasterFull(resolve(app, quoteless(f.DEM)));
       const [c0, c1, c2] = dem.corners; const W = dem.w, H = dem.h; const px = (c1[0] - c0[0]) / W, py = (c0[1] - c2[1]) / H;
       const nod = dem.nodata;
@@ -163,25 +218,39 @@
       const lines = async (key, what) => { if (!f[key]) return []; const L = await readVector(app, f[key], what); return L.features.filter(x => x.type === 'line' || x.type === 'polygon'); };
       const cut = (await lines('CUTOFF', 'Cut-off')).flatMap(x => x.coords);
       const coast = (await lines('WATERFRONT', 'Water front')).flatMap(x => x.coords.map(pts => ({ pts, elev: numProp(x.props, ['elev', 'elevation', 'stage', 'z']) })));
-      const exL = f.EXCLUSION ? await readVector(app, f.EXCLUSION, 'Exclusion') : null; const exclusion = exL ? exL.features.filter(x => x.type === 'polygon').map(x => x.coords) : [];
+      const defT = AV.exclusionType(f.EXCL_TYPE, 'VOID'), defH = parseFloat(f.EXCL_HEIGHT) >= 0 && f.EXCL_HEIGHT !== '' ? parseFloat(f.EXCL_HEIGHT) : (AV.f2dRun(m).si ? 0.3 : 1.0), defP = parseFloat(f.EXCL_POROSITY) > 0 ? Math.min(1, parseFloat(f.EXCL_POROSITY)) : 0.5;
+      const exL = f.EXCLUSION ? await readVector(app, f.EXCLUSION, 'Exclusion') : null;
+      const exclusion = exL ? exL.features.filter(x => x.type === 'polygon').map(x => { const hh = numProp(x.props, ['height', 'bheight', 'h', 'raise']), pp = numProp(x.props, ['porosity', 'por']);
+        return { rings: x.coords, type: AV.exclusionType(strProp(x.props, ['type', 'btype', 'mode', 'exclusion']), defT), height: isFinite(hh) && hh >= 0 ? hh : defH, porosity: pp > 0 && pp <= 1 ? pp : defP }; }) : [];
+      const zones = [];
+      if (tri) for (const [key, what] of [['MESH_ZONES', 'Mesh zones'], ['BREAK_LINES', 'Break lines']]) if (f[key]) for (const x of (await readVector(app, f[key], what)).features) { const sz = numProp(x.props, ['size', 'length', 'cellsize']);
+        if (x.type === 'polygon') zones.push({ kind: 'polygon', coords: x.coords, size: sz }); else if (x.type === 'line') for (const pts of x.coords) zones.push({ kind: 'line', coords: pts, size: sz }); }
       // 1D nodes to couple: those tagged "Link2D" (Avaris DS) when any node has that tag, otherwise every junction / storage / divider
       const N = [...m.nodes.values()].filter(n => n.type !== 'OUTFALL'); const tagged = N.filter(n => /^link2d$/i.test(String(n.tag || '').trim()));
       const nodes = (tagged.length ? tagged : N).map(n => ({ id: n.id, x: n.x, y: n.y }));
-      dlg.body.textContent = 'Building the mesh...'; await new Promise(r => setTimeout(r, 30));
-      const mesh = AV.buildMesh2D({ boundary, exclusion, cutoff: cut, coast, sample, nodes, lenFactor });
+      await say('Building the mesh...');
+      const mesh = tri ? AV.buildUMesh({ boundary, exclusion, cutoff: cut, coast, sample, nodes, lenFactor, zones, progress: (t) => { dlg.body.textContent = t; } })
+        : AV.buildMesh2D({ boundary, exclusion, cutoff: cut, coast, sample, nodes, lenFactor });
       if (!mesh.cells.length) throw new Error('No cells were created: check that the boundary overlaps the DEM and that the cell size is smaller than the boundary.');
-      mesh.source = { boundary: f.BOUNDARY, dem: f.DEM, cutoff: f.CUTOFF, waterfront: f.WATERFRONT, exclusion: f.EXCLUSION, cellSize: boundary.map(b => b.size), roughness: boundary.map(b => b.n) };
+      mesh.source = { boundary: f.BOUNDARY, dem: f.DEM, cutoff: f.CUTOFF, waterfront: f.WATERFRONT, exclusion: f.EXCLUSION, zones: tri ? f.MESH_ZONES : undefined, breakLines: tri ? f.BREAK_LINES : undefined, cellSize: boundary.map(b => b.size), roughness: boundary.map(b => b.n) };
       const mp = AV.meshPath(app); if (mp) await window.host.writeText(mp, JSON.stringify(mesh));
-      app.mesh2d = mesh; app.meshResults = null; dlg.close();
+      AV.prepMesh(mesh); app.mesh2d = mesh; app.meshResults = null; app._meshHeat = null; app._meshRange = null; dlg.close();
       app.panels.refreshLayers(); app.map.redraw();
       const s = mesh.stats; if (quiet) { app.status('2D mesh rebuilt: ' + s.cells + ' cells.'); return; }
-      AV.alert('Mesh created:\n\n' + s.cells.toLocaleString() + ' cells (' + boundary.map(b => b.size).join(', ') + ' ' + (mapU === 'NONE' ? 'map units' : mapU.toLowerCase()) + ')\n' + s.links.toLocaleString() + ' surface links\n' + s.couplings + ' manholes coupled to the surface' + (tagged.length ? ' (nodes tagged Link2D)' : '') + '\n' + s.outfalls + ' water-front outfalls' +
-        (s.skippedExcl ? '\n' + s.skippedExcl + ' cells removed by exclusion polygons' : '') + (s.skippedNoData ? '\n' + s.skippedNoData + ' cells skipped (no DEM data)' : '') + (mp ? '\n\nSaved to ' + mp : '\n\nSave the model to keep the mesh.') + '\n\nRun the simulation to compute the 1D-2D flooding.', 'Create Meshes');
-    } catch (e) { dlg.close(); if (quiet) { app.status('2D mesh not built: ' + e.message); return; } AV.alert('Could not create the mesh:\n\n' + e.message, 'Create Meshes'); }
+      const rec = AV.meshRecStep(m, mesh); const cur = parseFloat(f.ROUTING_STEP) > 0 ? parseFloat(f.ROUTING_STEP) : parseFloat(m.options.ROUTING_STEP) || 0;
+      await AV.alert('Mesh created (' + (tri ? 'unstructured' : 'square grid') + '):\n\n' + s.cells.toLocaleString() + ' cells' + (tri ? ' (' + s.triangles.toLocaleString() + ' triangles' + (s.quads ? ', ' + s.quads + ' small triangles merged into quadrilaterals' : '') + '; cell size ' : ' (') + boundary.map(b => b.size).join(', ') + ' ' + (mapU === 'NONE' ? 'map units' : mapU.toLowerCase()) + ')\n' + s.links.toLocaleString() + ' surface links\n' + s.couplings + ' manholes coupled to the surface' + (tagged.length ? ' (nodes tagged Link2D)' : '') + '\n' + s.outfalls + ' water-front outfalls' +
+        (tri ? '\nSmallest triangle angle ' + s.minAngle + '°' + (s.below20 ? ' (' + s.below20 + ' triangles below 20°)' : '') + (zones.length ? '\n' + zones.length + ' mesh zones / break lines' : '') : '') +
+        (s.skippedExcl ? '\n' + s.skippedExcl + (tri ? ' triangles' : ' cells') + ' removed by VOID exclusion polygons' : '') + (s.raised ? '\n' + s.raised + ' cells raised (RAISED exclusion polygons)' : '') + (s.porous ? '\n' + s.porous + ' porous cells (POROUS exclusion polygons)' : '') +
+        (s.skippedNoData ? '\n' + s.skippedNoData + ' cells skipped (no DEM data)' : '') + (rec ? '\n\nShortest surface links about ' + AV.fmt(rec.len, 1) + ' ' + (AV.f2dRun(m).si ? 'm' : 'ft') + ': a 2D routing step of ' + rec.step + ' s or less is recommended (now ' + (cur || '-') + ' s).' : '') +
+        (mp ? '\n\nSaved to ' + mp : '\n\nSave the model to keep the mesh.') + '\n\nRun the simulation to compute the 1D-2D flooding.', 'Create Meshes');
+      if (rec && cur > rec.step * 1.25 && await AV.confirm('The 2D routing step (' + cur + ' s) is long for the smallest cells of this mesh; runs may not converge or may lose water. Set the 2D routing step to ' + rec.step + ' s?', 'Create Meshes', 'Set ' + rec.step + ' s', 'Keep ' + cur + ' s')) {
+        const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = Object.assign({}, m.osem2d || {}, { ROUTING_STEP: String(rec.step) });
+        app.exec({ label: '2D routing step', do: () => { m.osem2d = Object.assign({}, nw2); }, undo: () => { m.osem2d = old2 ? Object.assign({}, old2) : undefined; }, changes: [{ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: '2D ROUTING_STEP', old: f.ROUTING_STEP, nw: String(rec.step) }] }); }
+    } catch (e) { console.error(e); dlg.close(); if (quiet) { app.status('2D mesh not built: ' + e.message); return; } AV.alert('Could not create the mesh:\n\n' + e.message, 'Create Meshes'); }
   };
   AV.loadMesh2D = async function (app) {
     app.mesh2d = null; app.meshResults = null; app._meshRemoved = false; const mp = AV.meshPath(app); if (!mp) return;
-    try { if (await window.host.exists(mp)) { const j = JSON.parse(await window.host.readText(mp)); app.mesh2d = j && j.cells ? j : null; app._meshRemoved = !app.mesh2d; } } catch (e) { app.mesh2d = null; }
+    try { if (await window.host.exists(mp)) { const j = JSON.parse(await window.host.readText(mp)); app.mesh2d = j && j.cells ? AV.prepMesh(j) : null; app._meshRemoved = !app.mesh2d; } } catch (e) { app.mesh2d = null; }
   };
   // Avaris DS keeps the 2D settings in <model>.ini [2D]; take them over when the model has none of its own
   AV.importAvaris2D = async function (app) {
@@ -208,22 +277,28 @@
     pasture: { short: 'Pasture / arable', label: 'Pasture / arable (DF 0 up to 0.25 m, 0.5 above)', df: [0.25, 0.5, 1e9, 0] },
     none: { short: 'None', label: 'No debris factor', df: [1e9, 0, 1e9, 0] } };
   AV.meshDF = (app) => { const P = app.prefs.mesh2d || {}; return (AV.HAZARD_DF[P.df] || AV.HAZARD_DF.conservative).df; };
-  // faces of the mesh in the results: flat [link index, cell a, cell b, axis, sign] + face width (model units)
+  // faces of the mesh in the results: flat [link index, cell a, cell b] + face width (model units) + unit direction
+  // (x, y) from the centre of a to the centre of b. A cell's velocity vector is the least-squares fit to the normal
+  // velocities of its faces (for the square grid: the mean of its x faces and of its y faces, as before).
   function meshFaces(app, R0) {
     const R = R0 || app.results, mesh = app.mesh2d; const ci = new Map(mesh.cells.map((c, k) => [c.id, k])); const lf = mesh.lenFactor || 1;
-    const F = [], W = [], per = mesh.cells.map(() => []);
+    const F = [], W = [], Dd = [];
     for (const l of mesh.links || []) { const a = ci.get(l.a), b = ci.get(l.b); if (a === undefined || b === undefined) continue; const li = R.idx.link.get(l.id); if (li === undefined) continue;
-      const A = mesh.cells[a], B = mesh.cells[b]; const dx = B.x - A.x, dy = B.y - A.y; const ax = Math.abs(dx) >= Math.abs(dy) ? 0 : 1; const sg = (ax ? dy : dx) >= 0 ? 1 : -1;
-      const j = W.length; F.push(li, a, b, ax, sg); W.push(l.w > 0 ? +l.w : Math.min(A.s, B.s) / 2 * lf); per[a].push(j); per[b].push(j); }
-    return { F: Int32Array.from(F), W: Float32Array.from(W), per };
+      const A = mesh.cells[a], B = mesh.cells[b]; let dx = B.x - A.x, dy = B.y - A.y;
+      if (!mesh.verts) { if (Math.abs(dx) >= Math.abs(dy)) { dx = Math.sign(dx) || 1; dy = 0; } else { dy = Math.sign(dy) || 1; dx = 0; } } else { const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L; }
+      F.push(li, a, b); W.push(l.w > 0 ? +l.w : Math.min(A.s, B.s) / 2 * lf); Dd.push(dx, dy); }
+    return { F: Int32Array.from(F), W: Float32Array.from(W), D: Float32Array.from(Dd) };
   }
+  // velocity vector from the sums of n n' and n u over the faces of a cell
+  AV.lsVel = (sxx, sxy, syy, sxu, syu) => { const tr = sxx + syy; if (!(tr > 0)) return [0, 0]; const det = sxx * syy - sxy * sxy;
+    if (det > 1e-6 * tr * tr) return [(syy * sxu - sxy * syu) / det, (sxx * syu - sxy * sxu) / det]; return [sxu / tr, syu / tr]; };
   AV.computeMeshResults = async function (app) {
     const R = app.results, mesh = app.mesh2d; if (!R || !mesh || !AV.has2D(app)) { app.meshResults = null; return; }
     const idx = mesh.cells.map(c => { const i = R.idx.node.get(c.id); return i === undefined ? -1 : i; });
     if (!idx.some(i => i >= 0)) { app.meshResults = null; return; }
     const thr = parseFloat(AV.f2d(app.model).FLOOD_DEPTH) || 0; const si = AV.f2dRun(app.model).si; const siK = si ? 1 : 0.3048; const df = AV.meshDF(app);
     const faces = meshFaces(app);
-    let st = null; try { st = await AV.busy.track(window.host.outMesh2d(R.handle, idx, Array.from(faces.F), Array.from(faces.W), thr, siK, df), 'Computing 2D flood statistics'); } catch (e) { console.error(e); st = null; }
+    let st = null; try { st = await AV.busy.track(window.host.outMesh2d(R.handle, idx, Array.from(faces.F), Array.from(faces.W), thr, siK, df, Array.from(faces.D)), 'Computing 2D flood statistics'); } catch (e) { console.error(e); st = null; }
     const n = idx.length, nv = R.meta.nVars.node; const nan = () => new Float32Array(n).fill(NaN);
     if (!st) { st = { maxd: new Float32Array(n), maxv: nan(), vxm: nan(), vym: nan(), maxhr: nan(), maxdv: nan(), arrive: nan(), tmax: nan(), tpond: nan(), trecede: nan() };
       idx.forEach((i, c) => { st.maxd[c] = i < 0 ? NaN : R.stats.node.max[i * nv]; }); }
@@ -239,19 +314,19 @@
     if (app.results === R && app.meshResults && app.meshResults.df.join(',') === df.join(',')) { const M = app.meshResults; const st = { maxd: M.maxd, maxv: M.maxv, maxhr: M.maxhr, maxdv: M.maxdv, arrive: M.arrive, tmax: M.tmax, tpond: M.tpond, trecede: M.trecede }; R._m2d = { key, st }; return st; }
     const idx = mesh.cells.map(c => { const i = R.idx.node.get(c.id); return i === undefined ? -1 : i; }); if (!idx.some(i => i >= 0)) return null;
     const thr = parseFloat(AV.f2d(app.model).FLOOD_DEPTH) || 0; const siK = AV.f2dRun(app.model).si ? 1 : 0.3048; const faces = meshFaces(app, R);
-    const st = await AV.busy.track(window.host.outMesh2d(R.handle, idx, Array.from(faces.F), Array.from(faces.W), thr, siK, df), 'Computing the 2D statistics of ' + (R.scenName || 'the run'));
+    const st = await AV.busy.track(window.host.outMesh2d(R.handle, idx, Array.from(faces.F), Array.from(faces.W), thr, siK, df, Array.from(faces.D)), 'Computing the 2D statistics of ' + (R.scenName || 'the run'));
     R._m2d = { key, st }; return st;
   };
   // current-time velocity / hazard of every cell (from the link snapshot of the current period), cached per snapshot
   AV.meshDynamic = function (app) {
     const R = app.results, MR = app.meshResults; if (!R || !MR || !R.snap || !R.snap.link || !R.snap.node) return null;
     if (app._meshDyn && app._meshDyn.snap === R.snap.link) return app._meshDyn;
-    const n = MR.idx.length, nvL = R.meta.nVars.link, nvN = R.meta.nVars.node, L = R.snap.link, N = R.snap.node; const { F, W } = MR.faces;
-    const sx = new Float64Array(n), nx = new Uint8Array(n), sy = new Float64Array(n), ny = new Uint8Array(n);
-    for (let j = 0; j < W.length; j++) { const li = F[5 * j], q = L[li * nvL], y = L[li * nvL + 1]; const v = y > 0.003 && W[j] > 0 ? F[5 * j + 4] * q / (W[j] * y) : 0; const a = F[5 * j + 1], b = F[5 * j + 2];
-      if (F[5 * j + 3] === 0) { sx[a] += v; nx[a]++; sx[b] += v; nx[b]++; } else { sy[a] += v; ny[a]++; sy[b] += v; ny[b]++; } }
+    const n = MR.idx.length, nvL = R.meta.nVars.link, nvN = R.meta.nVars.node, L = R.snap.link, N = R.snap.node; const { F, W, D } = MR.faces;
+    const S = new Float64Array(5 * n);
+    for (let j = 0; j < W.length; j++) { const li = F[3 * j], q = L[li * nvL], y = L[li * nvL + 1]; const u = y > 0.003 && W[j] > 0 ? q / (W[j] * y) : 0; const ux = D[2 * j], uy = D[2 * j + 1];
+      for (const c of [F[3 * j + 1], F[3 * j + 2]]) { const o = 5 * c; S[o] += ux * ux; S[o + 1] += ux * uy; S[o + 2] += uy * uy; S[o + 3] += ux * u; S[o + 4] += uy * u; } }
     const vel = new Float32Array(n).fill(NaN), hzd = new Float32Array(n).fill(NaN), vx = new Float32Array(n), vy = new Float32Array(n); const df = MR.df, K = MR.siK;
-    for (let c = 0; c < n; c++) { if (MR.idx[c] < 0) continue; const d = N[MR.idx[c] * nvN]; vx[c] = nx[c] ? sx[c] / nx[c] : 0; vy[c] = ny[c] ? sy[c] / ny[c] : 0; const v = Math.hypot(vx[c], vy[c]); vel[c] = v;
+    for (let c = 0; c < n; c++) { if (MR.idx[c] < 0) continue; const d = N[MR.idx[c] * nvN]; const o = 5 * c; const vv = AV.lsVel(S[o], S[o + 1], S[o + 2], S[o + 3], S[o + 4]); vx[c] = vv[0]; vy[c] = vv[1]; const v = Math.hypot(vx[c], vy[c]); vel[c] = v;
       const dm = d * K; hzd[c] = d > MR.thr ? dm * (v * K + 0.5) + (dm > df[2] ? df[3] : dm > df[0] ? df[1] : 0) : 0; }
     return (app._meshDyn = { snap: L, vel, hzd, vx, vy });
   };
@@ -349,16 +424,21 @@
     const mesh = app.mesh2d, cells = mesh.cells, R = app.results;
     const key = [S.field, JSON.stringify(S.breaks), JSON.stringify(S.colors), S.ramp, S.invert, app.meshResults && app.meshResults.cmp ? app.meshResults.cmp.name + ':' + app.meshResults.cmp.label : ''].join('|');
     const H = app._meshHeat; if (H && H.key === key && H.mesh === mesh && H.MR === app.meshResults && (!AV.MESH_DYNAMIC[S.field] || H.snap === (R && R.snap && R.snap.node))) return H;
-    let s0 = Infinity, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const c of cells) { s0 = Math.min(s0, c.s); x0 = Math.min(x0, c.x - c.s / 2); y0 = Math.min(y0, c.y - c.s / 2); x1 = Math.max(x1, c.x + c.s / 2); y1 = Math.max(y1, c.y + c.s / 2); }
+    let s0 = Infinity, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; const tri = !!mesh.verts;
+    for (const c of cells) { const b = AV.cellBox(c); s0 = Math.min(s0, tri ? c.s / 1.5 : c.s); x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]); }
     const cap = AV.MESH_DYNAMIC[S.field] ? 1.5e6 : 4e6; let px = s0; const n0 = ((x1 - x0) / s0) * ((y1 - y0) / s0); if (n0 > cap) px = s0 * Math.ceil(Math.sqrt(n0 / cap));
     const pad = 2; const nc = Math.max(1, Math.round((x1 - x0) / px)) + 2 * pad, nr = Math.max(1, Math.round((y1 - y0) / px)) + 2 * pad;
     const cv = document.createElement('canvas'); cv.width = nc; cv.height = nr; const g = cv.getContext('2d'); const img = g.createImageData(nc, nr); const D = img.data;
     const Cc = S.breaks ? S.colors.map(rgbOf) : null;
+    if (tri) { // polygons drawn into the raster
+      g.imageSmoothingEnabled = false;
+      for (let k = 0; k < cells.length; k++) { const c = cells[k]; const col = AV.meshHeatColor(app, S, AV.cellValue(app, k, S.field), Cc); if (!col) continue; const P = AV.cellPoly(c);
+        g.fillStyle = 'rgb(' + col.join(',') + ')'; g.beginPath(); P.forEach((q, i) => { const X = pad + (q[0] - x0) / px, Y = pad + (y1 - q[1]) / px; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.closePath(); g.fill(); g.strokeStyle = g.fillStyle; g.lineWidth = 0.6; g.stroke(); }
+    } else {
     for (let k = 0; k < cells.length; k++) { const c = cells[k]; const col = AV.meshHeatColor(app, S, AV.cellValue(app, k, S.field), Cc); if (!col) continue;
       const i0 = pad + Math.round((c.x - c.s / 2 - x0) / px), j0 = pad + Math.round((y1 - (c.y + c.s / 2)) / px), n = Math.max(1, Math.round(c.s / px));
       for (let j = j0; j < j0 + n && j < nr; j++) for (let i = i0; i < i0 + n && i < nc; i++) { const o = (j * nc + i) * 4; D[o] = col[0]; D[o + 1] = col[1]; D[o + 2] = col[2]; D[o + 3] = 255; } }
-    g.putImageData(img, 0, 0);
+    g.putImageData(img, 0, 0); }
     // slight blur (about half a cell) so the blocks blend into a continuous surface
     const out = document.createElement('canvas'); out.width = nc; out.height = nr; const go = out.getContext('2d'); try { go.filter = 'blur(' + (0.75) + 'px)'; } catch (e) { /* no filter */ } go.drawImage(cv, 0, 0);
     return (app._meshHeat = { key, mesh, MR: app.meshResults, snap: R && R.snap && R.snap.node, canvas: out, x0: x0 - pad * px, y1: y1 + pad * px, w: nc * px, h: nr * px });
@@ -374,6 +454,13 @@
       return;
     }
     const groups = new Map(); const outline = new Path2D(); let nOut = 0;
+    if (mesh.verts) { // unstructured: polygons
+      for (let k = 0; k < cells.length; k++) { const c = cells[k], b = AV.cellBox(c); if (b[2] < vb.x1 || b[0] > vb.x2 || b[3] < vb.y1 || b[1] > vb.y2) continue;
+        const P = AV.cellPoly(c); const col = app.themeHidden ? null : AV.meshColor(app, k, S); const wpx = c.s * sc; const ol = (S.outline || app.themeHidden) && wpx > 5 && !big;
+        if (!col && !ol) continue; const path = new Path2D(); P.forEach((q, i) => { const [x, y] = map.toScreen(q[0], q[1]); i ? path.lineTo(x, y) : path.moveTo(x, y); }); path.closePath();
+        if (col) { let g = groups.get(col); if (!g) groups.set(col, g = new Path2D()); g.addPath(path); }
+        if (ol) { outline.addPath(path); nOut++; } }
+    } else
     for (let k = 0; k < cells.length; k++) { const c = cells[k], hs = c.s / 2; if (c.x + hs < vb.x1 || c.x - hs > vb.x2 || c.y + hs < vb.y1 || c.y - hs > vb.y2) continue;
       const [x, y] = map.toScreen(c.x - hs, c.y + hs); const w = c.s * sc; const col = app.themeHidden ? null : AV.meshColor(app, k, S);
       if (col) { let p = groups.get(col); if (!p) groups.set(col, p = new Path2D()); p.rect(x, y, w, w); }
@@ -388,7 +475,7 @@
     const app = map.app, MR = app.meshResults, cells = app.mesh2d.cells, sc = map.scale; let VX = MR.vxm, VY = MR.vym;
     if (app.playMode) { const D = AV.meshDynamic(app); if (!D) return; VX = D.vx; VY = D.vy; }
     const vmin = MR.si ? 0.02 : 0.06, vref = MR.si ? 2 : 6; const p = new Path2D(); let n = 0;
-    for (let k = 0; k < cells.length; k++) { const c = cells[k], w = c.s * sc; if (w < 12) continue; const hs = c.s / 2; if (c.x + hs < vb.x1 || c.x - hs > vb.x2 || c.y + hs < vb.y1 || c.y - hs > vb.y2) continue;
+    for (let k = 0; k < cells.length; k++) { const c = cells[k], w = c.s * sc * (app.mesh2d.verts ? 0.8 : 1); if (w < 12) continue; const hs = c.s / 2; if (c.x + hs < vb.x1 || c.x - hs > vb.x2 || c.y + hs < vb.y1 || c.y - hs > vb.y2) continue;
       const vx = VX[k], vy = VY[k], v = Math.hypot(vx, vy); if (!(v > vmin)) continue;
       const L = w * (0.3 + 0.55 * Math.min(1, v / vref)); const ux = vx / v, uy = -vy / v; const [cx, cy] = map.toScreen(c.x, c.y);
       const x0 = cx - ux * L / 2, y0 = cy - uy * L / 2, x1 = cx + ux * L / 2, y1 = cy + uy * L / 2; const hl = Math.min(7, L * 0.35);
@@ -398,10 +485,16 @@
   AV.meshHit = function (map, wx, wy) {
     const mesh = map.app.mesh2d; if (!mesh || !AV.meshStyle(map.app).visible) return -1;
     // bucket index (bucket = largest cell size), built once per mesh
-    if (!mesh._ix) { const B = Math.max(...mesh.cells.map(c => c.s)); const ix = new Map(); mesh.cells.forEach((c, k) => { const key = Math.floor(c.x / B) + ',' + Math.floor(c.y / B); let a = ix.get(key); if (!a) ix.set(key, a = []); a.push(k); });
-      Object.defineProperty(mesh, '_ix', { value: { B, ix }, enumerable: false, writable: true }); }
-    const { B, ix } = mesh._ix; const bi = Math.floor(wx / B), bj = Math.floor(wy / B);
-    for (let i = bi - 1; i <= bi + 1; i++) for (let j = bj - 1; j <= bj + 1; j++) { const a = ix.get(i + ',' + j); if (a) for (const k of a) { const c = mesh.cells[k], hs = c.s / 2; if (Math.abs(wx - c.x) <= hs && Math.abs(wy - c.y) <= hs) return k; } }
+    return AV.meshCellAt(mesh, wx, wy);
+  };
+  // cell containing a point (bucket index by cell centre; bucket = largest cell extent), -1 when none
+  AV.meshCellAt = function (mesh, wx, wy) {
+    if (!mesh._ix) { let B = 0; for (const c of mesh.cells) { const b = AV.cellBox(c); B = Math.max(B, b[2] - b[0], b[3] - b[1]); } const ix = new Map(); mesh.cells.forEach((c, k) => { const key = Math.floor(c.x / B) + ',' + Math.floor(c.y / B); let a = ix.get(key); if (!a) ix.set(key, a = []); a.push(k); });
+      Object.defineProperty(mesh, '_ix', { value: { B, ix }, enumerable: false, writable: true, configurable: true }); }
+    const { B, ix } = mesh._ix; const bi = Math.floor(wx / B), bj = Math.floor(wy / B); const tri = !!mesh.verts;
+    for (let i = bi - 1; i <= bi + 1; i++) for (let j = bj - 1; j <= bj + 1; j++) { const a = ix.get(i + ',' + j); if (a) for (const k of a) { const c = mesh.cells[k];
+      if (!tri) { const hs = c.s / 2; if (Math.abs(wx - c.x) <= hs && Math.abs(wy - c.y) <= hs) return k; continue; }
+      const b = AV.cellBox(c); if (wx < b[0] || wx > b[2] || wy < b[1] || wy > b[3]) continue; if (pip(wx, wy, AV.cellPoly(c))) return k; } }
     return -1;
   };
   // legend for result fields (bottom-left of the map)
@@ -436,8 +529,10 @@
     const feats = mesh.cells.map((c, k) => { const hs = c.s / 2; const props = { id: c.id, elev: c.elev };
       for (const [f, nm, d] of RF) { const v = app.meshResults ? AV.cellValue(app, k, f) : null; props[nm] = v === null || !isFinite(v) ? (f === 'arrival' || f === 'tmax' ? -1 : 0) : +v.toFixed(d); }
       if (app.meshResults) props.hzclass = props.hazard > 0 ? AV.hazardClass(props.hazard) : '';
-      return { coords: [[[c.x - hs, c.y - hs], [c.x - hs, c.y + hs], [c.x + hs, c.y + hs], [c.x + hs, c.y - hs], [c.x - hs, c.y - hs]]], props }; });
-    const fields = [{ name: 'id', type: 'C', len: 20 }, { name: 'elev', type: 'N', len: 18, dc: 4 }].concat(RF.map(([f, nm, d]) => ({ name: nm, type: 'N', len: 18, dc: d })), app.meshResults ? [{ name: 'hzclass', type: 'C', len: 20 }] : []);
+      props.area = +AV.cellArea(c).toFixed(3); props.btype = c.bt === 1 ? 'RAISED' : c.bt === 2 ? 'POROUS' : '';
+      if (!mesh.verts) return { coords: [[[c.x - hs, c.y - hs], [c.x - hs, c.y + hs], [c.x + hs, c.y + hs], [c.x + hs, c.y - hs], [c.x - hs, c.y - hs]]], props };
+      const P = AV.cellPoly(c).slice().reverse(); P.push(P[0].slice()); return { coords: [P], props }; });
+    const fields = [{ name: 'id', type: 'C', len: 20 }, { name: 'elev', type: 'N', len: 18, dc: 4 }, { name: 'area', type: 'N', len: 18, dc: 3 }, { name: 'btype', type: 'C', len: 8 }].concat(RF.map(([f, nm, d]) => ({ name: nm, type: 'N', len: 18, dc: d })), app.meshResults ? [{ name: 'hzclass', type: 'C', len: 20 }] : []);
     const w = AV.SHP.write('polygon', feats, fields); const base = p.replace(/\.shp$/i, '');
     await window.host.writeBinary(base + '.shp', new Uint8Array(w.shp)); await window.host.writeBinary(base + '.shx', new Uint8Array(w.shx)); await window.host.writeBinary(base + '.dbf', new Uint8Array(w.dbf));
     if (app.crsWKT) await window.host.writeText(base + '.prj', app.crsWKT);
@@ -461,12 +556,12 @@
   };
   AV.meshClearSel = function (app) { if (app.meshSelSet) app.meshSelSet.clear(); app.meshSel = -1; app.map.redrawOverlay(); AV.syncTableSelection(app); };
   // 2D cell graph: depth (+ ground / water surface), velocity and hazard rating of a cell over time (3 linked charts)
-  AV.cellFaces = function (app, k) { const MR = app.meshResults; const { F, W } = MR.faces; const L = [], Wd = [];
-    for (let j = 0; j < W.length; j++) if (F[5 * j + 1] === k || F[5 * j + 2] === k) { L.push(F[5 * j], F[5 * j + 3], F[5 * j + 4], 0); Wd.push(W[j]); } return { L, Wd }; };
+  AV.cellFaces = function (app, k) { const MR = app.meshResults; const { F, W, D } = MR.faces; const L = [], Wd = [], Dd = [];
+    for (let j = 0; j < W.length; j++) if (F[3 * j + 1] === k || F[3 * j + 2] === k) { L.push(F[3 * j]); Wd.push(W[j]); Dd.push(D[2 * j], D[2 * j + 1]); } return { L, Wd, Dd }; };
   AV.cellGraph = async function (app, k) {
     const MR = app.meshResults, R = app.results; if (!MR || !R) { AV.toast('Run the 1D-2D model first.', true); return; } const c = app.mesh2d.cells[k];
-    const { L, Wd } = AV.cellFaces(app, k);
-    const S = await AV.busy.track(window.host.outCellSeries(R.handle, MR.idx[k], L, Wd, MR.thr, MR.siK, MR.df), 'Reading the 2D cell results');
+    const { L, Wd, Dd } = AV.cellFaces(app, k);
+    const S = await AV.busy.track(window.host.outCellSeries(R.handle, MR.idx[k], L, Wd, MR.thr, MR.siK, MR.df, Dd), 'Reading the 2D cell results');
     const x = Array.from(R.times); const U = AV.meshSI(app) ? 'm' : 'ft', V = AV.meshUnit(app, 'vel');
     const body = h('div', { style: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: '2px' } });
     const boxes = [0, 1, 2].map(() => { const b = h('div', { style: { flex: 1, minHeight: '120px', display: 'flex' } }); body.appendChild(b); return b; });
@@ -490,7 +585,8 @@
     const el = AV.$('#props'); if (!el) return; const c = app.mesh2d.cells[k]; el.innerHTML = '';
     const L = AV.meshSI(app) ? 'm' : 'ft'; const f = (v, d) => v === null || v === undefined || !isFinite(v) ? '-' : AV.fmt(v, d);
     el.appendChild(h('div', { class: 'phead' }, h('div', { class: 'pt' }, '2D Cell ' + c.id), h('div', { class: 'ps' }, 'X ' + AV.fmt(c.x, 2) + '   Y ' + AV.fmt(c.y, 2))));
-    const rows = [['Ground Elevation (' + L + ')', f(c.elev, 3)], ['Cell Size (map units)', f(c.s)], ['Roughness (n)', f(c.n, 4)], ['Connected Neighbours', String(c.deg)]];
+    const rows = [['Ground Elevation (' + L + ')', f(c.elev, 3)], app.mesh2d.verts ? ['Cell Area (map units²)', f(AV.cellArea(c), 1) + (c.v ? (c.v.length === 3 ? '  (triangle)' : '  (' + c.v.length + ' sides)') : '')] : ['Cell Size (map units)', f(c.s)], ['Roughness (n)', f(c.n, 4)], ['Connected Neighbours', String(c.deg)]];
+    if (c.bt) rows.push(['Building', c.bt === 1 ? 'Raised (exclusion polygon)' : 'Porous, porosity ' + f(c.por, 2)]);
     const MR = app.meshResults; const V = AV.meshUnit(app, 'vel'), DV = AV.meshUnit(app, 'dv'); const hr = MR ? AV.cellValue(app, k, 'hazard') : null;
     const res = MR ? [['Max. Depth (' + L + ')', f(AV.cellValue(app, k, 'maxdepth'), 3)], ['Max. Water Surface Elev. (' + L + ')', f(c.elev + (AV.cellValue(app, k, 'maxdepth') || 0), 3)],
       ['Max. Velocity (' + V + ')', f(AV.cellValue(app, k, 'maxvel'), 3)], ['Max. Depth x Velocity (' + DV + ')', f(AV.cellValue(app, k, 'dv'), 3)],

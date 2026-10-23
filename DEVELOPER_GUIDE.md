@@ -462,3 +462,18 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - `pool(n)` 控制并行引擎进程数；`evaluate(xs, events)` 每个候选跑全部事件并 `scoreRuns` 评分（每项检查 1 = 在容差内，到 2 倍容差线性降到 0；监测点权重；"满足标准" = 2/3 事件全部检查通过）。
 - 搜索：`nsga2`（分数↑、改变量↓）、`sceua`、`dds`；`finalOptions` 从前沿选 A/B/C 并在全部事件（含验证）上重跑，序列存 `<name>.avres`。
 - 应用：`app.exec({ asUser: { user: 'System', role: 'system' }, ... })`，`history.js` 的 `record` 支持 `cmd.asUser`。
+
+## 20. 2.9.0：非结构网格（三角形）与建筑物类型
+
+- **入口**：Create Meshes 先弹出二选一（Square grid / Unstructured mesh），选择存在 `;;@OSEM2D MESH_TYPE`（SQUARE / UNSTRUCTURED），Options → 2D Flood 里也能改；静默重建（打开模型时）按这个值。新键：`MESH_ZONES`（多边形，属性 `size`）、`BREAK_LINES`（线，可选 `size`）、`EXCL_TYPE` / `EXCL_HEIGHT` / `EXCL_POROSITY`（排除多边形没有 `type` / `height` / `porosity` 属性时的默认值）。
+- **生成器** `renderer/js/umesh.js` `AV.buildUMesh(opt)`（纯函数，无 DOM）：
+  1. 尺寸场：背景网格（分辨率 hmin/2，最多 400 万格）。"Cell size" s 指面积与 s×s 方格相同的等边三角形，边长 h = 1.52 s；网格区多边形直接设定 h（大的先，小的后覆盖，可加密也可放粗）；带 size 的断线和建筑轮廓只会加密（建筑轮廓 h ≤ 周长/4，至少 1/4 本地尺寸，保证角点）；两遍倒角扫描限制增长率 0.35。
+  2. 布点：所有约束线（边界、VOID 建筑、cut-off、其他建筑、网格区边线、断线、水岸线）保留拐点（转角 > 25°）和开放线端点，拐点之间按本地 h 等分，0.3 h 内的点合并；然后从每个边界多边形内部一个种子点按六边形格子生长（每点 6 个候选，距离 h，离已有点 < 0.72 h 的不要），均匀区得到等边三角形。
+  3. Delaunator（ISC，`js/lib/delaunator.min.js`）三角化；缺失的约束边在中点加点重来（最多 8 轮，conforming Delaunay）；自由点 Laplacian 平滑 3 次后再三角化。
+  4. 质心在边界外或 VOID 建筑内的三角形删除；面积 < 0.2 × 目标面积或最小角 < 12° 的三角形并入最长自由边的邻居单元（邻居多边形插入第三个顶点，最多 6 边）。
+- **单元和连接**（引擎不改，仍是"检查井 + 宽明渠"）：T_a = (单元 a 质心, 边端点 1, 端点 2) 三角形面积；每个单元按 f_a = A_a / Σ(有连接的 T_a) 放大（边界边、cut-off 边没有连接），连接平面面积 = T_a f_a + T_b f_b，宽 w = (T_a + T_b) / L（L = 两质心距离，质心连线垂直于边时 = 半个边长，与方格 w = s/2 一致），长 = 平面面积 / w（下限 0.25 L）。方格时这正好是 Avaris DS 的 len = s/2 (4/deg_a + 4/deg_b)。cut-off：约束边或质心连线与 cut-off 线相交的不连。
+- **建筑物类型**（两种网格都支持）：VOID 不建单元；RAISED 单元地面 + height；POROUS 面积 × porosity、相关连接宽度 × porosity（方格只乘宽度）。单元字段 `bt`（1 raised / 2 porous）、`por`。
+- **mesh2d.json v2**：`type: 'tri'`、`verts`（扁平坐标）、单元 `v`（顶点号，逆时针）、`a`（面积）、`s` = √a。`AV.prepMesh` 给单元加不保存的 `_p`（多边形）和 `_b`（外框）；`AV.cellPoly / cellBox / cellArea / meshCellAt` 统一方格和三角形，绘图、点选、热力图、导出 Shapefile / 栅格、淹没范围多边形、横断面、对比面积、分区积水区都改用这些函数。
+- **流速**：面方向 = 质心 a→b 单位向量（方格为 ±x / ±y），单元流速 = 各面法向流速 Q/(w y) 的最小二乘向量（`AV.lsVel`，outreader `mesh2d` / `cellSeries` 新增 dirs 参数）；方格时与原来"x 面平均、y 面平均"完全相同。
+- **2D 计算步长**：小单元需要小步长。`AV.meshRecStep` 取 5% 分位连接长度 L，建议步长 ≈ 0.5 L / √(g·1 m)（取整到 0.1…30 s 的档位）；Create Meshes 的结果里显示，当前 2D Routing Step 大于建议值 1.25 倍时询问是否改成建议值。实测：demo3 加网格区（40）和断线（25）后，5 s 步长不收敛（连续性 −916 %），1 s 正常（7.8 %，同模型方格 3.3 %、非结构不加密 8.5 %；这个模型本身有单元水深到 30 ft 上限、大量 Flooding Loss）。
+- **验证**（Linux Electron）：平地点源（1 km²，20 m，1 m³/s 1 h）方格 2,500 单元 / 三角 2,460：淹没面积 222,800 / 223,600 m²，连续性 0.295 / 0.300 %，最大水深 0.110 / 0.103 m；斜坡（1600×800 m，坡 0.3 %）：淹没面积 0.640 / 0.592 km²，出流 1.012 / 1.133 ×10³ m³，连续性 1.20 / 0.89 %；加网格区（8 m）、断线（10 m）和三种建筑：5,201 单元，连续性 1.11 %，平均步长 0.63 s。Riverside（RD2 数据）三角网格整体运行 vs 2 个子模型耦合运行：单元最高水深最大差 0.002 ft。所有连接平面面积之和 = 单元面积之和（相对差 < 1e-6）。方格的单元流速与 2.8 算法逐值相同。

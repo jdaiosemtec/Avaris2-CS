@@ -11,7 +11,7 @@
     const r4 = (v) => v === null || v === undefined || !isFinite(v) ? '' : +(+v).toFixed(4);
     const cols = [{ k: 'id', l: 'ID', get: (c) => c.id, ro: true }, { k: 'x', l: 'X', get: (c) => +c.x.toFixed(3), num: true, ro: true }, { k: 'y', l: 'Y', get: (c) => +c.y.toFixed(3), num: true, ro: true },
       { k: 'elev', l: 'Ground Elev. (' + L + ')', get: (c) => c.elev, num: true, mesh: true }, { k: 'n', l: 'Roughness', get: (c) => c.n, num: true, mesh: true },
-      { k: 's', l: 'Cell Size', get: (c) => c.s, num: true, ro: true }, { k: 'deg', l: 'Neighbours', get: (c) => c.deg, num: true, ro: true }];
+      { k: 's', l: 'Cell Size', get: (c) => c.s, num: true, ro: true }, { k: 'area', l: 'Cell Area', get: (c) => +AV.cellArea(c).toFixed(3), num: true, ro: true }, { k: 'deg', l: 'Neighbours', get: (c) => c.deg, num: true, ro: true }];
     const RC = (f) => ({ k: '_' + f, l: AV.MESH_FIELDS[f].replace(/ \(hr\)$/, '') + ' (' + AV.meshUnit(app, f) + ') (result)', get: (c) => r4(AV.cellValue(app, K(c), f)), num: true, ro: true, res: true });
     if (app.meshResults) cols.push(...['maxdepth', 'maxwse', 'maxvel', 'hazard', 'dv', 'arrival', 'tmax', 'tpond', 'trecede'].map(RC));
     if (app.meshResults && app.playMode) cols.push(...['depth', 'wse', 'vel', 'hzd'].map(f => Object.assign(RC(f), { l: AV.MESH_FIELDS[f].replace(' (current time)', '') + ' (' + AV.meshUnit(app, f) + ') at current time' })));

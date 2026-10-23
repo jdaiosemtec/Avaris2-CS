@@ -419,7 +419,7 @@
       const m = this.model; const key = (m.geomVersion || 0) + '|' + m.nodes.size + '|' + m.links.size + '|' + m.subcatchments.size + '|' + (this.app.mesh2d ? this.app.mesh2d.cells.length : 0);
       if (this._mbModel === m && this._mbKey === key) return this._mb;
       let b = m.bounds(false); const M = this.app.mesh2d;
-      if (M && M.cells.length) { let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const c of M.cells) { const s = c.s / 2; if (c.x - s < x1) x1 = c.x - s; if (c.y - s < y1) y1 = c.y - s; if (c.x + s > x2) x2 = c.x + s; if (c.y + s > y2) y2 = c.y + s; } b = b ? { x1: Math.min(b.x1, x1), y1: Math.min(b.y1, y1), x2: Math.max(b.x2, x2), y2: Math.max(b.y2, y2) } : { x1, y1, x2, y2 }; }
+      if (M && M.cells.length) { let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const c of M.cells) { const q = AV.cellBox(c); if (q[0] < x1) x1 = q[0]; if (q[1] < y1) y1 = q[1]; if (q[2] > x2) x2 = q[2]; if (q[3] > y2) y2 = q[3]; } b = b ? { x1: Math.min(b.x1, x1), y1: Math.min(b.y1, y1), x2: Math.max(b.x2, x2), y2: Math.max(b.y2, y2) } : { x1, y1, x2, y2 }; }
       if (b) { const pw = Math.max(b.x2 - b.x1, b.y2 - b.y1, 1) * 0.02; b = { x1: b.x1 - pw, y1: b.y1 - pw, x2: b.x2 + pw, y2: b.y2 + pw }; }
       this._mb = b; this._mbModel = m; this._mbKey = key; return b;
     }
@@ -542,7 +542,7 @@
       if (this.dragObj) { const o = this.dragObj; const [x, y] = this.toScreen(o.x, o.y); ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fillStyle = SC.node; ctx.fill(); ctx.strokeStyle = '#263238'; ctx.stroke(); }
       // selected 2D cell
       if (this.app.mesh2d) { const sel = new Set(this.app.meshSelSet || []); if (this.app.meshSel >= 0 && this.app.mesh2d.cells[this.app.meshSel]) sel.add(this.app.mesh2d.cells[this.app.meshSel]);
-        if (sel.size) { ctx.save(); ctx.strokeStyle = SC.sub; ctx.lineWidth = 2.5; for (const c of sel) { if (c.x + c.s < vb.x1 || c.x - c.s > vb.x2 || c.y + c.s < vb.y1 || c.y - c.s > vb.y2) continue; const [x, y] = this.toScreen(c.x - c.s / 2, c.y + c.s / 2); ctx.strokeRect(x, y, c.s * S, c.s * S); } ctx.restore(); } }
+        if (sel.size) { ctx.save(); ctx.strokeStyle = SC.sub; ctx.lineWidth = 2.5; for (const c of sel) { const q = AV.cellBox(c); if (q[2] < vb.x1 || q[0] > vb.x2 || q[3] < vb.y1 || q[1] > vb.y2) continue; if (!this.app.mesh2d.verts) { const [x, y] = this.toScreen(c.x - c.s / 2, c.y + c.s / 2); ctx.strokeRect(x, y, c.s * S, c.s * S); continue; } ctx.beginPath(); AV.cellPoly(c).forEach((p, i) => { const [x, y] = this.toScreen(p[0], p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.stroke(); } ctx.restore(); } }
       if (this.app.mesh2d) AV.drawMeshLegend(this, ctx);
       if (this.app.partView && this.app.partView.P) AV.partOverlay(this, ctx);
       for (const f of AV.mapOverlays || []) { try { ctx.save(); f(this, ctx); } catch (e) { console.warn('overlay', e); } finally { ctx.restore(); } }

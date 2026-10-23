@@ -13,7 +13,7 @@
   const fin = (v) => v !== null && v !== undefined && isFinite(v);
 
   // area of a cell in model units² and the display unit (ha / ac)
-  function areaInfo(app) { const lf = app.mesh2d.lenFactor || 1; const si = AV.meshSI(app); return { cell: (c) => (c.s * lf) * (c.s * lf), k: si ? 1e-4 : 1 / 43560, u: si ? 'ha' : 'ac' }; }
+  function areaInfo(app) { const lf = app.mesh2d.lenFactor || 1; const si = AV.meshSI(app); return { cell: (c) => AV.cellArea(c) * lf * lf, k: si ? 1e-4 : 1 / 43560, u: si ? 'ha' : 'ac' }; }
 
   // ---------------------------------------------------------------- polygons from cells (dissolve)
   // Every cell gives its 4 edges counter-clockwise; an edge shared by two selected cells appears in both directions and
@@ -22,8 +22,8 @@
   AV.cellsToRings = function (cells) {
     const q = (v) => Math.round(v * 1000); const E = new Map(); const key = (a, b) => a + '|' + b;
     const add = (a, b) => { const r = key(b, a); if (E.has(r)) E.delete(r); else E.set(key(a, b), [a, b]); };
-    for (const c of cells) { const hs = c.s / 2; const p = [[c.x - hs, c.y - hs], [c.x + hs, c.y - hs], [c.x + hs, c.y + hs], [c.x - hs, c.y + hs]].map(([x, y]) => q(x) + ',' + q(y));
-      for (let i = 0; i < 4; i++) add(p[i], p[(i + 1) % 4]); }
+    for (const c of cells) { const p = AV.cellPoly(c).map(([x, y]) => q(x) + ',' + q(y));
+      for (let i = 0; i < p.length; i++) add(p[i], p[(i + 1) % p.length]); }
     const from = new Map(); for (const [k, [a, b]] of E) { let l = from.get(a); if (!l) from.set(a, l = []); l.push(b); }
     const rings = [];
     for (const [start, l] of from) while (l.length) { const ring = [start]; let cur = l.pop(); let guard = 0;
@@ -201,11 +201,16 @@
 
   // raster of a mesh field at the finest cell size (map units): G[row * nc + col], row 0 = top, -9999 = no data
   AV.meshRaster = function (app, field) {
-    const cells = app.mesh2d.cells; let s0 = Infinity, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const c of cells) { s0 = Math.min(s0, c.s); x0 = Math.min(x0, c.x - c.s / 2); y0 = Math.min(y0, c.y - c.s / 2); x1 = Math.max(x1, c.x + c.s / 2); y1 = Math.max(y1, c.y + c.s / 2); }
+    const cells = app.mesh2d.cells; let s0 = Infinity, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; const tri = !!app.mesh2d.verts;
+    for (const c of cells) { const b = AV.cellBox(c); s0 = Math.min(s0, tri ? c.s / 2 : c.s); x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]); }
+    if (tri && ((x1 - x0) / s0) * ((y1 - y0) / s0) > 2.5e7) s0 = Math.sqrt((x1 - x0) * (y1 - y0) / 2.5e7);
     const nc = Math.max(1, Math.round((x1 - x0) / s0)), nr = Math.max(1, Math.round((y1 - y0) / s0)); const G = new Float32Array(nc * nr).fill(-9999);
     const dry = !/^(elev|maxwse|wse|ddepth)$/.test(field);
     cells.forEach((c, k) => { const v = AV.cellValue(app, k, field); if (!fin(v)) return; if (dry && !(v > 0)) return;
+      if (tri) { const b = AV.cellBox(c), P = AV.cellPoly(c); // pixels whose centre lies in the cell
+        for (let j = Math.max(0, Math.floor((y1 - b[3]) / s0)); j <= Math.min(nr - 1, Math.ceil((y1 - b[1]) / s0)); j++) { const yc = y1 - (j + 0.5) * s0;
+          for (let i = Math.max(0, Math.floor((b[0] - x0) / s0)); i <= Math.min(nc - 1, Math.ceil((b[2] - x0) / s0)); i++) { const xc = x0 + (i + 0.5) * s0; if (pip(xc, yc, P)) G[j * nc + i] = v; } }
+        return; }
       const i0 = Math.round((c.x - c.s / 2 - x0) / s0), j0 = Math.round((y1 - (c.y + c.s / 2)) / s0), n = Math.max(1, Math.round(c.s / s0));
       for (let j = j0; j < j0 + n && j < nr; j++) for (let i = i0; i < i0 + n && i < nc; i++) G[j * nc + i] = v; });
     return { nc, nr, x0, y0, y1, s0, G };
@@ -248,7 +253,7 @@
     app.setTool('draw-ext'); app.map.drawGeom = 'line'; app.map.setHint('2D cross section: click the vertices of the line; double-click or Enter to finish. Esc to cancel.');
   };
   AV.showCrossSection2D = function (app, pts) {
-    const mesh = app.mesh2d, MR = app.meshResults, lf = mesh.lenFactor || 1; let s0 = Infinity; for (const c of mesh.cells) s0 = Math.min(s0, c.s); const step = s0 / 4;
+    const mesh = app.mesh2d, MR = app.meshResults, lf = mesh.lenFactor || 1; let s0 = Infinity; for (const c of mesh.cells) s0 = Math.min(s0, c.s); const step = s0 / (mesh.verts ? 6 : 4);
     const samp = []; let ch = 0;
     for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); const n = Math.max(1, Math.ceil(L / step));
       for (let k = i === 1 ? 0 : 1; k <= n; k++) { const t = k / n; samp.push({ x: a[0] + t * (b[0] - a[0]), y: a[1] + t * (b[1] - a[1]), ch: (ch + t * L) * lf }); } ch += L; }

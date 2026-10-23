@@ -279,7 +279,7 @@
       const app = this.app, cells = app.mesh2d.cells, lf = app.mesh2d.lenFactor || 1, si = AV.meshSI(app); const thr = app.flood2d && app.flood2d.S.thr !== undefined ? app.flood2d.S.thr : AV.meshDefaultBreaks(app, 'maxdepth')[0];
       const ak = si ? 1e-4 : 1 / 43560, au = si ? 'ha' : 'ac', L = si ? 'm' : 'ft', V = si ? 'm/s' : 'ft/s';
       const fig = (R) => { const s = R._m2d.st; let area = 0, n = 0, md = 0, mv = 0, hr75 = 0, hr2 = 0, arr = Infinity, vol = 0;
-        for (let k = 0; k < cells.length; k++) { const d = s.maxd[k]; if (!(d >= thr) || !(d > 0)) continue; const a = (cells[k].s * lf) ** 2; area += a; n++; vol += a * d; md = Math.max(md, d);
+        for (let k = 0; k < cells.length; k++) { const d = s.maxd[k]; if (!(d >= thr) || !(d > 0)) continue; const a = AV.cellArea(cells[k]) * lf * lf; area += a; n++; vol += a * d; md = Math.max(md, d);
           if (isFinite(s.maxv[k])) mv = Math.max(mv, s.maxv[k]); if (s.maxhr[k] >= 0.75) hr75 += a; if (s.maxhr[k] >= 2) hr2 += a; if (isFinite(s.arrive[k])) arr = Math.min(arr, s.arrive[k]); }
         return { area: area * ak, n, md, mv, hr75: hr75 * ak, hr2: hr2 * ak, arr: isFinite(arr) ? arr : null }; };
       const b = fig(B), c = fig(C);

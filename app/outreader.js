@@ -140,32 +140,37 @@ class OutReader {
 
 
   // 2D flood statistics of the mesh in one pass over the file.
-  //   cells: Int32Array of node indexes (-1 = not in the file); links: flat Int32Array [link index, cell a, cell b,
-  //   axis (0 = x, 1 = y), sign (+1 when a -> b points to +x / +y)] per 2D link; width: Float32Array face width per link.
-  //   The velocity of a cell is the depth-averaged velocity of its faces, Q / (face width x face depth), averaged over
-  //   the faces of each direction (x, y). Hazard rating (DEFRA FD2320/FD2321): HR = d (v + 0.5) + DF, with d in m and
-  //   v in m/s (siK converts model units), DF by depth (df: [d1, DF1, d2, DF2]).
-  mesh2d(cells, links, width, thr, siK, df) {
+  //   cells: Int32Array of node indexes (-1 = not in the file); links: flat Int32Array [link index, cell a, cell b] per
+  //   2D link; width: Float32Array face width per link; dirs: Float32Array unit direction (x, y) from a to b per link.
+  //   The velocity of a cell is the least-squares vector fit to the normal velocities of its faces, Q / (face width x
+  //   face depth) along the direction a -> b (for the square grid: the mean of the x faces and of the y faces). Hazard
+  //   rating (DEFRA FD2320/FD2321): HR = d (v + 0.5) + DF, with d in m and v in m/s (siK converts model units), DF by
+  //   depth (df: [d1, DF1, d2, DF2]).
+  static lsVel(sxx, sxy, syy, sxu, syu) { const tr = sxx + syy; if (!(tr > 0)) return [0, 0]; const det = sxx * syy - sxy * sxy;
+    if (det > 1e-6 * tr * tr) return [(syy * sxu - sxy * syu) / det, (sxx * syu - sxy * sxu) / det]; return [sxu / tr, syu / tr]; }
+  mesh2d(cells, links, width, thr, siK, df, dirs) {
     const L = this._layout('node'), LL = this._layout('link'); const per = this.bytesPerPeriod; const n = cells.length, nl = width.length;
-    const dt = this.reportStep / 3600; const NP = this.nPeriods;
+    const dt = this.reportStep / 3600; const NP = this.nPeriods; const ls = OutReader.lsVel;
     const maxd = new Float32Array(n).fill(NaN), maxv = new Float32Array(n), vxm = new Float32Array(n), vym = new Float32Array(n), maxhr = new Float32Array(n), maxdv = new Float32Array(n);
     const arrive = new Float32Array(n).fill(NaN), tmax = new Float32Array(n), tpond = new Float32Array(n), trecede = new Float32Array(n), tdry = new Int32Array(n).fill(-1), pk = new Int32Array(n);
     for (let c = 0; c < n; c++) if (cells[c] >= 0) maxd[c] = -Infinity;
-    const sx = new Float64Array(n), nx = new Uint8Array(n), sy = new Float64Array(n), ny = new Uint8Array(n); const dep = new Float32Array(n);
+    const S = new Float64Array(5 * n); const G = new Float64Array(3 * n); const dep = new Float32Array(n);
+    // the geometric sums (n n') do not change with time
+    for (let j = 0; j < nl; j++) { if (links[3 * j] < 0) continue; const ux = dirs[2 * j], uy = dirs[2 * j + 1]; for (const c of [links[3 * j + 1], links[3 * j + 2]]) { G[3 * c] += ux * ux; G[3 * c + 1] += ux * uy; G[3 * c + 2] += uy * uy; } }
     const blockPeriods = Math.max(1, Math.floor((32 << 20) / per));
     for (let p0 = 0; p0 < NP; p0 += blockPeriods) {
       const np = Math.min(blockPeriods, NP - p0); let b = this._read(this.outputPos + p0 * per, np * per); if (b.byteOffset % 4) b = Buffer.from(b);
       const f = new Float32Array(b.buffer, b.byteOffset, Math.floor(b.byteLength / 4));
       for (let k = 0; k < np; k++) { const p = p0 + k; const no = (k * per + L.off) / 4, lo = (k * per + LL.off) / 4;
         for (let c = 0; c < n; c++) { const i = cells[c]; dep[c] = i >= 0 ? f[no + i * L.nv] : 0; }
-        sx.fill(0); nx.fill(0); sy.fill(0); ny.fill(0);
-        for (let j = 0; j < nl; j++) { const li = links[5 * j]; if (li < 0) continue; const q = f[lo + li * LL.nv], y = f[lo + li * LL.nv + 1];
-          const v = y > 0.003 && width[j] > 0 ? links[5 * j + 4] * q / (width[j] * y) : 0; const a = links[5 * j + 1], c2 = links[5 * j + 2];
-          if (links[5 * j + 3] === 0) { sx[a] += v; nx[a]++; sx[c2] += v; nx[c2]++; } else { sy[a] += v; ny[a]++; sy[c2] += v; ny[c2]++; } }
+        S.fill(0);
+        for (let j = 0; j < nl; j++) { const li = links[3 * j]; if (li < 0) continue; const q = f[lo + li * LL.nv], y = f[lo + li * LL.nv + 1];
+          const u = y > 0.003 && width[j] > 0 ? q / (width[j] * y) : 0; if (u === 0) continue; const ux = dirs[2 * j] * u, uy = dirs[2 * j + 1] * u;
+          const a = links[3 * j + 1], c2 = links[3 * j + 2]; S[2 * a] += ux; S[2 * a + 1] += uy; S[2 * c2] += ux; S[2 * c2 + 1] += uy; }
         for (let c = 0; c < n; c++) { if (cells[c] < 0) continue; const d = dep[c];
           if (d > maxd[c]) { maxd[c] = d; tmax[c] = (p + 1) * dt; pk[c] = p; tdry[c] = -1; } else if (tdry[c] < 0 && d <= thr && maxd[c] > thr) tdry[c] = p;
           if (d > thr) { tpond[c] += dt; if (!(arrive[c] >= 0)) arrive[c] = (p + 1) * dt; }
-          const vx = nx[c] ? sx[c] / nx[c] : 0, vy = ny[c] ? sy[c] / ny[c] : 0; const v = Math.hypot(vx, vy);
+          const vv = ls(G[3 * c], G[3 * c + 1], G[3 * c + 2], S[2 * c], S[2 * c + 1]); const vx = vv[0], vy = vv[1]; const v = Math.hypot(vx, vy);
           if (v > maxv[c]) { maxv[c] = v; vxm[c] = vx; vym[c] = vy; }
           const dm = d * siK, vm = v * siK; const hr = d > thr ? dm * (vm + 0.5) + (dm > df[2] ? df[3] : dm > df[0] ? df[1] : 0) : 0;
           if (hr > maxhr[c]) maxhr[c] = hr; if (d * v > maxdv[c]) maxdv[c] = d * v; } }
@@ -174,19 +179,20 @@ class OutReader {
       trecede[c] = maxd[c] > thr ? ((tdry[c] < 0 ? NP - 1 : tdry[c]) - pk[c]) * dt : 0; }
     return { maxd, maxv, vxm, vym, maxhr, maxdv, arrive, tmax, tpond, trecede };
   }
-  // time series of one cell: depth, velocity (from its faces), hazard rating
-  cellSeries(node, links, width, thr, siK, df) {
+  // time series of one cell: depth, velocity (from its faces: links = link indexes, dirs = unit directions), hazard rating
+  cellSeries(node, links, width, thr, siK, df, dirs) {
     const L = this._layout('node'), LL = this._layout('link'); const per = this.bytesPerPeriod; const NP = this.nPeriods; const nl = width.length;
     const d = new Float32Array(NP), v = new Float32Array(NP), hr = new Float32Array(NP);
+    let gxx = 0, gxy = 0, gyy = 0; for (let j = 0; j < nl; j++) { if (links[j] < 0) continue; const ux = dirs[2 * j], uy = dirs[2 * j + 1]; gxx += ux * ux; gxy += ux * uy; gyy += uy * uy; }
     const blockPeriods = Math.max(1, Math.floor((32 << 20) / per));
     for (let p0 = 0; p0 < NP; p0 += blockPeriods) {
       const np = Math.min(blockPeriods, NP - p0); let b = this._read(this.outputPos + p0 * per, np * per); if (b.byteOffset % 4) b = Buffer.from(b);
       const f = new Float32Array(b.buffer, b.byteOffset, Math.floor(b.byteLength / 4));
       for (let k = 0; k < np; k++) { const p = p0 + k; const no = (k * per + L.off) / 4, lo = (k * per + LL.off) / 4; const dd = node >= 0 ? f[no + node * L.nv] : 0;
-        let sx = 0, nx = 0, sy = 0, ny = 0;
-        for (let j = 0; j < nl; j++) { const li = links[4 * j]; if (li < 0) continue; const q = f[lo + li * LL.nv], y = f[lo + li * LL.nv + 1]; const vv = y > 0.003 && width[j] > 0 ? links[4 * j + 2] * q / (width[j] * y) : 0;
-          if (links[4 * j + 1] === 0) { sx += vv; nx++; } else { sy += vv; ny++; } }
-        const vel = Math.hypot(nx ? sx / nx : 0, ny ? sy / ny : 0); d[p] = dd; v[p] = vel; const dm = dd * siK, vm = vel * siK;
+        let sx = 0, sy = 0;
+        for (let j = 0; j < nl; j++) { const li = links[j]; if (li < 0) continue; const q = f[lo + li * LL.nv], y = f[lo + li * LL.nv + 1]; const u = y > 0.003 && width[j] > 0 ? q / (width[j] * y) : 0;
+          sx += dirs[2 * j] * u; sy += dirs[2 * j + 1] * u; }
+        const vv = OutReader.lsVel(gxx, gxy, gyy, sx, sy); const vel = Math.hypot(vv[0], vv[1]); d[p] = dd; v[p] = vel; const dm = dd * siK, vm = vel * siK;
         hr[p] = dd > thr ? dm * (vm + 0.5) + (dm > df[2] ? df[3] : dm > df[0] ? df[1] : 0) : 0; } }
     return { d, v, hr };
   }
