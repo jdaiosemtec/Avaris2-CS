@@ -382,7 +382,7 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 水量平衡：下游收到的切口水量记作外部入流，上游 outfall 记作外部出流；合并报告时按引擎输出的 `CPLVOL` 扣除。
 
 **文件和流程**
-- 界面：Run 对话框里有 *Coupled parallel* 选项（模型旁有 `<模型>.partition.json` 时才出现）。主模型在分区后改过（对象签名不同）时不能选，提示先 Regenerate。2D 暂不耦合（只算 1D 管网）。
+- 界面：Run 对话框里有 *Coupled parallel* 选项（模型旁有 `<模型>.partition.json` 时才出现）。主模型在分区后改过（对象签名不同）时不能选，提示先 Regenerate。对话框按核数和模型规模给出速度提示。
 - `main.js` 的 `engine:runCoupled`：在 `<结果文件夹>/<运行名>_parts/` 写 `run.cpl`（制表符分隔：SHM、MODE、THREADS、PART k level inp rpt out、CPL up outfall link down node），启动协调进程，读 `PROGRESS / PART / CPLVOL / DONE`。
 - `app/cplmerge.js`：把各子模型的 .out 合并成一个**主模型 ID** 的 .out（节点取所属分区，边界 outfall 不要；切口管取上游子模型，掉头写出的管道把流量和流速取反、偏移量对调；系统变量：流量类求和、降雨/入渗按汇水面积加权、温度/蒸发取第一个子模型，系统出流扣掉切口流量），并合并 .rpt（连续性表求和后重算误差，对象表按主模型顺序合并，去掉边界 outfall 和 System 行）。前端和网页数字孪生只读这一个 .out/.rpt。
 - 运行记录（`<运行名>.json`）里 `type: "1D coupled"`、`seconds`、`coupled.subModels`。Scenario Comparison 的 KPI 卡片里有 *Run time*，可直接比较整体模型和耦合计算的结果和耗时。
@@ -393,8 +393,16 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 对照：这个模型对数值扰动很敏感，只把整体模型的 ROUTING_STEP 从 5 s 改成 4.9 s 或 4.95 s，节点最高水深之差就有 90% 分位 0.009–0.020 m、95% 分位 0.17–0.35 m、最大 4.6–6.8 m。所以耦合结果和整体模型的差别不大于模型本身的数值敏感度。
 - 普通（整体）运行：引擎改动后 Riverside 的 .out 与旧引擎逐字节相同。
 
+**1D-2D 耦合（2.6.2 起）**
+- 模型启用 2D 且已建网格时，耦合运行自动做 1D-2D：`partition.js` 的 `AV.partition2DJob` 在运行时把网格分给各子模型（网格改了不用重新生成子模型）：单元中心落在某分区 D8 面积内 → 该分区；含耦合检查井的单元 → 这些检查井（多数）所在分区；其余单元沿 2D 链接广度优先取最近已分配单元的分区；仍未分配的取最近检查井的分区。
+- 两端在不同子模型的 2D 链接和耦合孔口按切口管处理：留在起点所在子模型，终点换成边界 outfall `CB_<链接ID>`（outfall 只能接一根链接，所以每根切口链接一个），另一侧的单元接收流量并把水位传回，每次迭代交换（`couple.c` 不需要改动）。
+- 子模型写成 `<运行名>_parts/Pnn.finp`（`AV.mesh2DToINP` 加了第 4 个参数：整个网格用于查单元高程/糙率，边界 outfall 列表）；合并结果为 `<运行名>.fout / .frpt`，`job.order` 加入单元、2D 链接、孔口、水岸 outfall，`nodeOwner` 加入单元归属。运行记录 `type: "1D-2D coupled"`。
+- 验证（Riverside 1D-2D，1578 个单元，开发机 2 核）：整体 133 s；12 个子模型 108 s（413 根切口 2D 链接），节点最高水深最大差 0.010 m、单元最大差 0.003 m；2 个子模型 95 s（96 根切口），节点最大差 0.001 m、单元 0.002 m；水深 > 0.05 m 的单元两者都是 791 个。
+
 **速度**
-- 并行收益取决于核数和模型规模：每次迭代有两次进程同步（约几十微秒）。子模型数 ≤ 物理核数、每个子模型足够大时才有明显加速；子模型数多于核数时会变慢（开发机只有 2 核，12 个子模型的 Riverside 比整体模型慢）。
+- 每次 Picard 迭代有两次进程同步。2.6.2 起同步方式按核数选择（`couple.c` `barrier`）：子模型数 ≤ 逻辑处理器数时等待方自旋约 1–2 ms（`pause` 指令）再睡眠；子模型多于处理器时立即让出处理器（`sched_yield` / `SwitchToThread`），再睡眠。
+- 实测（Riverside 1D，593 个节点，2 核）：整体 12.9 s；2 个子模型 旧 13.5 s → 新 8.6 s；12 个子模型 旧 33.3 s → 新 14.1 s。
+- 加速需要子模型数 ≤ 核数、每个子模型有足够的计算量。Run 对话框和分区检查会提示：子模型多于物理核数、每个子模型对象太少（< 约 200 个对象 / 100 个节点）。分区工具的建议上限从 1.5 × 核数改为核数。
 
 ## 12. 出图排版、旱流污水、数据推断与清理、CSO 统计（2.5.0 起）
 
@@ -418,3 +426,7 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 | 2D 横断面 | 2D Flood Analysis ▸ Cross Section | `flood.js` `AV.crossSection2D`；`features.js` `onDrawHook` | 在地图上画折线（双击或 Enter 结束），按最小单元尺寸的 1/4 采样：地面、最大水面、当前时刻水面（播放模式，随时间步更新，`app.emit('period')`）、对比方案最大水面。线保留在地图上直到关闭面板。 |
 
 验证（Riverside Demo，Design 10yr，1578 个单元、3036 个 2D 链接）：单元流速与引擎链接流速逐值一致（-0.28349 vs -0.28346 m/s）；淹没范围面积 = 1179 个湿单元面积之和；按区域统计两个半区的淹没面积之和等于全区。
+
+## 14. 文件夹选择（2.6.2 起）
+- `folderdlg.js` `AV.folderDialog({ title, defaultPath, modelFolder })`：程序内的文件夹选择框（Windows 系统对话框不能加按钮）。左侧位置（模型文件夹、桌面、文档、下载、主目录、盘符，`main.js` IPC `fs:places`），右侧子文件夹（单击选中、双击进入），路径栏可输入，↑ 上一级；底部左侧 **New Folder**（在列表里直接输入名称，Enter 创建），右侧 Cancel / Select Folder。用于分区子模型文件夹。
+- 子模型文件夹按模型记住（`prefs.partition.folderBy[模型路径]`），不再把上一个模型的文件夹带到另一个模型。

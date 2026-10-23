@@ -83,8 +83,11 @@
   };
 
   // ------------------------------------------------------------------ .finp: model + 2D elements
-  AV.mesh2DToINP = function (text, mesh, m) {
+  // extra (coupled parallel run, one sub-model): { all: the whole mesh (cell lookups), bnd: [{ id, elev, x, y }] boundary
+  //   outfalls standing for the cells of other sub-models at the cut 2D links / coupling orifices }
+  AV.mesh2DToINP = function (text, mesh, m, extra) {
     const f = AV.f2d(m); const elevOff = /ELEVATION/i.test(m.options.LINK_OFFSETS || '');
+    const allCells = extra && extra.all ? extra.all.cells : mesh.cells;
     const pad = (a) => a.map((x, i) => i === a.length - 1 ? String(x) : String(x).padEnd(i === 0 ? 17 : 11)).join(' ');
     const add = { JUNCTIONS: [], OUTFALLS: [], CONDUITS: [], ORIFICES: [], XSECTIONS: [], COORDINATES: [] };
     for (const c of mesh.cells) { add.JUNCTIONS.push(pad([c.id, c.elev, MAXD2D, 0, 0, 0])); add.COORDINATES.push(pad([c.id, c.x, c.y])); }
@@ -92,14 +95,15 @@
     // manhole is deepened to the top of its orifice. The engine would make exactly these adjustments itself
     // (WARNING 10 "crest elevation raised to downstream invert", WARNING 02 "maximum depth increased"); doing it
     // here gives the same results without hundreds of warnings in the report.
-    const cellZ = new Map(mesh.cells.map(c => [c.id, c.elev])); const r4 = (v) => +(+v).toFixed(4); const up4 = (v) => Math.ceil(v * 1e4 + 1e-6) / 1e4; const deepen = new Map();
+    const cellZ = new Map(allCells.map(c => [c.id, c.elev])); const r4 = (v) => +(+v).toFixed(4); const up4 = (v) => Math.ceil(v * 1e4 + 1e-6) / 1e4; const deepen = new Map();
     for (const o of mesh.outfalls) { add.OUTFALLS.push(pad([o.id, o.elev, 'FREE', 'NO'])); add.COORDINATES.push(pad([o.id, o.x, o.y]));
       const zc = cellZ.get(o.cell); const crest = Math.max(o.elev, isFinite(zc) ? zc : o.elev);
       add.ORIFICES.push(pad([o.id + 'X', o.id, o.cell, 'SIDE', crest > o.elev ? up4(elevOff ? crest : crest - o.elev) : r4(elevOff ? crest : 0), 0.65, 'NO', 0])); add.XSECTIONS.push(pad([o.id + 'X', 'RECT_CLOSED', MAXD2D, o.w, 0, 0])); }
-    const cellN = new Map(mesh.cells.map(c => [c.id, c.n])); // roughness may have been edited per cell in the attribute table
-    for (const l of mesh.links) { const na = cellN.get(l.a), nb = cellN.get(l.b); const n = isFinite(na) && isFinite(nb) ? Math.max(na, nb) : l.n; add.CONDUITS.push(pad([l.id, l.a, l.b, l.len, n, 0, 0, 0, 0])); add.XSECTIONS.push(pad([l.id, 'RECT_OPEN', MAXD2D, l.w, 0, 0, 1])); }
+    if (extra && extra.bnd) for (const b of extra.bnd) { add.OUTFALLS.push(pad([b.id, b.elev, 'FIXED', b.elev, 'NO'])); add.COORDINATES.push(pad([b.id, b.x, b.y])); }
+    const cellN = new Map(allCells.map(c => [c.id, c.n])); // roughness may have been edited per cell in the attribute table
+    for (const l of mesh.links) { const na = cellN.get(l.a), nb = cellN.get(l.bOrig || l.b); const n = isFinite(na) && isFinite(nb) ? Math.max(na, nb) : l.n; add.CONDUITS.push(pad([l.id, l.a, l.b, l.len, n, 0, 0, 0, 0])); add.XSECTIONS.push(pad([l.id, 'RECT_OPEN', MAXD2D, l.w, 0, 0, 1])); }
     for (const x of mesh.couplings) { const nd = m.nodes.get(x.node); if (!nd) continue; const z0 = +nd.p.elev || 0, rim = (+nd.p.maxDepth || 0);
-      const zc = cellZ.get(x.cell); const crest = Math.max(z0 + rim, isFinite(zc) ? zc : z0 + rim);
+      const zc = cellZ.get(x.cellOf || x.cell); const crest = Math.max(z0 + rim, isFinite(zc) ? zc : z0 + rim);
       add.ORIFICES.push(pad([x.id, x.node, x.cell, 'SIDE', crest > z0 + rim ? up4(elevOff ? crest : crest - z0) : r4(elevOff ? crest : rim), 0.65, 'NO', 0])); add.XSECTIONS.push(pad([x.id, 'RECT_CLOSED', MAXD2D, x.w, 0, 0]));
       deepen.set(x.node, +(up4(crest - z0 + MAXD2D) + 0.0001).toFixed(4)); }
     const lines = text.split(/\r?\n/); const out = []; let sec = null; const seen = new Set();

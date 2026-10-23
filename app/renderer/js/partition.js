@@ -5,7 +5,7 @@
 //    mostly backwards is turned round
 //  - links with reverse flow (flag rule: flow for >= N min and reverse >= W % of that time), pumps / orifices / weirs /
 //    outlets, links of flow dividers and the manholes of one 2D ponding area are never separated
-//  - as few cut points as possible, partitions of about the same size (nodes), count <= 1.5 x CPU cores
+//  - as few cut points as possible, partitions of about the same size (nodes), count <= CPU cores
 //  - at a cut, the conduit stays in the upstream partition; its downstream node becomes an outfall there (stage set by
 //    the coupling engine: the water level of the downstream partition) and receives the conduit flow as an inflow in
 //    the downstream partition
@@ -195,7 +195,8 @@
     const empty = st.filter(s => !s.outfalls.length && !s.cout); out.push(empty.length ? { t: 'er', s: empty.map(s => PID(s.i)).join(', ') + ': no outfall and no cut point' } : { t: 'ok', s: 'Every partition drains to an outfall or a cut point' });
     const dev = Math.max(...st.map(s => Math.abs(s.nodes - avg) / avg)) * 100;
     out.push(dev > S.tol ? { t: 'wn', s: 'Largest deviation from the average size: ' + dev.toFixed(0) + ' % (tolerance ' + S.tol + ' %) – move branches if needed' } : { t: 'ok', s: 'Partition sizes within ' + dev.toFixed(0) + ' % of the average' });
-    const mx = Math.floor(cores * 1.5); out.push(st.length > mx ? { t: 'wn', s: st.length + ' partitions > ' + mx + ' (1.5 × ' + cores + ' cores): more partitions than the computer can run in parallel' } : { t: 'ok', s: st.length + ' partitions ≤ ' + mx + ' (1.5 × ' + cores + ' cores)' });
+    const mx = cores; out.push(st.length > mx ? { t: 'wn', s: st.length + ' partitions > ' + cores + ' processor cores: the coupled run is fastest with at most one partition per core' } : { t: 'ok', s: st.length + ' partitions ≤ ' + cores + ' processor cores' });
+    { const per = Math.round(app.model.nodes.size / Math.max(1, st.length)); if (per < 100) out.push({ t: 'wn', s: 'About ' + per.toLocaleString() + ' nodes per partition: very little work per sub-model, use fewer partitions for a faster coupled run' }); }
     if (!A.hasResults) out.push({ t: 'wn', s: 'No base results: flow directions follow the link directions and reverse flow is not checked' });
     return out;
   };
@@ -442,5 +443,68 @@
       couplings: def.couplings.map(c => ({ up: pidx.get(c.up.partition), outfall: c.up.node, link: c.link, down: pidx.get(c.down.partition), node: c.down.node, reversed: !!c.reversed })),
       order: { subcatch: [...m.subcatchments.keys()], node: [...m.nodes.keys()], link: [...m.links.keys()] },
       nodeOwner: def.assignment, title: (m.title || []).slice(0, 3), usUnits: /^(CFS|GPM|MGD)$/i.test(m.flowUnits || '') };
+  };
+  // ------------------------------------------------------------------ coupled parallel 1D-2D run
+  // The 2D mesh is shared out over the sub-models at run time (the mesh can change without regenerating them):
+  //   - a cell goes to the partition whose area (D8 partition areas, when generated) holds its centre; a cell with
+  //     coupled manholes goes to the partition of (most of) those manholes; the other cells take the partition of
+  //     the nearest assigned cell along the 2D links (breadth first), else of the nearest manhole;
+  //   - every 2D link / coupling orifice whose two ends lie in different sub-models is cut exactly like a cut pipe:
+  //     it stays in the sub-model of its first end and ends at a boundary outfall carrying the ID of the cell on the
+  //     other side; that cell receives the flow, and its water level is passed back to the outfall, in every
+  //     iteration of every time step (couple.c).
+  // Each sub-model is written as <run>_parts/Pnn.finp; the merged results are <run>.fout / .frpt.
+  AV.partition2DJob = async function (app, ci, job, pdir) {
+    const mesh = app.mesh2d, m = app.model, def = ci.def; const n = mesh.cells.length, NP = ci.parts.length;
+    const ck = new Map(mesh.cells.map((c, k) => [c.id, k])); const part = new Int32Array(n).fill(-1);
+    const nodePart = (id) => { const p = def.assignment ? def.assignment[id] : undefined; return p === undefined ? -1 : p; };
+    // 1. partition areas
+    const sf = def.surface && def.surface.files; let fromAreas = 0;
+    if (sf && sf.length) { const mdir = AV.dirname(app.filePath); const folder = ci.folder || mdir;
+      for (let p = 0; p < sf.length; p++) { if (!sf[p]) continue; let L = null; try { L = await AV.loadDataFile(app, AV.joinPath(folder, sf[p])); } catch (e) { L = null; } if (!L) continue;
+        for (const ft of L.features) { if (ft.type !== 'polygon') continue; const b = ft.bbox || [-Infinity, -Infinity, Infinity, Infinity];
+          for (let k = 0; k < n; k++) { if (part[k] >= 0) continue; const c = mesh.cells[k]; if (c.x < b[0] || c.x > b[2] || c.y < b[1] || c.y > b[3]) continue;
+            let ins = false; for (const r of ft.coords) for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > c.y) !== (yj > c.y) && c.x < xi + (c.y - yi) * (xj - xi) / (yj - yi)) ins = !ins; }
+            if (ins) { part[k] = p; fromAreas++; } } } } }
+    // 2. cells with coupled manholes
+    const votes = new Map(); for (const x of mesh.couplings) { const k = ck.get(x.cell), p = nodePart(x.node); if (k === undefined || p < 0) continue; let v = votes.get(k); if (!v) votes.set(k, v = new Map()); v.set(p, (v.get(p) || 0) + 1); }
+    for (const [k, v] of votes) { let best = -1, bn = -1; for (const [p, c] of v) if (c > bn) { bn = c; best = p; } part[k] = best; }
+    // 3. breadth first along the 2D links
+    const adj = mesh.cells.map(() => []); for (const l of mesh.links) { const a = ck.get(l.a), b = ck.get(l.b); if (a === undefined || b === undefined) continue; adj[a].push(b); adj[b].push(a); }
+    let queue = []; for (let k = 0; k < n; k++) if (part[k] >= 0) queue.push(k);
+    while (queue.length) { const nx = []; for (const k of queue) for (const o of adj[k]) if (part[o] < 0) { part[o] = part[k]; nx.push(o); } queue = nx; }
+    // 4. cells still unassigned (no seed in their part of the mesh): the nearest manhole
+    if (part.some(p => p < 0)) { const pts = [...m.nodes.values()].filter(nd => nodePart(nd.id) >= 0);
+      for (let k = 0; k < n; k++) if (part[k] < 0) { const c = mesh.cells[k]; let bd = Infinity, bp = 0; for (const nd of pts) { const d = (nd.x - c.x) ** 2 + (nd.y - c.y) ** 2; if (d < bd) { bd = d; bp = nodePart(nd.id); } } part[k] = bp; } }
+    // sub-meshes and cuts
+    const sub = ci.parts.map(() => ({ cells: [], links: [], outfalls: [], couplings: [], bnd: new Map() }));
+    mesh.cells.forEach((c, k) => sub[part[k]].cells.push(c));
+    // an outfall takes one link only: one boundary outfall per cut link (CB_<link>), the link is re-pointed to it
+    const repoint = new Map();
+    const cut = (owner, l, otherId) => { const k = ck.get(otherId); const c = mesh.cells[k]; const S = sub[owner]; const oid = 'CB_' + l;
+      S.bnd.set(oid, { id: oid, elev: c.elev, x: c.x, y: c.y }); repoint.set(l, oid);
+      job.couplings.push({ up: owner, outfall: oid, link: l, down: part[k], node: otherId, reversed: false }); };
+    let nCut = 0;
+    for (const l of mesh.links) { const a = ck.get(l.a), b = ck.get(l.b); if (a === undefined || b === undefined) continue; sub[part[a]].links.push(l); if (part[a] !== part[b]) { cut(part[a], l.id, l.b); nCut++; } }
+    for (const o of mesh.outfalls) { const k = ck.get(o.cell); if (k === undefined) continue; sub[part[k]].outfalls.push(o); }
+    for (const x of mesh.couplings) { const k = ck.get(x.cell), p = nodePart(x.node); if (k === undefined || p < 0) continue; sub[p].couplings.push(x); if (part[k] !== p) { cut(p, x.id, x.cell); nCut++; } }
+    // the sub-model files
+    try { await window.host.mkdir(pdir); } catch (e) { }
+    const runSI = AV.f2dRun(m).si; const owner = Object.assign({}, def.assignment || {});
+    // the cut links end at their boundary outfall
+    for (const S of sub) { S.links = S.links.map(l => repoint.has(l.id) ? Object.assign({}, l, { b: repoint.get(l.id), bOrig: l.b }) : l);
+      S.couplings = S.couplings.map(x => repoint.has(x.id) ? Object.assign({}, x, { cell: repoint.get(x.id), cellOf: x.cell }) : x); }
+    for (let p = 0; p < NP; p++) {
+      const text = await window.host.readText(ci.parts[p].inp); const S = sub[p];
+      const finp = AV.joinPath(pdir, 'P' + String(p + 1).padStart(2, '0') + '.finp');
+      await window.host.writeText(finp, AV.mesh2DToINP(text, S, m, { all: mesh, bnd: [...S.bnd.values()] }));
+      job.parts[p].inp = finp;
+    }
+    mesh.cells.forEach((c, k) => { owner[c.id] = part[k]; }); for (const o of mesh.outfalls) { const k = ck.get(o.cell); if (k !== undefined) owner[o.id] = part[k]; }
+    job.nodeOwner = owner;
+    job.order.node = job.order.node.concat(mesh.cells.map(c => c.id), mesh.outfalls.map(o => o.id));
+    job.order.link = job.order.link.concat(mesh.links.map(l => l.id), mesh.outfalls.map(o => o.id + 'X'), mesh.couplings.filter(x => m.nodes.has(x.node)).map(x => x.id));
+    job.flood2d = true; void runSI;
+    return { cells: sub.map(S => S.cells.length), cuts2D: nCut, fromAreas };
   };
 })(window.AV);

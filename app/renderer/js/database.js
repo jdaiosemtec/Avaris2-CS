@@ -25,7 +25,14 @@
     const list = h('div', { class: 'runpick' }, runs.length ? runs.slice(0, 12).map(r => h('div', { class: 'runpickrow', title: 'Use this name (the run is replaced)', onclick: () => { name.value = r.name; if (r.meta && r.meta.desc) desc.value = r.meta.desc; } }, h('b', null, r.name), ' ', h('span', null, r.meta ? new Date(r.meta.date).toLocaleString() + (r.meta.type ? ' · ' + r.meta.type : '') : ''))) : h('div', { class: 'dbempty' }, 'No simulation results yet.'));
     // run mode: whole model, or coupled parallel when the model has been partitioned (Tools > Partition Model)
     const ci = opts.coupled; let modeEl = null; const rWhole = h('input', { type: 'radio', name: 'runmode', checked: true }), rCpl = h('input', { type: 'radio', name: 'runmode' });
+    let perf = null;
     if (ci) {
+      // what to expect from the parallel run: one processor core per sub-model, and enough work per sub-model
+      let cores = 0; try { const c = await window.host.cpuInfo(); cores = c.physical || c.logical || 0; } catch (e) { }
+      const work = app.model.nodes.size + app.model.links.size + (ci.has2D && AV.has2D(app) && app.mesh2d ? 2 * app.mesh2d.cells.length : 0); const np = ci.parts.length; const tips = [];
+      if (cores && np > cores) tips.push(np + ' sub-models but ' + cores + ' processor cores: the sub-models wait for each other in every iteration, so the run is slower than it could be. Partition into at most ' + cores + ' sub-models (Tools ▸ Partition Model).');
+      if (work / np < 200) tips.push('Each sub-model has very little work (about ' + Math.round(work / np).toLocaleString() + ' objects): the exchange in every iteration may cost more than it saves. Use fewer sub-models.');
+      perf = tips.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'Speed: ' + tips.join(' ')) : h('div', { class: 'note' }, 'Speed: ' + np + ' sub-models on ' + (cores || '?') + ' processor cores.');
       const hps = AV.hasHPS(app); const ok = hps && !ci.stale && !ci.missing.length; if (ok && app._lastCoupled) { rCpl.checked = true; rWhole.checked = false; } if (!ok) rCpl.disabled = true;
       modeEl = h('div', { class: 'runmode' },
         h('label', null, rWhole, ' Whole model'),
@@ -34,7 +41,8 @@
         ci.stale ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'The model changed after it was partitioned (' + ci.stale + ' change' + (ci.stale === 1 ? '' : 's') + '). Update the sub-models first: Tools ▸ Partition Model ▸ Regenerate.') : null,
         ci.missing.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'Sub-model file(s) missing: ' + ci.missing.slice(0, 3).join(', ') + '. Generate the sub-models again (Tools ▸ Partition Model).') : null,
         ok && ci.edited.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, ci.edited.length + ' sub-model file(s) were edited directly after they were generated (' + ci.edited.slice(0, 3).join(', ') + '); the coupled run uses them as they are.') : null,
-        ok && ci.has2D ? h('div', { class: 'note' }, 'The coupled run computes the 1D network; 2D flooding is not coupled yet (use Whole model for 1D-2D).') : null);
+        ok && ci.has2D && AV.has2D(app) && app.mesh2d && app.mesh2d.cells.length ? h('div', { class: 'note' }, '1D-2D: the 2D mesh (' + app.mesh2d.cells.length.toLocaleString() + ' cells) is shared out over the sub-models; 2D links that cross a partition boundary are coupled like cut pipes.') : null,
+        ok ? perf : null);
     }
     const body = h('div', { style: { width: '480px', display: 'flex', flexDirection: 'column', gap: '8px' } },
       h('div', { class: 'form' }, h('label', null, 'Simulation name'), name, h('label', null, 'Description'), desc),

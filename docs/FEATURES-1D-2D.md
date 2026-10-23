@@ -36,7 +36,7 @@ the Licence Manager and `license-tools/keygen.js --edition HPS` issue it.
 | Function | Where in the UI | Code |
 |---|---|---|
 | Model partition (partition, adjust, generate sub-models, D8 areas, regenerate) | Tools → Partition → Partition Model (ribbon `lic: 'HPS'`) | `partition.js`, `partpanel.js` (`AV.openPartition` checks `AV.hasHPS`) |
-| Coupled parallel simulation (1D now, 1D-2D when the 2D coupling follows) | Run dialog → "Coupled parallel" | `database.js` askRunName, `sim.js` runCoupled, `main.js` engine:runCoupled, `cplmerge.js`, engine `couple.c` |
+| Coupled parallel simulation (1D and 1D-2D) | Run dialog → "Coupled parallel" | `database.js` askRunName, `sim.js` runCoupled, `main.js` engine:runCoupled, `cplmerge.js`, engine `couple.c` |
 | Real-time rolling simulation (phase 5) | – | not part of HPS: a later, separate tier |
 
 ## 2D results analysis (part of `2D`, 2.6.0)

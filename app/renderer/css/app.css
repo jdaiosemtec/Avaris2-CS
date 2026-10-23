@@ -941,6 +941,18 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .fldview .csopane .csopane { flex: none; }
 .fldbar { height: 10px; background: #eceff1; border-radius: 2px; overflow: hidden; } .fldbar span { display: block; height: 100%; }
 .fldsw { display: inline-block; width: 14px; height: 11px; border: 1px solid rgba(0,0,0,.25); vertical-align: middle; }
+/* folder dialog */
+.fdlg { display: flex; flex-direction: column; gap: 6px; }
+.fdbar { display: flex; gap: 6px; align-items: center; } .fdpath { flex: 1; }
+.fdmain { display: grid; grid-template-columns: 170px 1fr; height: 340px; border: 1px solid var(--border, #cfd8dc); }
+.fdside { border-right: 1px solid var(--border, #cfd8dc); overflow: auto; padding: 4px 0; background: #f7f9fa; }
+.fdplace { padding: 5px 10px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .fdplace:hover { background: #e8f0f6; } .fdplace.on { background: #dbe9f6; font-weight: 600; }
+.fdsep { border-top: 1px solid #dde3e7; margin: 4px 0; }
+.fdlist { overflow: auto; background: #fff; }
+.fdrow { display: flex; align-items: center; gap: 8px; padding: 4px 10px; cursor: default; user-select: none; } .fdrow:hover { background: #f1f6fa; } .fdrow.sel { background: #dbe9f6; }
+.fdrow .fdd { margin-left: auto; color: var(--muted); font-size: 11px; } .fdi { width: 18px; text-align: center; display: inline-block; } .fdplace .fdi { margin-right: 6px; }
+.fdnew { flex: 1; } .fdempty { padding: 14px; color: var(--muted); }
+.fdstatus { min-height: 16px; font-size: 11.5px; color: var(--muted); } .fdstatus.bad { color: var(--danger); }
 /* dry weather flow */
 .dwfdlg { width: 900px; max-height: 72vh; overflow: auto; }
 .dwfdlg .psec2 { font-weight: 600; margin: 10px 0 4px; }

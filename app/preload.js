@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('host', {
   tempDir: () => ipcRenderer.invoke('app:tempDir'),
   rm: (p) => ipcRenderer.invoke('fs:rm', p),
   mkdir: (p) => ipcRenderer.invoke('fs:mkdir', p),
+  places: () => ipcRenderer.invoke('fs:places'),
   pathForFile: (f) => { try { return webUtils.getPathForFile(f); } catch (e) { return f && f.path; } },
   getUsers: () => ipcRenderer.invoke('app:users:get'),
   setUsers: (u) => ipcRenderer.invoke('app:users:set', u),

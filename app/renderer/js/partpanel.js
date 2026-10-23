@@ -30,10 +30,10 @@
       const body = h('div', { class: 'fllist partp', style: { padding: '8px 12px 14px' } }); root.appendChild(body);
       if (V.tab === 'regen') { regenView(body); return; }
       const sec = (n, t) => h('div', { class: 'psec' }, h('span', { class: 'pn' }, String(n)), t);
-      const R = app.results; const mx = Math.floor(C * 1.5);
+      const R = app.results; const mx = C;
       body.appendChild(sec(1, 'Settings'));
       body.appendChild(h('div', { class: 'form' },
-        h('label', null, 'Number of partitions'), h('span', null, num('n', 64, { min: 2, max: 400 }), h('span', { class: 'hint' }, '  this computer: ' + C + ' cores → at most ' + mx + ' in parallel')),
+        h('label', null, 'Number of partitions'), h('span', null, num('n', 64, { min: 2, max: 400 }), h('span', { class: 'hint' }, '  this computer: ' + C + ' cores → at most ' + mx + ' for the coupled run')),
         h('label', null, 'Base results'), h('span', { class: R ? '' : 'hint' }, R ? AV.basename(R.meta.file || '') + ' (' + R.meta.nPeriods + ' steps)' : 'none – run a simulation or open results (Database) first')));
       const unit = app.model.isSI ? 'm' : 'ft'; const opt = (label, ctl, hint) => [h('div', { class: 'al' }, label), h('div', { class: 'ac' }, ctl), hint ? h('div', { class: 'ah' }, hint) : null];
       const keep = h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } });
@@ -68,14 +68,14 @@
       const chk = AV.partChecks(app, P, V.A, V.S, C); V.errors = chk.filter(c => c.t === 'er').length;
       body.appendChild(h('div', { class: 'pchecks' }, chk.map(c => h('div', { class: c.t }, (c.t === 'ok' ? '✓ ' : c.t === 'er' ? '✗ ' : '⚠ ') + c.s))));
       body.appendChild(sec(5, 'Generate sub-models'));
-      const dir = AV.dirname(app.filePath); const folder = h('input', { type: 'text', value: V.S.folder || AV.joinPath(dir, 'Partition'), style: { width: '100%' } });
+      const dir = AV.dirname(app.filePath); const folder = h('input', { type: 'text', value: (V.S.folderBy && V.S.folderBy[app.filePath]) || AV.joinPath(dir, 'Partition'), style: { width: '100%' } }); // remembered per model
       const patt = h('input', { type: 'text', value: V.S.pattern, style: { width: '100%' } });
       const bnd = h('input', { type: 'checkbox', checked: V.S.boundary !== false });
       const F2 = AV.f2d(app.model); const demAbs = F2.DEM ? absPath(AV.dirname(app.filePath), F2.DEM.replace(/^"|"$/g, '')) : '';
       const dem = h('input', { type: 'text', value: V.S.dem || demAbs, placeholder: 'DEM (GeoTIFF / ASCII grid) – optional', style: { width: '100%' } });
       const surf = h('input', { type: 'checkbox', checked: V.S.surface !== false });
       body.appendChild(h('div', { class: 'form' }, h('label', null, 'Folder'), h('span', { style: { display: 'flex', gap: '4px' } }, folder,
-          B('…', async () => { let d = folder.value; while (d && !await window.host.exists(d)) { const up = AV.dirname(d); if (!up || up === d) break; d = up; } const p = await window.host.openDialog({ folder: true, defaultPath: d || folder.value, title: 'Folder for the sub-models' }); if (p) folder.value = p; })),
+          B('…', async () => { let d = folder.value; while (d && !await window.host.exists(d)) { const up = AV.dirname(d); if (!up || up === d) break; d = up; } const p = await AV.folderDialog({ defaultPath: d || folder.value, title: 'Folder for the sub-models', modelFolder: AV.dirname(app.filePath) }); if (p) folder.value = p; })),
         h('label', null, 'File names'), patt, h('label', null, 'Standalone boundaries'), h('label', { style: { color: 'inherit' } }, bnd, ' base-run inflows and water levels at the cut points (each sub-model can run on its own)'),
         h('label', null, 'Partition areas'), h('label', { style: { color: 'inherit' } }, surf, ' surface area of each partition from the DEM (D8), written as its 2D boundary'),
         h('label', null, 'DEM'), h('span', { style: { display: 'flex', gap: '4px' } }, dem, B('…', async () => { const p = await window.host.openDialog({ filters: [{ name: 'DEM', extensions: ['tif', 'tiff', 'asc'] }] }); if (p) dem.value = p; }))));
@@ -167,7 +167,7 @@
     }
     // ---- generate the sub-models and the relationship file
     async function generate(folder, pattern, withBnd, demPath) {
-      const P = V.P; if (!P || V.errors) return; V.S.folder = folder; V.S.pattern = pattern; V.S.boundary = withBnd; V.S.surface = !!demPath; if (demPath) V.S.dem = demPath; app.prefs.partition = V.S; app.savePrefs();
+      const P = V.P; if (!P || V.errors) return; V.S.folder = folder; V.S.folderBy = Object.assign({}, V.S.folderBy, { [app.filePath]: folder }); V.S.pattern = pattern; V.S.boundary = withBnd; V.S.surface = !!demPath; if (demPath) V.S.dem = demPath; app.prefs.partition = V.S; app.savePrefs();
       busy = true; render(); app.status('Writing sub-models…'); const bz = AV.busy.start('Writing the sub-models');
       try {
         const bnd = withBnd ? await AV.partBoundary(app, P) : null;

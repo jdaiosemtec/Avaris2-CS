@@ -383,6 +383,14 @@
       this.progEls = { bar, pct, t0 };
       app.status('Running the coupled parallel simulation...');
       const job = Object.assign(AV.partitionRunJob(app, ci), { dir, base, threads, id: 'main' });
+      // 1D-2D: the mesh is shared out over the sub-models (partition.js AV.partition2DJob)
+      let f2 = null;
+      if (AV.f2dEnabled(m) && AV.has2D(app)) {
+        if (!app.mesh2d || !app.mesh2d.cells.length) AV.toast('2D flooding is enabled but no mesh has been created: running the 1D model only (Simulation ▸ Create Meshes).', true, 7000);
+        else { pct.textContent = 'Sharing the 2D mesh (' + app.mesh2d.cells.length.toLocaleString() + ' cells) over the sub-models...';
+          try { f2 = await AV.partition2DJob(app, ci, job, AV.joinPath(dir, base.replace(/[^\w\-. ]/g, '_') + '_parts')); }
+          catch (e) { this.runDlg.close(); this.runDlg = null; AV.alert('The 2D mesh could not be shared over the sub-models: ' + e.message, 'Coupled parallel run'); return; }
+          pct.textContent = 'Starting ' + ci.parts.length + ' sub-models (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' cells, ' + f2.cuts2D + ' cut 2D links)...'; } }
       const res = await window.host.runCoupled(job);
       this.runDlg.close(); this.runDlg = null;
       const secs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -391,9 +399,9 @@
       let rptText = ''; try { rptText = await window.host.readText(res.rpt); } catch (e) { }
       const warnings = (rptText.match(/WARNING \d+[^\n]*/g) || []);
       const ok = res.code === 0 && !res.errors.length;
-      { const ts0 = this.parseTimeStepSummary(rptText); await AV.writeRunMeta(AV.dirname(res.out), base, { name: base, desc: rn.desc, date: new Date().toISOString(), model: AV.basename(app.filePath), type: '1D coupled', flowUnits: m.flowUnits,
+      { const ts0 = this.parseTimeStepSummary(rptText); await AV.writeRunMeta(AV.dirname(res.out), base, { name: base, desc: rn.desc, date: new Date().toISOString(), model: AV.basename(app.filePath), type: f2 ? '1D-2D coupled' : '1D coupled', flowUnits: m.flowUnits,
         code: ok ? 0 : (res.code || 1), seconds: +secs, engineSeconds: res.seconds, massBal: res.massBal, warnings: warnings.length, notConv: ts0['% of Steps Not Converging'] !== undefined ? +ts0['% of Steps Not Converging'] : undefined,
-        coupled: { subModels: ci.parts.length, cutPoints: ci.def.couplings.length, threads, partsFolder: res.coupled && res.coupled.dir } }); }
+        coupled: { subModels: ci.parts.length, cutPoints: ci.def.couplings.length, cut2D: f2 ? f2.cuts2D : 0, threads, partsFolder: res.coupled && res.coupled.dir } }); }
       if (app.db) app.db.render();
       if (!ok) {
         app.status('Simulation failed.');
@@ -402,7 +410,7 @@
       }
       await this.loadResults(res.out, res.rpt, true);
       const mb = res.massBal || {}; const ts = this.parseTimeStepSummary(rptText);
-      const kv = h('div', { class: 'kv' }, ['Run mode', 'Coupled parallel, ' + ci.parts.length + ' sub-models', 'Run time', secs + ' s (engine ' + AV.fmt(res.seconds, 1) + ' s)', 'Runoff continuity error', AV.fmt(mb.runoff, 2) + ' %', 'Flow routing continuity error', AV.fmt(mb.flow, 2) + ' %',
+      const kv = h('div', { class: 'kv' }, ['Run mode', 'Coupled parallel' + (f2 ? ' 1D-2D' : '') + ', ' + ci.parts.length + ' sub-models' + (f2 ? ' (' + f2.cuts2D + ' cut 2D links)' : ''), 'Run time', secs + ' s (engine ' + AV.fmt(res.seconds, 1) + ' s)', 'Runoff continuity error', AV.fmt(mb.runoff, 2) + ' %', 'Flow routing continuity error', AV.fmt(mb.flow, 2) + ' %',
         'Warnings', String(warnings.length)].map(t => h('div', null, t)));
       if (ts['% of Steps Not Converging'] !== undefined) kv.append(h('div', null, '% of steps not converging'), h('div', null, ts['% of Steps Not Converging']));
       if (ts['Average Iterations per Step'] !== undefined) kv.append(h('div', null, 'Average iterations per step'), h('div', null, ts['Average Iterations per Step']));

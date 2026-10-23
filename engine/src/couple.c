@@ -288,10 +288,41 @@ static void futexWait(volatile int* a, int v)
 static void futexWake(volatile int* a) { syscall(SYS_futex, (int*)a, FUTEX_WAKE, INT_MAX, NULL, NULL, 0); }
 #endif
 
+// processors available: with at least one per sub-model the waiting processes spin (a few microseconds per
+// barrier); with more sub-models than processors they yield at once (spinning would take the processor away from
+// the sub-model everybody waits for)
+static int NCpu = 0;
+static int cpuCount(void)
+{
+#ifdef _WIN32
+    SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors;
+#else
+    long n = sysconf(_SC_NPROCESSORS_ONLN); return n > 0 ? (int)n : 1;
+#endif
+}
+static inline void cpuRelax(void)
+{
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64)
+    __builtin_ia32_pause();
+#endif
+}
+static inline void yieldCpu(void)
+{
+#ifdef _WIN32
+    SwitchToThread();
+#else
+    sched_yield();
+#endif
+}
+
 static int barrier(int n)
 {
     int g = __atomic_load_n(&H->gen, __ATOMIC_ACQUIRE);
     long spins = 0;
+    long spinMax, yieldMax;
+    if (!NCpu) NCpu = cpuCount();
+    spinMax = (n <= NCpu) ? 400000 : 64;          // ~1-2 ms of spinning when every sub-model has a processor
+    yieldMax = (n <= NCpu) ? 0 : 2000;
     if (__atomic_add_fetch(&H->count, 1, __ATOMIC_ACQ_REL) == n)
     {
         __atomic_store_n(&H->count, 0, __ATOMIC_RELAXED);
@@ -309,7 +340,9 @@ static int barrier(int n)
     while (__atomic_load_n(&H->gen, __ATOMIC_ACQUIRE) == g)
     {
         if (H->abort) return 0;
-        if (++spins < 2000) continue;
+        ++spins;
+        if (spins < spinMax) { cpuRelax(); continue; }
+        if (spins < spinMax + yieldMax) { yieldCpu(); continue; }
 #ifdef _WIN32
         WaitForSingleObject(evBar[g & 1], 50);
 #else

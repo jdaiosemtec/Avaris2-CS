@@ -287,6 +287,12 @@ ipcMain.handle('gdal:run', async (e, tool, args) => {
 });
 ipcMain.handle('app:tempDir', async () => { const d = path.join(os.tmpdir(), 'osemcm-' + process.pid + '-' + Date.now()); await fs.promises.mkdir(d, { recursive: true }); return d; });
 ipcMain.handle('fs:rm', async (e, p) => { if (!/osemcm-/.test(p) && !/\.gdb[\\/]?$/i.test(p)) throw new Error('refused'); await fs.promises.rm(p, { recursive: true, force: true }); return true; });
+ipcMain.handle('fs:places', async () => {
+  const g = (k) => { try { return app.getPath(k); } catch (err) { return null; } };
+  const drives = []; if (process.platform === 'win32') for (let c = 65; c <= 90; c++) { const d = String.fromCharCode(c) + ':\\'; try { if (fs.existsSync(d)) drives.push(d); } catch (err) { } }
+  else drives.push('/');
+  return { home: g('home'), desktop: g('desktop'), documents: g('documents'), downloads: g('downloads'), drives };
+});
 ipcMain.handle('fs:mkdir', async (e, p) => { await fs.promises.mkdir(p, { recursive: true }); return true; });
 // copy a bundled sample into Documents\Avaris\Samples so it can be run and saved
 ipcMain.handle('app:prepareSample', async (e, name) => {
@@ -378,7 +384,7 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
   try { const probe = path.join(dir, '.avaris_write_test'); fs.writeFileSync(probe, ''); fs.unlinkSync(probe); } catch (err) { dir = path.join(os.tmpdir(), 'avaris'); }
   const base = (job.base || 'model').replace(/[^\w\-. ]/g, '_');
   const pdir = path.join(dir, base + '_parts'); fs.mkdirSync(pdir, { recursive: true });
-  const rpt = path.join(dir, base + '.rpt'), out = path.join(dir, base + '.out');
+  const rpt = path.join(dir, base + (job.flood2d ? '.frpt' : '.rpt')), out = path.join(dir, base + (job.flood2d ? '.fout' : '.out'));
   for (const [h, r] of outFiles) if (path.resolve(r.file) === path.resolve(out)) { r.close(); outFiles.delete(h); }
   const parts = job.parts.map((p, k) => ({ inp: p.inp, level: p.level || 0, rpt: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.rpt'), out: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.out') }));
   const cfg = path.join(pdir, 'run.cpl');
