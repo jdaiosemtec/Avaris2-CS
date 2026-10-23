@@ -341,7 +341,21 @@
           this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false });
         } else { inpText = AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m); flood2d = true; pct.textContent = 'Starting engine (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' surface cells)...'; }
       }
-      if (app.filePath) inpText = AV.runDataPaths(inpText, AV.dirname(app.filePath), dir);
+      if (app.filePath) {
+        // files the run needs but that are not there: say which and where to fix it, instead of the engine's ERROR 3xx
+        const miss = await AV.missingDataFiles(inpText, AV.dirname(app.filePath));
+        if (miss.length) { this.runDlg.close(); this.runDlg = null; app.status('Simulation not started.');
+          const onlyOpt = miss.every(x => x.optional);
+          const a = await AV.modal({ title: 'Run Simulation - files not found', width: 640, body: h('div', { style: { lineHeight: 1.55 } },
+              h('div', null, 'The model uses these files, but they were not found on this computer:'),
+              h('ul', { style: { margin: '6px 0 8px 18px', padding: 0 } }, miss.map(x => h('li', null, h('b', null, x.what), ': ', h('code', { style: { wordBreak: 'break-all' } }, x.abs)))),
+              h('div', { class: 'note' }, 'Copy the file to that place, or change the path: interface files (hot start, rainfall) in Parameter View ▸ Other Sections ▸ Interface Files; rain gage and time-series files in their editors.' + (onlyOpt ? ' Or run without them: the missing interface files are left out of this run only (a run without its hot start file starts dry).' : ''))),
+            buttons: [{ label: 'Cancel', value: null }].concat(onlyOpt ? [{ label: 'Run Without Them', primary: true, value: 'skip' }] : []) }).done;
+          if (a !== 'skip') return;
+          const L = inpText.split('\n'); for (const x of miss) L[x.line] = ';' + L[x.line] + ' ;; left out: file not found'; inpText = L.join('\n');
+          this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine(); return false; } }], enterSubmits: false }); }
+        inpText = AV.runDataPaths(inpText, AV.dirname(app.filePath), dir);
+      }
       const res = await window.host.runEngine({ inpText, dir, base, detail: !!this.detailReport, encoding, flood2d, named: true, id: 'main' });
       this.runDlg.close(); this.runDlg = null;
       const secs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -842,6 +856,23 @@
   };
 
 
+
+  // data files the run needs ([FILES] USE …, rain gage files, time-series files, temperature file) that do not exist:
+  // [{ what, file, abs, line, optional }] (optional = a USE line of [FILES]: the run can go on without it)
+  AV.missingDataFiles = async function (text, modelDir) {
+    const isAbs = (p) => /^([a-zA-Z]:|[\\/])/.test(p); const abs = (f) => isAbs(f) ? f : AV.joinPath(modelDir || '', f.replace(/^\.[\\/]/, ''));
+    const out = []; let sec = ''; const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) { const tr = lines[i].trim(); if (/^\[/.test(tr)) { sec = tr.toUpperCase(); continue; } if (!tr || tr[0] === ';') continue;
+      const t = AV.tokenize(lines[i]); let f = null, what = '', opt = false;
+      if (sec === '[FILES]' && /^USE$/i.test(t[0]) && t.length >= 3) { f = t.slice(2).join(' '); what = (t[1] || '').toLowerCase() + ' interface file'; opt = true; }
+      else if (sec === '[RAINGAGES]' && /^FILE$/i.test(t[4] || '') && t[5]) { f = t[5]; what = 'rainfall file of rain gage ' + t[0]; }
+      else if (sec === '[TIMESERIES]' && /^FILE$/i.test(t[1] || '') && t[2]) { f = t[2]; what = 'data file of time series ' + t[0]; }
+      else if (sec === '[TEMPERATURE]' && /^FILE$/i.test(t[0]) && t[1]) { f = t[1]; what = 'climate file'; }
+      if (!f) continue; f = f.replace(/^"|"$/g, ''); const a = abs(f);
+      let ok = true; try { ok = await window.host.exists(a); } catch (e) { ok = true; }
+      if (!ok) out.push({ what, file: f, abs: a, line: i, optional: opt }); }
+    return out;
+  };
   // ---- data files named in the model (rain gage files, time-series files, [FILES], [TEMPERATURE] FILE) are relative to the
   // model folder, but the engine resolves relative names from the folder of the input file it runs (the results folder):
   // rewrite them relative to that folder (keeps the path short and ASCII where the model path has e.g. Chinese folder names)

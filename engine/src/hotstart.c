@@ -48,6 +48,28 @@
 //  Local Variables
 //-----------------------------------------------------------------------------
 static int fileVersion;
+// file version 5 (written by other SWMM-based programs) stores the names of all subcatchments, nodes and links after the
+// header; objects are then matched by name, so the file may list them in another order
+static int *hsMap[3] = {NULL, NULL, NULL};          // file position -> model index (SUBCATCH, NODE, LINK)
+static int  hsIndex(int kind, int k) { return hsMap[kind] ? hsMap[kind][k] : k; }
+static int  readNames(FILE* f, int type, int n, int kind)
+{
+    int k, len, j; char name[1024];
+    hsMap[kind] = (int *)calloc(n > 0 ? n : 1, sizeof(int));
+    if ( !hsMap[kind] ) return 0;
+    for (k = 0; k < n; k++)
+    {
+        if ( fread(&len, sizeof(int), 1, f) != 1 || len <= 0 || len >= (int)sizeof(name) ) return 0;
+        if ( fread(name, 1, len, f) != (size_t)len ) return 0;
+        name[len] = '\0';
+        j = project_findObject(type, name);
+        if ( j < 0 ) return 0;
+        hsMap[kind][k] = j;
+    }
+    return 1;
+}
+static void freeNames(void) { int k; for (k = 0; k < 3; k++) { if (hsMap[k]) free(hsMap[k]); hsMap[k] = NULL; } }
+
 
 //-----------------------------------------------------------------------------
 //  External functions (declared in funcs.h)
@@ -110,6 +132,7 @@ int openHotstartFile1()
     char  fileStamp2[] = "SWMM5-HOTSTART2";
     char  fileStamp3[] = "SWMM5-HOTSTART3";
     char  fileStamp4[] = "SWMM5-HOTSTART4";
+    char  fileStamp5[] = "SWMM5-HOTSTART5";
 
     // --- try to open the file
     if ( Fhotstart1.mode != USE_FILE ) return TRUE;
@@ -121,7 +144,8 @@ int openHotstartFile1()
 
     // --- check that file contains proper header records
     fread(fStampx, sizeof(char), strlen(fileStamp2), Fhotstart1.file);
-    if      ( strcmp(fStampx, fileStamp4) == 0 ) fileVersion = 4;
+    if      ( strcmp(fStampx, fileStamp5) == 0 ) fileVersion = 5;
+    else if ( strcmp(fStampx, fileStamp4) == 0 ) fileVersion = 4;
     else if ( strcmp(fStampx, fileStamp3) == 0 ) fileVersion = 3;
     else if ( strcmp(fStampx, fileStamp2) == 0 ) fileVersion = 2;
     else
@@ -167,10 +191,25 @@ int openHotstartFile1()
          return FALSE;
     }
 
+    // --- version 5: names of the subcatchments, nodes and links (match by name)
+    freeNames();
+    if ( fileVersion >= 5 )
+    {
+        if ( !readNames(Fhotstart1.file, SUBCATCH, nSubcatch, 0) ||
+             !readNames(Fhotstart1.file, NODE, nNodes, 1) ||
+             !readNames(Fhotstart1.file, LINK, nLinks, 2) )
+        {
+            freeNames();
+            report_writeErrorMsg(ERR_HOTSTART_FILE_FORMAT, "");
+            return FALSE;
+        }
+    }
+
     // --- read contents of the file and close it
     if ( fileVersion >= 3 ) readRunoff();
     readRouting();
     fclose(Fhotstart1.file);
+    freeNames();
     if ( ErrorCode ) return FALSE;
     else return TRUE;
 }
@@ -272,7 +311,7 @@ void readRouting()
 //           from hotstart file.
 //
 {
-    int   i, j;
+    int   i, ii, j;
     float x;
     double xgw[4];
     FILE* f = Fhotstart1.file;
@@ -297,7 +336,7 @@ void readRouting()
     }
 
     // --- read node states
-    for (i = 0; i < Nobjects[NODE]; i++)
+    for (ii = 0; ii < Nobjects[NODE]; ii++) if ( (i = hsIndex(1, ii)) >= 0 )
     {
         if ( !readFloat(&x, f) ) return;
         Node[i].newDepth = x;
@@ -328,7 +367,7 @@ void readRouting()
     }
 
     // --- read link states
-    for (i = 0; i < Nobjects[LINK]; i++)
+    for (ii = 0; ii < Nobjects[LINK]; ii++) if ( (i = hsIndex(2, ii)) >= 0 )
     {
         if ( !readFloat(&x, f) ) return;
         Link[i].newFlow = x;
@@ -434,11 +473,11 @@ void  readRunoff()
 //  Purpose: reads saved state of all subcatchments from a hot start file.
 //
 {
-    int    i, j, k;
+    int    i, ii, j, k;
     double x[6];
     FILE*  f = Fhotstart1.file;
 
-    for (i = 0; i < Nobjects[SUBCATCH]; i++)
+    for (ii = 0; ii < Nobjects[SUBCATCH]; ii++) if ( (i = hsIndex(0, ii)) >= 0 )
     {
         // Ponded depths & runoff (4 elements)
         for (j = 0; j < 3; j++)
