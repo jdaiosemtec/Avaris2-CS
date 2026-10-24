@@ -283,7 +283,7 @@
           if (sm.raw.INFLOWS.some(r => { const t = AV.tokenize(r); return t[0] === dn && /^FLOW$/i.test(t[1] || ''); })) { warn.push(PID(p) + ': ' + dn + ' already has an external inflow; the base-run coupling inflow is not added (the coupled run sets it)'); continue; }
           const acc = new Map(); for (const c of cs) for (const [t, q] of bnd.flow.get(c.link.id) || []) acc.set(t, (acc.get(t) || 0) + Math.abs(q));
           if (!acc.size) continue; const ser = 'CPL_Q_' + dn; sm.timeseries.set(ser, { file: null, rows: [...acc].sort((a, b) => a[0] - b[0]).map(([t, q]) => ['', t.toFixed(4), +q.toPrecision(6)]), desc: 'Base-run inflow from ' + [...new Set(cs.map(c => PID(c.upPart)))].join(', ') });
-          sm.raw.INFLOWS.push(dn.padEnd(17) + 'FLOW'.padEnd(17) + ser.padEnd(17) + 'FLOW     1.0      1.0'); } }
+          sm.raw.INFLOWS.push((dn + ' ').padEnd(17) + 'FLOW'.padEnd(17) + (ser + ' ').padEnd(17) + 'FLOW     1.0      1.0'); /* a space after every field, also for long IDs */ } }
       // written as for a run (all objects reported, rainfall series in the project units), so that the coupled run
       // matches a run of the whole model
       const text = sm.toINP({ reportAll: true }); const st = P.stats[p];

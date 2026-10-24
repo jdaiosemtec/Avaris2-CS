@@ -9,7 +9,7 @@
   const tok = (l) => AV.tokenize(l);
   const isData = (l) => { const t = l.trim(); return t && t[0] !== ';'; };
   const q = (s) => { s = String(s === undefined || s === null ? '' : s); return s === '' ? '""' : /\s/.test(s) ? '"' + s + '"' : s; };
-  const line = (arr, w) => arr.map((x, i) => i === arr.length - 1 ? q(x) : q(x).padEnd(i === 0 ? (w || 17) : 11)).join('').trimEnd();
+  const line = (arr, w) => arr.map((x, i) => i === arr.length - 1 ? q(x) : (q(x) + ' ').padEnd(i === 0 ? (w || 17) : 11)).join('').trimEnd();
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const num = (v, d) => { const x = parseFloat(v); return isFinite(x) ? x : d; };
   const U = (m) => { const si = m.isSI; return { L: si ? 'm' : 'ft', D: si ? 'mm' : 'in', R: si ? 'mm/hr' : 'in/hr', T: si ? '°C' : '°F', E: si ? 'mm/day' : 'in/day', W: si ? 'km/hr' : 'mph', V: si ? 'm3' : 'ft3' }; };

@@ -48,7 +48,7 @@
     const rainTS = new Set([...m.gages.values()].filter(g => g.p.source !== 'FILE' && !g.p.tsUnits).map(g => g.p.series));
     if (D !== 1) for (const n of rainTS) { const ts = m.timeseries.get(n); if (ts && ts.rows) ts.rows = ts.rows.map(r => [r[0], r[1], fmt(r[2] * D)]); }
     // free-form sections: inflows / dry weather flow (flow values), evaporation, transects, options
-    const tok = AV.tokenize; const line = (t) => t.map((x, j) => j === t.length - 1 ? String(x) : String(x).padEnd(j === 0 ? 17 : 11)).join('');
+    const tok = AV.tokenize; const line = (t) => t.map((x, j) => j === t.length - 1 ? String(x) : (String(x) + ' ').padEnd(j === 0 ? 17 : 11)).join('');
     const mapRows = (sec, fn) => { if (!m.raw[sec]) return; m.raw[sec] = m.raw[sec].map(l => { const tl = l.trim(); if (!tl || tl[0] === ';') return l; const t = tok(l); const r = fn(t); return r ? line(r) : l; }); };
     mapRows('INFLOWS', (t) => { if ((t[1] || '').toUpperCase() !== 'FLOW') return null; if (t.length > 5 && num(t[5]) !== null) t[5] = fmt(num(t[5]) * q); if (t.length > 6 && num(t[6]) !== null) t[6] = fmt(num(t[6]) * q); if (t[2] === '') t[2] = '""'; return t; });
     mapRows('DWF', (t) => { if ((t[1] || '').toUpperCase() !== 'FLOW' || num(t[2]) === null) return null; t[2] = fmt(num(t[2]) * q); return t; });

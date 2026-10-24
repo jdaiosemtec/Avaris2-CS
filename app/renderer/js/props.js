@@ -12,7 +12,7 @@
   const namesOf = (m, sec) => uniq(dataTok(m, sec).map(t => t[0]));
   const curvesOf = (m, re) => [...m.curves].filter(([, c]) => re.test(c.type || '')).map(([n]) => n);
   const patterns = (m, type) => { const out = []; const seen = new Set(); for (const t of dataTok(m, 'PATTERNS')) { if (seen.has(t[0])) continue; seen.add(t[0]); const ty = (t[1] || '').toUpperCase(); if (!type || ty === type || !/^(MONTHLY|DAILY|HOURLY|WEEKEND)$/.test(ty)) out.push(t[0]); } return out; };
-  const fmtLine = (t) => t.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : String(x)).map((x, j) => j === t.length - 1 ? x : x.padEnd(j === 0 ? 17 : 11)).join('');
+  const fmtLine = (t) => t.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : String(x)).map((x, j) => j === t.length - 1 ? x : (x + ' ').padEnd(j === 0 ? 17 : 11)).join('');
   const UT = (m, k) => AV.unitText(m, k);
   const lab = (m, l, k) => { const u = k ? UT(m, k) : ''; return u ? l + ' (' + u + ')' : l; };
   const empty = (list) => [['', '<Empty>']].concat(list.map(x => [x, x]));
@@ -29,7 +29,7 @@
   AV.VIRTP.treat = {
     get: (m, o, pol) => { const r = (m.raw.TREATMENT || []).find(l => { if (!isData(l)) return false; const t = tok(l); return t[0] === o.id && t[1] === pol; }); return r ? tok(r).slice(2).join(' ') : ''; },
     set: (m, o, pol, v) => { const rows = AV.rawRows(m, 'TREATMENT'); const i = rows.findIndex(l => { if (!isData(l)) return false; const t = tok(l); return t[0] === o.id && t[1] === pol; });
-      const x = String(v === undefined || v === null ? '' : v).trim(); const ln = o.id.padEnd(17) + pol.padEnd(11) + x;
+      const x = String(v === undefined || v === null ? '' : v).trim(); const ln = (o.id + ' ').padEnd(17) + (pol + ' ').padEnd(11) + x;
       if (i >= 0) { if (x) rows[i] = ln; else rows.splice(i, 1); } else if (x) rows.push(ln); } };
   // initial buildup of a subcatchment for one pollutant: [LOADINGS] subcatch pollutant buildup (pollutant/value pairs)
   AV.VIRTP.load = {
@@ -350,7 +350,7 @@
     if (!aq.value) secs.GROUNDWATER = replaceRows(m, 'GROUNDWATER', sc.id, []);
     else { const opt = [Egwt, Eb, Egw, UM].map(x => x.value.trim()); while (opt.length > 1 && opt[opt.length - 1] === '') opt.pop();
       secs.GROUNDWATER = replaceRows(m, 'GROUNDWATER', sc.id, [fmtLine([sc.id, aq.value, nd.value.trim(), Es.value.trim() || '0', A1.value.trim() || '0', B1.value.trim() || '0', A2.value.trim() || '0', B2.value.trim() || '0', A3.value.trim() || '0', Dsw.value.trim() || '0'].concat(opt.map(x => x || '*')))]); }
-    const gl = []; if (aq.value && LAT.value.trim()) gl.push(sc.id.padEnd(17) + 'LATERAL    ' + LAT.value.trim()); if (aq.value && DEEP.value.trim()) gl.push(sc.id.padEnd(17) + 'DEEP       ' + DEEP.value.trim());
+    const gl = []; if (aq.value && LAT.value.trim()) gl.push((sc.id + ' ').padEnd(17) + 'LATERAL    ' + LAT.value.trim()); if (aq.value && DEEP.value.trim()) gl.push((sc.id + ' ').padEnd(17) + 'DEEP       ' + DEEP.value.trim());
     secs.GWF = replaceRows(m, 'GWF', sc.id, gl);
     AV.setSections(app, 'Edit groundwater (' + sc.id + ')', secs);
     app.panels.showProps();

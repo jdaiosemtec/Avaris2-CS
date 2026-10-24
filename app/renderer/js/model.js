@@ -145,7 +145,7 @@ window.AV = window.AV || {};
   const findRow = (m, sec, id, pred) => { const r = m.raw[sec] || []; for (let i = 0; i < r.length; i++) { const t = r[i].trim(); if (!t || t[0] === ';') continue; const k = tokenize(r[i]); if (k[0] === id && (!pred || pred(k))) return [i, k]; } return [-1, null]; };
   const putRow = (m, sec, id, pred, toks) => {
     const rows = rawRows(m, sec); const [i] = findRow(m, sec, id, pred);
-    const line = toks ? toks.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : x).map((x, j) => j === toks.length - 1 ? x : x.padEnd(j === 0 ? 17 : 11)).join('') : null;
+    const line = toks ? toks.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : x).map((x, j) => j === toks.length - 1 ? x : (x + ' ').padEnd(j === 0 ? 17 : 11)).join('') : null;
     if (i >= 0) { if (line) rows[i] = line; else rows.splice(i, 1); } else if (line) rows.push(line);
   };
   const isFlow = (k) => (k[1] || '').toUpperCase() === 'FLOW';
@@ -700,7 +700,7 @@ window.AV = window.AV || {};
         for (let i = 0; i < rows.length; i++) { const tl = rows[i].trim(); if (!tl || tl[0] === ';' || !rows[i].includes(old)) continue;
           if (col === '*') { rows[i] = rows[i].replace(new RegExp('(^|\\s)' + old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s|$)', 'g'), (a, b) => b + newId); continue; }
           const t = tokenize(rows[i]); if (t[col] !== old) continue; t[col] = newId;
-          rows[i] = t.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : x).map((x, j) => j === t.length - 1 ? x : x.padEnd(j === 0 ? 17 : 11)).join(''); }
+          rows[i] = t.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : x).map((x, j) => j === t.length - 1 ? x : (x + ' ').padEnd(j === 0 ? 17 : 11)).join(''); }
       }
       this.touch();
     }

@@ -192,7 +192,7 @@
       // data rows that describe the subcatchment (land use, buildup, groundwater, patterns) are copied to the new part
       const COPY = [['COVERAGES', 0], ['LOADINGS', 0], ['GROUNDWATER', 0], ['GWF', 0], ['ADJUSTMENTS', 1]]; const oldRaw = {}, newRaw = {};
       for (const [sec, col] of COPY) { const rows = m.raw[sec]; if (!rows) continue; const add = [];
-        for (const l of rows) { const tl = l.trim(); if (!tl || tl[0] === ';') continue; const t = AV.tokenize(l); if (t[col] === sc.id) { t[col] = id; add.push(t.map((x, j) => j === t.length - 1 ? x : x.padEnd(j === 0 ? 17 : 11)).join('')); } }
+        for (const l of rows) { const tl = l.trim(); if (!tl || tl[0] === ';') continue; const t = AV.tokenize(l); if (t[col] === sc.id) { t[col] = id; add.push(t.map((x, j) => j === t.length - 1 ? x : (x + ' ').padEnd(j === 0 ? 17 : 11)).join('')); } }
         if (add.length) { oldRaw[sec] = rows.slice(); newRaw[sec] = rows.concat(add); } }
       app.exec({ label: 'Split subcatchment ' + sc.id,
         do: () => { sc.poly = newPoly.map(p => p.slice()); sc.p.area = newArea; sc.p.width = newWidth; m.subcatchments.set(id, ns); for (const s in newRaw) m.raw[s] = newRaw[s].slice(); },

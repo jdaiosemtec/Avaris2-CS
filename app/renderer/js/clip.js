@@ -6,7 +6,7 @@
   const KEY = 'osemcm.clipboard.v1';
   const tok = (l) => AV.tokenize(l);
   const isData = (l) => { const t = String(l).trim(); return t && t[0] !== ';'; };
-  const fmtLine = (t) => t.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : String(x)).map((x, j) => j === t.length - 1 ? x : x.padEnd(j === 0 ? 17 : 11)).join('');
+  const fmtLine = (t) => t.map(x => /\s/.test(x) || x === '' ? '"' + x + '"' : String(x)).map((x, j) => j === t.length - 1 ? x : (x + ' ').padEnd(j === 0 ? 17 : 11)).join('');
   const clone = (o) => JSON.parse(JSON.stringify(o));
   // raw sections whose rows belong to an object: [section, id column, kind]
   const OWN = [['INFLOWS', 0, 'NODE'], ['DWF', 0, 'NODE'], ['RDII', 0, 'NODE'], ['TREATMENT', 0, 'NODE'],

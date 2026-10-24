@@ -396,6 +396,11 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
   const pdir = path.join(dir, base + '_parts'); fs.mkdirSync(pdir, { recursive: true });
   const rpt = path.join(dir, base + (job.flood2d ? '.frpt' : '.rpt')), out = path.join(dir, base + (job.flood2d ? '.fout' : '.out'));
   for (const [h, r] of outFiles) if (path.resolve(r.file) === path.resolve(out)) { r.close(); outFiles.delete(h); }
+  // sub-models written by 2.3–2.9.5 could have the coupling inflow "CPL_Q_<node>" glued to its type FLOW when the node
+  // ID is long (ERROR 209 undefined object CPL_Q_…FLOW): such lines are repaired in a copy in the parts folder
+  const fixInp = (f, k) => { try { const t = fs.readFileSync(f, 'utf8'); const fx = t.replace(/^(\s*\S+\s+FLOW\s+CPL_Q_\S+?)FLOW(\s+[-\d.eE+]+\s+[-\d.eE+]+\s*)$/gm, '$1 FLOW$2'); if (fx === t) return f;
+    const c = path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '_fixed' + path.extname(f)); fs.writeFileSync(c, fx); return c; } catch (err) { return f; } };
+  job.parts.forEach((p, k) => { p.inp = fixInp(p.inp, k); });
   const parts = job.parts.map((p, k) => ({ inp: p.inp, level: p.level || 0, rpt: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.rpt'), out: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.out') }));
   const cfg = path.join(pdir, 'run.cpl');
   const L = ['AVCPL\t1', 'SHM\t' + path.join(pdir, 'run.shm'), 'MODE\t0', 'THREADS\t' + Math.max(1, job.threads || 1)];
