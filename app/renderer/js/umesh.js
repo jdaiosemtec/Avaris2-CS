@@ -239,8 +239,10 @@
     const sumT = new Float64Array(cells.length); for (const f of faces.values()) { sumT[f.a] += f.Ta; sumT[f.b] += f.Tb; cells[f.a].deg++; cells[f.b].deg++; }
     const links = []; let k2 = 0;
     for (const f of faces.values()) { const A = cells[f.a], B = cells[f.b]; const L = Math.hypot(B.x - A.x, B.y - A.y); if (!(L > 0)) continue;
-      const fa = A.A * A.por / sumT[f.a], fb = B.A * B.por / sumT[f.b]; const plan = (f.Ta * fa + f.Tb * fb) * lf * lf; const p = Math.min(A.por, B.por);
-      const w = (f.Ta + f.Tb) / L * lf * p; let len = plan / w; len = Math.max(len, 0.25 * L * lf);
+      // length from the open (non-porous) geometry, at least the distance between the centres; porosity then only
+      // narrows the link (width = porous plan area / length), so porous cells never get short, steep links
+      const fa0 = A.A / sumT[f.a], fb0 = B.A / sumT[f.b]; const w0 = (f.Ta + f.Tb) / L * lf; let len = Math.max((f.Ta * fa0 + f.Tb * fb0) * lf * lf / w0, L * lf);
+      const plan = (f.Ta * fa0 * A.por + f.Tb * fb0 * B.por) * lf * lf; const w = plan / len;
       links.push({ id: '2DL_' + (++k2), a: A.id, b: B.id, len: +len.toFixed(4), w: +w.toFixed(4), n: Math.max(A.n, B.n) }); }
 
     // ---- 7. water-front outfalls, 1D couplings
