@@ -263,13 +263,13 @@
         AV.partRecut(app, P, V.A); pending = { before }; V.hl = null; render(); redrawMap();
         const st2 = P.stats; const newIds = [...new Set(map.values())]; const cutsNew = P.cuts.filter(c => newIds.includes(c.upPart) && newIds.includes(c.downPart));
         const badCuts = cutsNew.filter(c => P.why.has(c.link.id)); const asB = pr ? AV.cpuPlan.assign([...before.values()].reduce((a, q) => { a[q] = (a[q] || 0) + 1; return a; }, []), pr) : null; const asA = pr ? AV.cpuPlan.assign(st2.map(s => s.nodes), pr) : null;
-        const over = P.count > physCores(); const pair = over ? smallestPair(P, -1) : null;
+        const over = P.count > physCores();
         prevBox.innerHTML = '';
         prevBox.appendChild(h('div', { class: 'psec' }, h('span', { class: 'pn' }, '2'), 'Preview (shown on the map)'));
         prevBox.appendChild(h('table', { class: 'ptbl' }, h('tr', null, ['Partition', 'Nodes', 'Cut points in', 'out'].map(x => h('th', null, x))), newIds.map(q => h('tr', null, h('td', null, h('span', { class: 'sw', style: { background: COL(q) } }), ' ' + PID(q)), h('td', { class: 'num' }, st2[q].nodes.toLocaleString()), h('td', { class: 'num' }, String(st2[q].cin)), h('td', { class: 'num' }, String(st2[q].cout))))));
         prevBox.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, cutsNew.length + ' new cut points' + (badCuts.length ? ' (' + badCuts.length + ' on pipes with oscillating flow)' : ', all one-way in the base run') + ' · total ' + P.count + ' partitions' + (asA ? ' · est. speed-up ×' + asB.speedup.toFixed(1) + ' → ×' + asA.speedup.toFixed(1) : '')));
-        if (over && pair) prevBox.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, P.count + ' partitions, more than the ' + physCores() + ' processor cores of this computer (fine for a run on a computer with more cores). To run here, you can merge the two smallest adjacent partitions ' + PID(pair.a) + ' (' + st2[pair.a].nodes.toLocaleString() + ') + ' + PID(pair.b) + ' (' + st2[pair.b].nodes.toLocaleString() + ').'));
-        dlg.setButtons([{ label: 'Cancel', onClick: () => { restore(); return true; } }].concat(over && pair ? [{ label: 'Apply', onClick: () => { apply(null); return true; } }, { label: 'Apply and Merge ' + PID(pair.a) + ' + ' + PID(pair.b), primary: true, onClick: () => { apply(pair); return true; } }] : [{ label: 'Apply', primary: true, onClick: () => { apply(null); return true; } }]));
+        if (over) prevBox.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, P.count + ' partitions, more than the ' + physCores() + ' processor cores of this computer (fine for a run on a computer with more cores).'));
+        dlg.setButtons([{ label: 'Cancel', onClick: () => { restore(); return true; } }, { label: 'Apply', primary: true, onClick: () => { apply(null); return true; } }]);
       }
       function apply(pair) {
         const before = pending.before; pending = null; (V.undo = V.undo || []).push({ owner: before, manual: P.manual || 0 });

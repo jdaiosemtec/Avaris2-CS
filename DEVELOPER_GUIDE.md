@@ -542,3 +542,7 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - `partition.js partChecks`：分区数 > 本机物理核时不输出"每个分区负载在 1xx % 内"一行（表里的 Load 仍按本机显示，核数那一行已说明）。
 - 分区计算耗时与 2.9.6 相同（vm 脚本在 4 万节点模型上对比：n=4 0.94 s vs 0.78 s，n=14 0.73 s vs 0.71 s）。
 
+## 31. 2.10.3：Split 对话框去掉合并
+
+- 用户要求去掉 Split Partition 里的 "Apply and Merge Pxx + Pyy" 按钮和合并建议（`smallestPair` 会挑到刚拆出的两块，等于撤销拆分）。现在只有 Cancel / Apply；分区数 > 本机核时只显示中性说明。`smallestPair` 仍用于 Merge Partitions… 的默认选择；`apply(pair)` 的参数保留但 Split 只传 null。
+
