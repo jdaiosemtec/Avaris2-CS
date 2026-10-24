@@ -403,6 +403,7 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
   const hsErr = []; let hsCache = null; const HS = require('./hssplit');
   const fixInp = (f, k) => { try { const t = fs.readFileSync(f, 'utf8'); let fx = t.replace(/^(\s*\S+\s+FLOW\s+CPL_Q_\S+?)FLOW(\s+[-\d.eE+]+\s+[-\d.eE+]+\s*)$/gm, '$1 FLOW$2');
       const nn = 'P' + String(k + 1).padStart(2, '0'); const lines = fx.split(/\r?\n/); let changed = fx !== t;
+      const srcDir = job.srcDirs && job.srcDirs[k] ? job.srcDirs[k] : path.dirname(f); const inParts = path.resolve(path.dirname(f)) === path.resolve(pdir);
       for (const F of HS.filesLines(lines)) { if (F.type !== 'HOTSTART') continue; const q = F.path.replace(/^"|"$/g, '');
         if (F.use === 'SAVE') { lines[F.i] = 'SAVE HOTSTART "' + path.join(pdir, nn + '_saved.hsf') + '"'; changed = true; continue; }
         const cands = path.isAbsolute(q) ? [q] : [path.resolve(path.dirname(f), q), job.srcDirs && job.srcDirs[k] ? path.resolve(job.srcDirs[k], q) : null, job.masterDir ? path.resolve(job.masterDir, q) : null].filter(Boolean); const src = cands.find(x => fs.existsSync(x));
@@ -410,6 +411,8 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
         try { if (!hsCache || hsCache.src !== src) hsCache = { src, buf: fs.readFileSync(src) }; const r = HS.split(hsCache.buf, job.masterTexts || [], lines.join('\n'));
           const out = path.join(pdir, nn + '.hsf'); fs.writeFileSync(out, r.buf); lines[F.i] = 'USE HOTSTART "' + out + '"'; changed = true; }
         catch (err) { hsErr.push(nn + ': ' + err.message + ' (' + src + ')'); } }
+      // the copy lives in the parts folder: relative data files of the sub-model are made absolute (2.9.10)
+      if ((changed || inParts) && HS.absPaths(lines, srcDir, path)) changed = true;
       if (!changed) return f;
       const c = path.join(pdir, nn + '_fixed' + path.extname(f)); fs.writeFileSync(c, lines.join('\r\n')); return c; } catch (err) { return f; } };
   job.parts.forEach((p, k) => { p.inp = fixInp(p.inp, k); });

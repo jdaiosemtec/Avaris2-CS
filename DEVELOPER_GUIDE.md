@@ -507,3 +507,8 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 
 - `main.js fs:rmRun(files, partsDir)`：先关闭 `outFiles` 里指向这些文件的 OutReader（Windows 上打开的文件删不掉，以前错误被忽略），每个文件最多重试 5 次；`partsDir` 必须是 `…_Results/<名>_parts`，递归删除。返回 `{ failed }`。
 - `database.js remove`：确认框列出 `_parts` 文件夹；`partsDir(r)` 取 run json 的 `coupled.partsFolder`，没有时用 `<名>_parts`；删除失败的文件弹框列出。
+
+## 26. 2.9.10：子模型拷贝里的相对路径
+
+- `hssplit.js absPaths(lines, baseDir, path)`：把 [RAINGAGES] FILE、[TIMESERIES] FILE、[FILES]、[TEMPERATURE] FILE 的相对路径改成以 baseDir 为基准的绝对路径（带空格的加引号）。
+- `main.js fixInp`：子模型文件要拷贝到 `_parts`（修复 / 热启动）或本身就在 `_parts`（1D-2D 的 .finp）时调用，baseDir = `job.srcDirs[k]`（分区文件夹）。

@@ -75,4 +75,24 @@ function filesLines(lines) {
   return out;
 }
 
-module.exports = { engineOrder, readHeader, split, filesLines };
+// Relative data-file paths of a model text made absolute against baseDir (2.9.10): a sub-model copied into the run's
+// _parts folder (1D-2D sub-model, repaired or hot start copy) would otherwise look for "../rain.dat" next to the copy
+// (ERROR 317 cannot open rainfall data file). Rain gage FILE, time series FILE, [FILES], [TEMPERATURE] FILE.
+// Returns the number of paths changed; lines are changed in place.
+function absPaths(lines, baseDir, path) {
+  let sec = '', n = 0;
+  const q = (p) => /\s/.test(p) ? '"' + p + '"' : p;
+  const fix = (p) => { const u = p.replace(/^"|"$/g, ''); if (!u || path.isAbsolute(u) || /^[A-Za-z]:[\\/]/.test(u) || /^\\\\/.test(u)) return null; return path.resolve(baseDir, u); };
+  lines.forEach((raw, i) => { const l = raw.trim(); if (!l || l[0] === ';') return; if (l[0] === '[') { sec = l.slice(1, l.indexOf(']')).toUpperCase(); return; }
+    const t = tok(l); let k = -1, rest = false;
+    if (sec === 'RAINGAGES' && /^FILE$/i.test(t[4] || '') && t[5]) k = 5;
+    else if (sec === 'TIMESERIES' && /^FILE$/i.test(t[1] || '') && t[2]) { k = 2; rest = true; }
+    else if (sec === 'FILES' && t.length >= 3) { k = 2; rest = true; }
+    else if (sec === 'TEMPERATURE' && /^FILE$/i.test(t[0] || '') && t[1]) k = 1;
+    if (k < 0) return;
+    const orig = rest ? t.slice(k).join(' ') : t[k]; const a = fix(orig); if (!a) return;
+    lines[i] = t.slice(0, k).map(q).join(' ') + ' ' + q(a) + (rest ? '' : (t.length > k + 1 ? ' ' + t.slice(k + 1).map(q).join(' ') : '')); n++; });
+  return n;
+}
+
+module.exports = { engineOrder, readHeader, split, filesLines, absPaths };
