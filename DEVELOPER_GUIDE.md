@@ -502,3 +502,8 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - `app/hssplit.js`：`engineOrder(text)` 从整体模型文本得到子汇水区 / 节点 / 管段顺序和记录长度（地下水 4、积雪 15、储存节点多 1 个 float、污染物项）；`split(hsBuf, masterTexts, subText)` 按 ID 拷贝记录到子模型顺序，整体模型没有的对象填 0，管段 setting 填 1（0 会让 link_getInflow 返回 0，2D 耦合连接被堵死），OFF 的水泵填 0。v5 文件自带名称。
 - `main.js engine:runCoupled` 的 `fixInp`：USE HOTSTART → `<parts>/Pnn.hsf`；SAVE HOTSTART → `<parts>/Pnn_saved.hsf`；相对路径按 子模型文件目录（`job.srcDirs`，1D-2D 时子模型拷贝在别处）→ 整体模型目录 查找；出错时整次运行返回说明。
 - `sim.js runCoupled`：模型有 USE HOTSTART 时把整体模型文本（1D，有网格时再加 1D-2D 文本）放进 `job.masterTexts`，按对象数量匹配热启动文件。
+
+## 25. 2.9.9：删除结果
+
+- `main.js fs:rmRun(files, partsDir)`：先关闭 `outFiles` 里指向这些文件的 OutReader（Windows 上打开的文件删不掉，以前错误被忽略），每个文件最多重试 5 次；`partsDir` 必须是 `…_Results/<名>_parts`，递归删除。返回 `{ failed }`。
+- `database.js remove`：确认框列出 `_parts` 文件夹；`partsDir(r)` 取 run json 的 `coupled.partsFolder`，没有时用 `<名>_parts`；删除失败的文件弹框列出。

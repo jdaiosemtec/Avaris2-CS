@@ -97,10 +97,18 @@
       await app.sim.loadResults(r.out, r.rpt, false); app.sim.lastRun = { out: r.out, rpt: r.rpt, inp: r.inp }; this.render();
     }
     files(r) { return [r.out, r.rpt, r.inp, r.json].filter(Boolean); }
+    // sub-model folder of a coupled run: <results>/<name>_parts (the name as the run wrote it)
+    partsDir(r) { const f = r.out || r.rpt || r.json; if (!f) return null; return (r.meta && r.meta.coupled && r.meta.coupled.partsFolder) || AV.joinPath(AV.dirname(f), r.name.replace(/[^\w\-. ]/g, '_') + '_parts'); }
     async releaseIfLoaded(r) { const app = this.app; const cur = app.results && app.results.rpt; if (cur && r.rpt && cur.toLowerCase() === r.rpt.toLowerCase()) await app.sim.clearResults(); }
     async remove(r) {
-      if (!await AV.confirm('Delete the simulation results "' + r.name + '"?\n\n' + this.files(r).map(f => AV.basename(f)).join('\n'), 'Database', 'Delete')) return;
-      await this.releaseIfLoaded(r); await window.host.rmRun(this.files(r)); AV.toast('Results "' + r.name + '" deleted.'); this.render();
+      const pd0 = this.partsDir(r); const hasParts = !!pd0 && await window.host.exists(pd0);
+      if (!await AV.confirm('Delete the simulation results "' + r.name + '"?\n\n' + this.files(r).map(f => AV.basename(f)).concat(hasParts ? [AV.basename(pd0) + '\\ (sub-model folder)'] : []).join('\n'), 'Database', 'Delete')) return;
+      await this.releaseIfLoaded(r);
+      const res = await window.host.rmRun(this.files(r), hasParts ? pd0 : null);
+      const failed = (res && res.failed) || [];
+      if (failed.length) AV.alert('These files of "' + r.name + '" could not be deleted (they are open in another program, or Windows still holds them):\n\n' + failed.map(f => AV.basename(f)).join('\n') + '\n\nClose the program that uses them and delete the results again.', 'Database');
+      else AV.toast('Results "' + r.name + '" deleted.');
+      this.render();
     }
     async rename(r) {
       const n = await AV.prompt('Rename Results', 'New name', r.name); if (!n || n.trim() === r.name) return; const nn = n.trim();

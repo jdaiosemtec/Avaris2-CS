@@ -54,7 +54,7 @@ contextBridge.exposeInMainWorld('host', {
   cancelEngine: (id) => ipcRenderer.invoke('engine:cancel', id),
   onProgress: (cb) => ipcRenderer.on('engine:progress', (e, p, id) => cb(p, id)),
   cpuInfo: () => ipcRenderer.invoke('sys:cpu'),
-  rmRun: (files) => ipcRenderer.invoke('fs:rmRun', files),
+  rmRun: (files, partsDir) => ipcRenderer.invoke('fs:rmRun', files, partsDir),
   renameRun: (pairs) => ipcRenderer.invoke('fs:renameRun', pairs),
   outOpen: (f) => ipcRenderer.invoke('out:open', f),
   outClose: (h) => ipcRenderer.invoke('out:close', h),

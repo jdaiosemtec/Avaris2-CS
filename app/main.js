@@ -468,7 +468,21 @@ ipcMain.handle('sys:cpu', async () => {
 });
 // simulation results of a model live in <model>_Results; only files there may be deleted / renamed from the Database panel
 const inResults = (p) => /(_Results|_Calibration[\\/]runs)[\\/][^\\/]+$/i.test(p);
-ipcMain.handle('fs:rmRun', async (e, files) => { for (const f of files) if (inResults(f)) { try { await fs.promises.unlink(f); } catch (err) { } } return true; });
+// Delete the files of a run (2.9.9): readers still open on its .out are closed first (on Windows an open file cannot be
+// deleted, and the error was ignored, so the files stayed); a locked file is tried again a few times; the sub-model
+// folder <name>_parts of a coupled run is removed too. Returns the files that could not be deleted.
+ipcMain.handle('fs:rmRun', async (e, files, partsDir) => {
+  const failed = [];
+  for (const f of files) { if (!inResults(f)) continue;
+    for (const [h, r] of outFiles) if (path.resolve(r.file) === path.resolve(f)) { try { r.close(); } catch (err) { } outFiles.delete(h); }
+    let ok = false;
+    for (let k = 0; k < 5 && !ok; k++) { try { await fs.promises.unlink(f); ok = true; } catch (err) { if (err.code === 'ENOENT') ok = true; else await new Promise(res => setTimeout(res, 300)); } }
+    if (!ok) failed.push(f); }
+  if (partsDir && /_Results[\\/][^\\/]+_parts$/i.test(partsDir) && fs.existsSync(partsDir)) {
+    for (const [h, r] of outFiles) if (path.resolve(r.file).startsWith(path.resolve(partsDir) + path.sep)) { try { r.close(); } catch (err) { } outFiles.delete(h); }
+    try { await fs.promises.rm(partsDir, { recursive: true, force: true, maxRetries: 4, retryDelay: 300 }); } catch (err) { failed.push(partsDir); } }
+  return { failed };
+});
 ipcMain.handle('fs:renameRun', async (e, pairs) => { for (const [a, b] of pairs) { if (!inResults(a) || !inResults(b)) throw new Error('refused'); if (fs.existsSync(a)) await fs.promises.rename(a, b); } return true; });
 
 // ---------------------------------------------------------------- binary results
