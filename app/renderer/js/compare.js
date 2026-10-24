@@ -227,7 +227,7 @@
       const W = c.clientWidth || 360, H = c.clientHeight || 360, d = window.devicePixelRatio || 1; c.width = W * d; c.height = H * d; const g = c.getContext('2d'); g.scale(d, d);
       const pts = rows.filter(r => r.b !== null && r.c !== null); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
       if (!pts.length) { g.fillStyle = '#90a4ae'; g.fillText('No values', 20, 20); return; }
-      let mn = Math.min(...pts.map(r => Math.min(r.b, r.c))), mx = Math.max(...pts.map(r => Math.max(r.b, r.c))); if (mx <= mn) { mx = mn + 1; } const pad = (mx - mn) * 0.05; mn -= pad; mx += pad;
+      let mn = AV.amin(pts.map(r => Math.min(r.b, r.c))), mx = AV.amax(pts.map(r => Math.max(r.b, r.c))); if (mx <= mn) { mx = mn + 1; } const pad = (mx - mn) * 0.05; mn -= pad; mx += pad;
       const L = 46, R = 10, T = 10, B = 34; const X = (v) => L + (v - mn) / (mx - mn) * (W - L - R), Y = (v) => H - B - (v - mn) / (mx - mn) * (H - T - B);
       g.strokeStyle = '#cfd8dc'; g.fillStyle = '#607d8b'; g.font = '10px Segoe UI'; g.lineWidth = 1;
       for (let i = 0; i <= 4; i++) { const v = mn + (mx - mn) * i / 4; g.beginPath(); g.moveTo(X(v), T); g.lineTo(X(v), H - B); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke(); g.textAlign = 'center'; g.fillText(AV.fmt(v, 2), X(v), H - B + 12); g.textAlign = 'right'; g.fillText(AV.fmt(v, 2), L - 4, Y(v) + 3); }

@@ -41,13 +41,13 @@
           B(V.detecting ? 'Detecting…' : 'Detect', () => detect(), false, V.detecting || busy),
           h('span', { class: 'hint' }, V.detecting ? V.detecting : prof ? '' : 'measures this computer and sets the best number and sizes of the partitions')),
         h('label', null, 'Base results'), h('span', { class: R ? '' : 'hint' }, R ? AV.basename(R.meta.file || '') + ' (' + R.meta.nPeriods + ' steps)' : 'none – run a simulation or open results (Database) first')));
-      if (prof) { const pl = AV.cpuPlan.plan(prof, maxParts()); const sl = AV.cpuPlan.slotsFor(prof, V.S.n).map(x => x.speed); const tw = AV.cpuPlan.twoClass(sl); const tot = app.model.nodes.size;
-        const T = tot / (V.S.n * (1 - tw.frac) + V.S.n * tw.frac * tw.r); const cls = [...new Set(prof.cores.map(c => c.cls))].sort((a, b) => b - a);
+      if (prof) { const pl = AV.cpuPlan.plan(prof, maxParts()); const sl = AV.cpuPlan.slotsFor(prof, pl.n).map(x => x.speed); const tw = AV.cpuPlan.twoClass(sl); const tot = app.model.nodes.size;
+        const T = tot / (pl.n * (1 - tw.frac) + pl.n * tw.frac * tw.r); const cls = [...new Set(prof.cores.map(c => c.cls))].sort((a, b) => b - a);
         const spd = cls.map(c => (cls.length < 2 ? 'core' : c === cls[0] ? 'performance core' : 'efficiency core') + ' ' + (prof.A[c] || 0).toFixed(2)).join(' · ') + (prof.B ? ' · with both threads busy ' + cls.map(c => (prof.B[c] || 0).toFixed(2)).join(' / ') : '');
         body.appendChild(h('div', { class: 'pmach' }, h('b', null, prof.model || 'This computer'), ' · ' + AV.cpuPlan.describe(prof) + ' · detected ' + (prof.date ? new Date(prof.date).toLocaleString() : ''), h('br'),
           'Relative speed: ' + spd, h('br'),
           h('b', null, 'Set for this computer: ' + pl.n + ' partitions'), tw.r < 0.95 ? ' – about ' + Math.round(T).toLocaleString() + ' nodes on each fast core and ' + Math.round(T * tw.r).toLocaleString() + ' on each slower one' : ' – the same size on every core', '; the cores are bound automatically at every run.',
-          V.S.n !== pl.n ? h('div', { class: 'hint', style: { color: 'var(--warn)' } }, 'Number of partitions changed to ' + V.S.n + ' by hand (best for this computer: ' + pl.n + ').') : null)); }
+          V.S.n !== pl.n ? h('div', { class: 'hint' }, 'Number of partitions set to ' + V.S.n + ' by hand (best for this computer: ' + pl.n + ')' + (V.S.n > prof.cores.length ? ' – more than the ' + prof.cores.length + ' cores here, e.g. for a run on another computer: the partitions get the same size. Click Detect on that computer for the best number there.' : '.')) : null)); }
       else if (prof0 && prof0.cores) body.appendChild(h('div', { class: 'pmach warn' }, 'The processor profile was measured on ' + (prof0.model || 'another processor') + ' – this computer is different (' + (AV.cpuTopoNow ? AV.cpuTopoNow.model : '?') + '). Click Detect to measure this computer; until then the partitions are balanced by number of nodes.'));
       const unit = app.model.isSI ? 'm' : 'ft'; const opt = (label, ctl, hint) => [h('div', { class: 'al' }, label), h('div', { class: 'ac' }, ctl), hint ? h('div', { class: 'ah' }, hint) : null];
       const keep = h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } });
@@ -112,7 +112,8 @@
       if (busy) return; stopMove(); busy = true; status.textContent = 'Analysing the base results…'; render(); const bz = AV.busy.start('Partitioning the model');
       try { await new Promise(r => setTimeout(r, 30)); const t0 = performance.now();
         V.A = await AV.partAnalyse(app, V.S); status.textContent = 'Partitioning…'; await new Promise(r => setTimeout(r, 20));
-        const pr = AV.cpuProfileOK(app); const w = pr ? AV.cpuPlan.twoClass(AV.cpuPlan.slotsFor(pr, V.S.n).map(x => x.speed)) : null;
+        // more partitions than cores here (e.g. for a run on another computer): the same size for all, nothing is blocked
+        const pr = AV.cpuProfileOK(app); const w = pr && V.S.n <= pr.cores.length ? AV.cpuPlan.twoClass(AV.cpuPlan.slotsFor(pr, V.S.n).map(x => x.speed)) : null;
         V.P = AV.partCompute(app, V.A, V.S, { w }); if (pr) V.P.cpu = { model: pr.model, sig: pr.sig, cores: AV.cpuPlan.describe(pr), date: pr.date }; V.sel = null; V.undo = []; V.hl = null; V.time = ((performance.now() - t0) / 1000).toFixed(1);
         app.status('Model partition: ' + V.P.count + ' partitions, ' + V.P.cuts.length + ' cut points (' + V.time + ' s).');
       } catch (e) { console.error(e); AV.alert('Partition failed: ' + e.message); }
@@ -261,14 +262,14 @@
         prevBox.appendChild(h('div', { class: 'psec' }, h('span', { class: 'pn' }, '2'), 'Preview (shown on the map)'));
         prevBox.appendChild(h('table', { class: 'ptbl' }, h('tr', null, ['Partition', 'Nodes', 'Cut points in', 'out'].map(x => h('th', null, x))), newIds.map(q => h('tr', null, h('td', null, h('span', { class: 'sw', style: { background: COL(q) } }), ' ' + PID(q)), h('td', { class: 'num' }, st2[q].nodes.toLocaleString()), h('td', { class: 'num' }, String(st2[q].cin)), h('td', { class: 'num' }, String(st2[q].cout))))));
         prevBox.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, cutsNew.length + ' new cut points' + (badCuts.length ? ' (' + badCuts.length + ' on pipes with oscillating flow)' : ', all one-way in the base run') + ' · total ' + P.count + ' partitions' + (asA ? ' · est. speed-up ×' + asB.speedup.toFixed(1) + ' → ×' + asA.speedup.toFixed(1) : '')));
-        if (over && pair) prevBox.appendChild(h('div', { class: 'note', style: { color: 'var(--warn)', marginTop: '6px' } }, P.count + ' partitions on ' + physCores() + ' processor cores. Suggested: merge the two smallest adjacent partitions ' + PID(pair.a) + ' (' + st2[pair.a].nodes.toLocaleString() + ') + ' + PID(pair.b) + ' (' + st2[pair.b].nodes.toLocaleString() + ').'));
+        if (over && pair) prevBox.appendChild(h('div', { class: 'note', style: { marginTop: '6px' } }, P.count + ' partitions, more than the ' + physCores() + ' processor cores of this computer (fine for a run on a computer with more cores). To run here, you can merge the two smallest adjacent partitions ' + PID(pair.a) + ' (' + st2[pair.a].nodes.toLocaleString() + ') + ' + PID(pair.b) + ' (' + st2[pair.b].nodes.toLocaleString() + ').'));
         dlg.setButtons([{ label: 'Cancel', onClick: () => { restore(); return true; } }].concat(over && pair ? [{ label: 'Apply', onClick: () => { apply(null); return true; } }, { label: 'Apply and Merge ' + PID(pair.a) + ' + ' + PID(pair.b), primary: true, onClick: () => { apply(pair); return true; } }] : [{ label: 'Apply', primary: true, onClick: () => { apply(null); return true; } }]));
       }
       function apply(pair) {
         const before = pending.before; pending = null; (V.undo = V.undo || []).push({ owner: before, manual: P.manual || 0 });
-        let msg = PID(p0) + ' split into ' + (P.count - (Math.max(...before.values()) + 1) + 1) + ' partitions';
+        let msg = PID(p0) + ' split into ' + (P.count - (AV.amax([...before.values()]) + 1) + 1) + ' partitions';
         if (pair) { for (const [id, q] of P.owner) if (q === pair.b) P.owner.set(id, pair.a); msg += '; ' + PID(pair.b) + ' merged into ' + PID(pair.a); }
-        V.sel = null; changed(P, msg + ' (' + (Math.max(...P.owner.values()) + 1) + ' partitions).');
+        V.sel = null; changed(P, msg + ' (' + (AV.amax([...P.owner.values()]) + 1) + ' partitions).');
       }
       dlg = AV.modal({ title: 'Split Partition ' + PID(p0), width: 600, body, buttons: [{ label: 'Cancel', onClick: () => { restore(); return true; } }] });
       if (dlg.done) dlg.done.then(() => { if (pending) restore(); });
@@ -345,7 +346,7 @@
         const owner = new Map(); const added = [], deleted = [], decide = [];
         for (const id of m.nodes.keys()) if (def.assignment[id] !== undefined) owner.set(id, def.assignment[id]);
         for (const id of Object.keys(def.assignment)) if (!m.nodes.has(id)) deleted.push(id);
-        const pending = [...m.nodes.keys()].filter(id => !owner.has(id)); added.push(...pending);
+        const pending = [...m.nodes.keys()].filter(id => !owner.has(id)); AV.pushAll(added, pending);
         for (let pass = 0; pass < 50 && pending.length; pass++) { let ch = false;
           for (let i = pending.length - 1; i >= 0; i--) { const id = pending[i]; const nb = { down: new Set(), up: new Set() };
             for (const l of m.links.values()) { if (l.from === id && owner.has(l.to)) nb.down.add(owner.get(l.to)); if (l.to === id && owner.has(l.from)) nb.up.add(owner.get(l.from)); }

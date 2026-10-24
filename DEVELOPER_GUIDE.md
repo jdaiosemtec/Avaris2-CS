@@ -527,3 +527,12 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - **partition.js `partCompute(app, A, S, opt)`**：`opt.w = { r, frac }` 时关闭分支的目标交替为 T 和 r·T（小区占 frac），质量用"最大 size/speed"；`opt.only` 只在这些节点内分区（Split），不重切，失败时 `P.blockers`（必须在一起的组：积水区 ≥2 个井、振荡管、泵堰等）。`partChecks` 有 profile 时按 Load 检查。`partOverlay` 画 `V.hl`（闪烁）。
 - **partpanel.js**：Detect（自动设分区数 = plan.n，存 `app.prefs.cpuProfile`；`AV.cpuProfileOK` 只认本机）；结果表 Core / Load 列和预计加速；Split Partition 对话框（参数同主分区、预览直接改 V.P、Cancel 恢复、超核数建议合并最小相邻两区）；Merge Partitions；Undo（`V.undo` 保存 owner）。`AV.modal` 新增 `setButtons`。
 - **sim.js / database.js**：运行前 `job.bind`；Run Status 增加子模型计算 / 等待时间表（`cplPartsTable`），运行信息 json 的 `coupled.parts` 也保存。
+
+## 29. 2.10.1：大模型分区栈溢出修复；不限制分区数
+
+- 原因：`partRecut` 里 `Math.max(...P.owner.values())` 把 18 万节点的值全部作为函数参数展开，超过 V8 参数上限（约 12 万）→ `Maximum call stack size exceeded`。
+  同类写法（`Math.max/min(...大数组)`、`push(...大数组)`）一律改为 `util.js` 的 `AV.amax / AV.amin / AV.pushAll`：partition.js（partRecut、partChecks 塘、partSurface、run spread）、partpanel.js（Split 前后计数、pending 追加）、compare.js。**新代码禁止对可能很大的数组用展开传参。**
+- blockers 只统计块内 ≥2 个成员的塘。
+- 分区数大于本机物理核：不阻止（可能在别的电脑上跑）。`partpanel.go()` 只在 `n ≤ 物理核数` 时用 Detect 的两类速度权重，否则各分区等大；Machine 框的预计速度按 Detect 的最佳数 `pl.n` 计算；手动数字的提示与 partChecks / Split 的文字改为中性说明（"本机跑可合并或用 Detect 的数"）。全部只是提示，不阻止生成。
+- 验证：scratchpad 的 vm 脚本在 36 万节点模型上（big600.inp）partCompute 4 区 ~12 s；加权 8 区 + 拆分 3 + partRecut 正常（默认 node 栈）。旧代码在 partRecut 报同样错误。
+

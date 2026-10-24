@@ -155,7 +155,7 @@
       const no = new Int32Array(B.length); for (let g = 0; g < B.length; g++) no[g] = ren.get(pf(owner[g]));
       const sizes = roots.map(p => size[p]);
       // weighted: the largest partitions run on the fast cores; quality = the slowest (size / speed)
-      let spread = Math.max(...sizes) / Math.max(1, Math.min(...sizes));
+      let spread = AV.amax(sizes) / Math.max(1, AV.amin(sizes));
       if (W) { const sp = [...sizes].sort((a, b) => b - a); const nS = Math.round(W.frac * roots.length); const nB = roots.length - nS; let worst = 0; sp.forEach((x, i) => { worst = Math.max(worst, i < nB ? x : x / W.r); }); spread = worst / (total / (nB + nS * W.r)); }
       return { blockOwner: no, count: roots.length, spread };
     };
@@ -193,7 +193,7 @@
     for (const l of m.links.values()) { const pa = P.owner.get(l.from), pb = P.owner.get(l.to); if (pa === undefined || pb === undefined || pa === pb) continue;
       const x = A.links.get(l.id); const back = x && x.f > 0 && x.r / x.f > 0.5;
       const up = back ? l.to : l.from, dn = back ? l.from : l.to; cuts.push({ link: l, up, down: dn, upPart: P.owner.get(up), downPart: P.owner.get(dn), back }); }
-    P.cuts = cuts; P.count = Math.max(0, ...P.owner.values()) + 1; AV.partStats(app, P); return P;
+    P.cuts = cuts; P.count = AV.amax([0, ...P.owner.values()]) + 1; AV.partStats(app, P); return P;
   };
   AV.partStats = function (app, P) {
     const m = app.model; const st = []; for (let i = 0; i < P.count; i++) st.push({ i, nodes: 0, links: 0, subs: 0, area: 0, outfalls: [], cin: 0, cout: 0, cx: 0, cy: 0 });
@@ -219,14 +219,14 @@
     out.push(rv.length ? { t: 'wn', s: rv.length + ' cut(s) on pipes with oscillating flow: ' + rv.slice(0, 6).map(c => c.link.id + ' (' + P.why.get(c.link.id).replace('oscillating flow ', '') + ' reverse)').join(', ') + (rv.length > 6 ? ' …' : '') + '. ' + nRev + ' of ' + app.model.links.size + ' links have oscillating flow in the base results and form groups larger than one partition, so some had to be cut (the least oscillating ones).' } : { t: 'ok', s: 'No cut on pipes with oscillating flow' + (nRev ? ' (' + nRev + ' kept whole)' : '') });
     const pondCut = new Set(badP.map(c => P.pondOf.get(c.up)));
     if (S.keepPonds === false) out.push({ t: 'ok', s: 'Ponding areas are not used as a constraint (option off)' }); else out.push(badP.length ? { t: 'wn', s: badP.length + ' cut(s) through ' + pondCut.size + ' ponding area(s) (added by hand)' } : { t: 'ok', s: A.ponds.length ? 'No cut through any of the ' + A.ponds.length + ' ponding areas (' + A.pondSource + ')' : 'No ponding areas in the base results' });
-    if (S.keepPonds !== false && A.ponds.length) { const big = Math.max(...A.ponds.map(g => g.length)); if (big > app.model.nodes.size / Math.max(2, st.length)) out.push({ t: 'wn', s: 'The largest ponding area holds ' + big + ' manholes (more than one partition): it is kept in one partition, so the partitions cannot be balanced. Check the base results, raise the 2D ponding depth or untick "Keep ponding areas whole".' }); }
+    if (S.keepPonds !== false && A.ponds.length) { const big = AV.amax(A.ponds.map(g => g.length)); if (big > app.model.nodes.size / Math.max(2, st.length)) out.push({ t: 'wn', s: 'The largest ponding area holds ' + big + ' manholes (more than one partition): it is kept in one partition, so the partitions cannot be balanced. Check the base results, raise the 2D ponding depth or untick "Keep ponding areas whole".' }); }
     const empty = st.filter(s => !s.outfalls.length && !s.cout); out.push(empty.length ? { t: 'er', s: empty.map(s => PID(s.i)).join(', ') + ': no outfall and no cut point' } : { t: 'ok', s: 'Every partition drains to an outfall or a cut point' });
     const prof = AV.cpuProfileOK && AV.cpuProfileOK(app);
     if (prof) {
       // 2.10.0: balanced for this computer – every partition runs on its own core; load = (nodes / core speed) / ideal
-      const asg = AV.cpuPlan.assign(st.map(s => s.nodes), prof); const hi = st.filter((s, k) => asg.parts[k].load * 100 > 100 + S.tol).sort((a, b) => asg.parts[b.i].load - asg.parts[a.i].load);
+      const asg = AV.cpuPlan.assign(st.map(s => s.nodes), prof); const hi = st.length > prof.cores.length ? [] : st.filter((s, k) => asg.parts[k].load * 100 > 100 + S.tol).sort((a, b) => asg.parts[b.i].load - asg.parts[a.i].load);
       out.push(hi.length ? { t: 'wn', s: hi.map(s => PID(s.i) + ' ' + Math.round(asg.parts[s.i].load * 100) + ' %').slice(0, 6).join(', ') + ' load (tolerance ' + S.tol + ' %): the whole run waits for ' + (hi.length > 1 ? 'them' : 'it') + '. Select ' + PID(hi[0].i) + ' and use Split Partition, or Partition Again.' } : { t: 'ok', s: 'Every partition within ' + (100 + +S.tol) + ' % load on its core (estimated speed-up ×' + asg.speedup.toFixed(1) + ')' });
-      const phys = prof.cores.length; out.push(st.length > phys ? { t: 'wn', s: st.length + ' partitions > ' + phys + ' processor cores' + (st.length > prof.logical ? ' and ' + prof.logical + ' threads: some sub-models share a core' : ': some sub-models run on the second thread of a core') + '. Use Merge Partitions, or Partition Again with the number from Detect.' } : { t: 'ok', s: st.length + ' partitions ≤ ' + phys + ' processor cores' });
+      const phys = prof.cores.length; out.push(st.length > phys ? { t: 'wn', s: st.length + ' partitions > ' + phys + ' processor cores of this computer' + (st.length > prof.logical ? ' and ' + prof.logical + ' threads: run here, some sub-models would share a core' : ': run here, some sub-models would use the second thread of a core') + '. Fine for a run on a computer with more cores; to run here, use Merge Partitions or the number from Detect.' } : { t: 'ok', s: st.length + ' partitions ≤ ' + phys + ' processor cores' });
     } else {
     const dev = Math.max(...st.map(s => Math.abs(s.nodes - avg) / avg)) * 100;
     out.push(dev > S.tol ? { t: 'wn', s: 'Largest deviation from the average size: ' + dev.toFixed(0) + ' % (tolerance ' + S.tol + ' %) – move branches if needed' } : { t: 'ok', s: 'Partition sizes within ' + dev.toFixed(0) + ' % of the average' });
@@ -417,7 +417,7 @@
         xs.sort((a, b) => a - b); for (let k = 0; k + 1 < xs.length; k += 2) { const ia = Math.max(0, Math.ceil((xs[k] - ox) / cx - 0.5)), ib = Math.min(w - 1, Math.floor((xs[k + 1] - ox) / cx - 0.5)); for (let i = ia; i <= ib; i++) inside[j * w + i] = 1; } }
       for (let k = 0; k < N; k++) if (!inside[k]) z[k] = NaN; } } catch (e) { console.warn('mask', e); } }
     // burn the pipes: label = partition + 1, buffer radius grows with the peak flow
-    const lab = new Int32Array(N); const qmax = Math.max(1e-9, ...[...A.links.values()].map(x => x.q));
+    const lab = new Int32Array(N); const qmax = Math.max(1e-9, AV.amax([...A.links.values()].map(x => x.q)));
     const cell = (x, y) => { const i = Math.floor((x - ox) / cx), j = Math.floor((oy - y) / cy); return i < 0 || j < 0 || i >= w || j >= hh ? -1 : j * w + i; };
     const burn = (pts, L, r) => { for (let k = 1; k < pts.length; k++) { const [x1, y1] = pts[k - 1], [x2, y2] = pts[k]; const n = Math.max(1, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / (Math.min(cx, cy) * 0.5)));
       for (let t = 0; t <= n; t++) { const x = x1 + (x2 - x1) * t / n, y = y1 + (y2 - y1) * t / n; const c = cell(x, y); if (c < 0) continue; const ci = c % w, cj = (c - ci) / w;
