@@ -256,7 +256,14 @@
   };
   AV.loadDataFile = async function (app, path) {
     if (AV.GDB.isGdbLayerPath(path)) {
-      const { gdb, layer } = AV.GDB.splitPath(path); const L = await AV.GDB.readLayer(gdb, layer);
+      const { gdb, layer } = AV.GDB.splitPath(path); const opts = {};
+      // very large feature classes (e.g. all buildings of a state): offer to read only the model area
+      try { const ls = AV.GDB._cache[gdb] || await AV.GDB.listLayers(gdb); const d = ls.find(x => x.name === layer); const b = app.model && app.model.bounds(false);
+        if (d && d.count > 100000 && b && b.x2 > b.x1) { const mx = Math.max(b.x2 - b.x1, b.y2 - b.y1) * 0.15;
+          const v = await AV.modal({ title: 'Add Data', body: AV.h('div', { style: { maxWidth: '520px', lineHeight: 1.5, whiteSpace: 'pre-wrap' } }, layer + ' has ' + d.count.toLocaleString() + ' features. Reading all of them takes long and makes the map slow.\n\nRead only the features in the model area (with a margin of 15 %)?'), buttons: [{ label: 'Cancel', value: null }, { label: 'All ' + d.count.toLocaleString(), value: 'all' }, { label: 'Model Area Only', primary: true, value: 'area' }] }).done;
+          if (!v) throw new Error('cancelled'); if (v === 'area') { opts.spat = [b.x1 - mx, b.y1 - mx, b.x2 + mx, b.y2 + mx]; if (app.crsWKT) opts.spatWKT = app.crsWKT; } } }
+      catch (e) { if (e.message === 'cancelled') throw new Error('Cancelled.'); }
+      const L = await AV.GDB.readLayer(gdb, layer, undefined, opts);
       return finishVector(app, Object.assign(L, { name: layer, path, gdb, visible: true, opacity: 1 }));
     }
     const e = ext(path); const name = AV.basename(path);

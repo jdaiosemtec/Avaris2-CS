@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('host', {
   layoutOutput: (job) => ipcRenderer.invoke('layout:output', job),
   message: (opts) => ipcRenderer.invoke('dlg:message', opts),
   readText: (p) => ipcRenderer.invoke('fs:readText', p),
+  readLines: (p) => ipcRenderer.invoke('fs:readLines', p),
   writeText: (p, t, enc) => ipcRenderer.invoke('fs:writeText', p, t, enc),
   encoding: (p) => ipcRenderer.invoke('fs:encoding', p),
   readBinary: (p) => ipcRenderer.invoke('fs:readBinary', p),

@@ -140,6 +140,9 @@ function decodeText(buf) {
   try { const t = new TextDecoder('utf-8', { fatal: true }).decode(buf); return { text: t.charCodeAt(0) === 0xFEFF ? t.slice(1) : t, enc: 'utf8' }; }
   catch (e) { return { text: buf.toString('latin1'), enc: 'latin1' }; }
 }
+// a newline-delimited text file (GeoJSONSeq) as an array of lines: files of any size (a single string is limited
+// to about 512 MB in V8)
+ipcMain.handle('fs:readLines', async (e, p) => { const out = []; const rl = require('readline').createInterface({ input: fs.createReadStream(p, { encoding: 'utf8' }), crlfDelay: Infinity }); for await (const l of rl) { const t = l.replace(/^\x1e/, '').trim(); if (t) out.push(t); } return out; });
 ipcMain.handle('fs:readText', async (e, p) => { const r = decodeText(await fs.promises.readFile(p)); fileEnc.set(path.resolve(p), r.enc); return r.text; });
 ipcMain.handle('fs:encoding', async (e, p) => fileEnc.get(path.resolve(p)) || 'utf8');
 ipcMain.handle('fs:writeText', async (e, p, text, enc) => {

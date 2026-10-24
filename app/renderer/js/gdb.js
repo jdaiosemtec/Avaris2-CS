@@ -19,13 +19,23 @@
     }));
   };
   // read one feature class into an external map layer object (not yet reprojected; loadDataFile does that)
-  GDB.readLayer = async function (gdb, layer, wkt) {
+  //   opts.spat: [x1, y1, x2, y2] only the features that intersect this box (in opts.spatWKT, else in the layer CRS)
+  //   The layer is converted to GeoJSONSeq (one feature per line) and read line by line, so feature classes of any
+  //   size can be read (one GeoJSON text of more than ~512 MB cannot be held as a string).
+  GDB.readLayer = async function (gdb, layer, wkt, opts) {
+    opts = opts || {};
     if (wkt === undefined) { const ls = GDB._cache[gdb] || await GDB.listLayers(gdb); const d = ls.find(x => x.name === layer); wkt = d ? d.wkt : null; }
-    const tmp = await window.host.tempDir(); const out = AV.joinPath(tmp, 'layer.geojson');
+    const tmp = await window.host.tempDir(); const out = AV.joinPath(tmp, 'layer.geojsonl');
     try {
-      const r = await window.host.gdal('ogr2ogr', ['-f', 'GeoJSON', '-dim', 'XY', '-nlt', 'CONVERT_TO_LINEAR', '-lco', 'RFC7946=NO', '-lco', 'WRITE_BBOX=NO', out, gdb, layer]);
+      const args = ['-f', 'GeoJSONSeq', '-dim', 'XY', '-nlt', 'CONVERT_TO_LINEAR', '-lco', 'RS=NO'];
+      if (opts.spat) { args.push('-spat', ...opts.spat.map(String)); if (opts.spatWKT) { const sp = AV.joinPath(tmp, 'spat.prj'); await window.host.writeText(sp, opts.spatWKT); args.push('-spat_srs', sp); } }
+      args.push(out, gdb, layer);
+      let r = await window.host.gdal('ogr2ogr', args);
+      if (r.code !== 0 && /RS/.test(r.stderr || '')) { const i = args.indexOf('RS=NO'); args.splice(i - 1, 2); r = await window.host.gdal('ogr2ogr', args); }
       if (r.code !== 0) fail(r, 'Could not read ' + layer);
-      const L = AV.SHP.readGeoJSON(await window.host.readText(out)); L.prjWKT = wkt || null; return L;
+      const lines = await window.host.readLines(out); const features = [];
+      for (const l of lines) { try { const f = JSON.parse(l); if (f && f.type === 'Feature') features.push(f); else if (f && f.type === 'FeatureCollection') features.push(...f.features); } catch (e) { /* skip a broken line */ } }
+      const L = AV.SHP.readGeoJSON({ type: 'FeatureCollection', features }); L.prjWKT = wkt || null; return L;
     } finally { window.host.rm(tmp).catch(() => { }); }
   };
   // write feature classes: layers [{name, kind:'point'|'line'|'polygon', feats:[{coords, props}], fields:[{key,name,type:'N'|'C'}]}]

@@ -87,7 +87,7 @@
     return { kind, features: feats, bbox: b[0] === Infinity ? [0, 0, 1, 1] : b, fields };
   };
   SHP.readGeoJSON = function (text) {
-    const gj = JSON.parse(text); const feats = []; let kind = 'unknown'; const fields = new Set();
+    const gj = typeof text === 'string' ? JSON.parse(text) : text; const feats = []; let kind = 'unknown'; const fields = new Set();
     const list = gj.type === 'FeatureCollection' ? gj.features : gj.type === 'Feature' ? [gj] : [{ geometry: gj, properties: {} }];
     const bb = (pts) => { let b = [Infinity, Infinity, -Infinity, -Infinity]; for (const p of pts) { b[0] = Math.min(b[0], p[0]); b[1] = Math.min(b[1], p[1]); b[2] = Math.max(b[2], p[0]); b[3] = Math.max(b[3], p[1]); } return b; };
     for (const f of list) {
