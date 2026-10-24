@@ -1,42 +1,80 @@
 <section class="topic" id="partition" data-ch="High Performance Simulation" data-title="Model partition">
 <h1>Model partition</h1>
-<p class="lead">Large models take long to run because one processor core does most of the work. <span class="ui">Tools ▸ Partition ▸ Partition Model</span> splits the model into sub-models along the flow, so that the <a href="#coupled-run">coupled parallel simulation</a> can run them at the same time on several cores. You enter only the number of partitions; the cut points are found automatically. Model partition is part of the <b>HPS</b> (High Performance Simulation) edition.</p>
-<figure><img src="images/part_map.png" alt="Model partitioned into four sub-models"><figcaption>Riverside split into four partitions. ⊗ marks the five cut points; the legend explains the markings.</figcaption></figure>
+<p class="lead">Large models take long to run because one processor core does most of the work. <span class="ui">Tools ▸ Partition ▸ Partition Model</span> splits the model into sub-models along the flow, so that the <a href="#coupled-run">coupled parallel simulation</a> can run them at the same time on several cores. You enter only the number of partitions – or let <b>Detect</b> and <b>OPT</b> choose it for your computer; the cut points are found automatically. Model partition is part of the <b>HPS</b> (High Performance Simulation) edition.</p>
+<figure><img src="images/part_map.png" alt="Model partitioned into sub-models"><figcaption>Riverside split into partitions. ⊗ marks the cut points; the legend explains the markings.</figcaption></figure>
 <h2>How the model is split</h2>
 <ul>
 <li><b>One direction of flow per partition.</b> The flow directions come from the <b>base results</b> (the results loaded when you partition). Every partition drains towards its own outfalls or towards one downstream partition; water never flows back and forth across a cut.</li>
 <li><b>Only conduits are cut, and only where it is safe.</b> Pumps, orifices, weirs, outlets and the links of flow dividers are never cut. Pipes with <b>oscillating flow</b> (flow that changes direction during the run) are not cut, and <b>ponding areas</b> – manholes that flood onto the same surface – stay in one partition.</li>
-<li><b>Balanced and few cuts.</b> The partitions get about the same size (within the size tolerance) with as few cut points as possible, because every cut point is exchanged in every iteration of the run.</li>
+<li><b>Balanced and few cuts.</b> The partitions get about the same amount of work (within the size tolerance) with as few cut points as possible, because every cut point is exchanged in every iteration of the run. After <a href="#part-detect">Detect</a>, partitions on slower cores get less work.</li>
 </ul>
 <p>At a cut point the pipe stays in the upstream partition. In the upstream sub-model its downstream end becomes a boundary outfall; in the downstream sub-model the node receives the pipe's flow. During the coupled run the two sub-models exchange flow and water level at every iteration, so they behave like one model.</p>
 <h2>Before you start</h2>
 <ul>
 <li>Save the model. The sub-models are written next to it.</li>
-<li>Run the model once (the whole model) and keep these results loaded. Without results the pipe directions as drawn are used and oscillating flow is not checked.</li>
-<li>Choose the number of partitions: at most the number of <b>processor cores</b> of the computer that will run the model (the panel shows it), and enough work per partition – roughly at least 100 nodes each. More partitions than cores makes the run slower, not faster.</li>
+<li>Run the model once (the whole model) and keep these results loaded (or open a run from the <a href="#database">Database</a>). Without results the pipe directions as drawn are used and oscillating flow is not checked. For 1D-2D models use 1D-2D results, so that the ponding areas on the surface are known.</li>
+<li>Decide on which computer the coupled run will take place. The best number of partitions depends on its processor; use <a href="#part-detect">Detect</a> on that computer.</li>
 </ul>
-<h2>Partition the model</h2>
+<h2>The Model Partition panel</h2>
+<p>Click <span class="ui">Tools ▸ Partition ▸ Partition Model</span>. The panel opens over the map with two tabs, <b>Partition</b> and <b>Regenerate</b>. The Partition tab has five numbered sections that you work through from top to bottom:</p>
+<div class="tablewrap"><table>
+<tr><th>Section</th><th>What you do there</th></tr>
+<tr><td>1 Settings</td><td>Number of partitions, <b>Detect</b> (measure this computer), base results, Advanced rules. Button <span class="ui">Partition</span> / <span class="ui">Partition Again</span>.</td></tr>
+<tr><td>2 Result</td><td>Counts, estimated speed-up with the <b>OPT</b> button, one row per partition with its core and load.</td></tr>
+<tr><td>3 Adjust</td><td>Move Cut, Add Cut, Split Partition, Merge Partitions, Undo.</td></tr>
+<tr><td>4 Checks</td><td>✓ fine, ⚠ warning, ✗ error that must be fixed before the sub-models can be written.</td></tr>
+<tr><td>5 Generate sub-models</td><td>Folder, file names, options; writes the sub-models and the partition file.</td></tr>
+</table></div>
+<p>When you click a partition row, the panel keeps its scroll position, so you can go through the rows one by one while watching the map.</p>
+<h2>Partition the model, step by step</h2>
 <ol class="steps">
-<li>Click <span class="ui">Tools ▸ Partition ▸ Partition Model</span>. The Model Partition panel opens over the map with two tabs, <b>Partition</b> and <b>Regenerate</b>.</li>
-<li>In <b>1 Settings</b>, type the <b>Number of partitions</b>. <b>Base results</b> shows which results are used.</li>
-<li>Click <span class="ui">Partition</span>. After a moment the map shows the partitions in colour and the <b>2 Result</b> section shows the counts and one row per partition.</li>
-<li>Check <b>4 Checks</b>. ✓ = fine, ⚠ = warning (for example a ponding area larger than one partition, or more partitions than cores), ✗ = error that must be fixed before generating.</li>
-<li>Optionally adjust the boundaries (<b>3 Adjust</b>, below).</li>
+<li>Open the panel (<span class="ui">Tools ▸ Partition ▸ Partition Model</span>).</li>
+<li>On the computer that will run the model, click <span class="ui">Detect</span> once (about 10–20 s). The number of partitions is set to the best value for this processor. Without Detect, type the <b>Number of partitions</b> yourself.</li>
+<li>Check <b>Base results</b>: it names the results file used for the flow directions.</li>
+<li>Click <span class="ui">Partition</span>. After a moment the map shows the partitions in colour and section <b>2 Result</b> shows the counts and one row per partition.</li>
+<li>Look at <b>est. speed-up</b>. Click <span class="ui">OPT</span> to let Avaris2 CS try several numbers of partitions and take the fastest (<a href="#part-opt">below</a>).</li>
+<li>Read <b>4 Checks</b>. Fix ✗ errors; read the ⚠ warnings.</li>
+<li>Optionally adjust the result: split the slowest partition, merge two small ones, or move a cut point (<a href="#part-adjust">Adjust</a>).</li>
 <li>In <b>5 Generate sub-models</b>, choose the folder and click <span class="ui">Generate N Sub-models</span>.</li>
+<li>Run the model with <span class="ui">Simulation ▸ Run ▸ Coupled parallel</span> (<a href="#coupled-run">Coupled parallel simulation</a>).</li>
 </ol>
-<figure class="narrow"><img src="images/part_panel.png" alt="Model Partition panel"><figcaption>The result: 4 partitions, 5 cut points, 101–215 nodes per partition, 94 pipes with oscillating flow kept whole, 260 ponding areas.</figcaption></figure>
+<figure class="narrow"><img src="images/part_detect.png" alt="Model Partition panel after Detect and Partition"><figcaption>After Detect: the processor, the relative speed of its cores and the number of partitions set for it. In 2 Result every partition has its core and load.</figcaption></figure>
+<h2 id="part-detect">Detect: balance the partitions for this computer</h2>
+<p>Modern processors have cores of different speed – for example Intel processors with <b>performance cores</b> (P-cores, two threads each) and slower <b>efficiency cores</b> (E-cores). Detect measures this once and the partition then follows it:</p>
+<ol class="steps">
+<li>Click <span class="ui">Detect</span> in 1 Settings. Avaris2 CS reads the processor (kinds of core, threads) and runs a short built-in benchmark model on every kind of core, first one sub-model per core, then one per thread, all at the same time.</li>
+<li>The green box shows the processor, how many cores of each kind it has, the <b>relative speed</b> of each kind (fastest = 1.00, and the speed when both threads of a core are busy), and <b>Set for this computer: N partitions</b>.</li>
+<li>The number of partitions is set to N. If the processor has fast and slower cores, the box also says how many nodes go on each fast core and on each slower one: partitions for the slower cores are made smaller, so that all finish each time step at about the same moment.</li>
+<li>Click <span class="ui">Partition</span> (or <span class="ui">Partition Again</span>) to apply it.</li>
+</ol>
+<p>The measurement is stored with your Avaris2 CS settings and is valid only on this processor. On another computer the box says that the profile was measured on a different processor – click Detect there. Until then the partitions are balanced by number of nodes.</p>
+<div class="callout tip"><b class="t">Tip:</b><p>You can always type a different number of partitions, also more than this computer has cores – for example when the coupled run will take place on a larger computer. Nothing is blocked: the partitions then get the same size and a hint reminds you to run Detect on that computer.</p></div>
 <h2>Reading the result</h2>
 <div class="tablewrap"><table>
 <tr><th>Item</th><th>Meaning</th></tr>
-<tr><td>partitions / cut points</td><td>Number of sub-models and of cut pipes.</td></tr>
-<tr><td>nodes per partition</td><td>Smallest and largest partition. Similar sizes give the best speed.</td></tr>
+<tr><td>partitions / cut points</td><td>Number of sub-models and of cut pipes. Every cut point is exchanged in every iteration, so fewer is faster.</td></tr>
+<tr><td>nodes per partition</td><td>Smallest and largest partition.</td></tr>
 <tr><td>oscillating pipes</td><td>Pipes with oscillating flow in the base results; not cut (purple dashed on the map).</td></tr>
-<tr><td>never cut</td><td>Pumps, orifices, weirs, outlets and divider links.</td></tr>
+<tr><td>never cut (pumps …)</td><td>Pumps, orifices, weirs, outlets and divider links.</td></tr>
 <tr><td>ponding areas</td><td>Groups of flooded manholes kept together (blue dashed circles).</td></tr>
-<tr><td>Table</td><td>Per partition: nodes, links, subcatchments, couplings from upstream (In) and to downstream (Out), and outfalls (<i>→ coupled</i> = it drains into another partition). Click a row to highlight it, double-click to zoom.</td></tr>
+<tr><td>est. speed-up</td><td>After Detect: how much faster the coupled run should be than one sub-model on one fastest core – total work divided by the slowest partition (its nodes divided by the speed of its core). Green when it reaches ¾ of what this computer can give. The exchange at the cut points is not included. The <b>OPT</b> button in this box finds the best number of partitions.</td></tr>
+<tr><td>Core</td><td>The core the partition is bound to at the run: the largest partition on the fastest core (P-core / E-core, <i>thread 2</i> = the second thread of a core).</td></tr>
+<tr><td>Load</td><td>The partition's work on its core compared with a perfect balance for this computer: 100 % is ideal; red above the size tolerance – the whole run waits for that partition.</td></tr>
+<tr><td>Links … Outfalls</td><td>Links and subcatchments of the partition, couplings from upstream (In) and to downstream (Out), and outfalls (<i>→ coupled</i> = it drains into another partition). Click a row to highlight the partition, double-click to zoom to it.</td></tr>
 </table></div>
+<h2 id="part-opt">OPT: find the fastest number of partitions</h2>
+<p>The best number of partitions depends not only on the processor but also on the model: groups that must stay together (ponding areas, pumping stations, oscillating pipes) can make one partition much larger than the others, and more partitions mean more cut points. OPT tries this out:</p>
+<ol class="steps">
+<li>Partition the model once (OPT appears in the est. speed-up box after Detect).</li>
+<li>Click <span class="ui">OPT</span>. Avaris2 CS partitions the model for several numbers – the number of cores and one more and one less, a number between cores and threads, the number of threads, the number from Detect and the current number – with the settings of the panel. A bar shows the progress; each number takes about as long as one Partition. <span class="ui">Cancel</span> stops.</li>
+<li>The table lists for each number: <b>Cut points</b>, the <b>Largest</b> partition, the <b>Max load</b> and the <b>Est. speed-up</b>. The fastest is marked <i>fastest</i> and selected; the current number is marked <i>(current)</i>.</li>
+<li>To choose, the cut points count as extra work (each sub-model costs 1 % for the exchange, each cut point a little more), so a number with many more cut points but almost the same speed-up is not chosen. Click another row if you prefer it.</li>
+<li>Click <span class="ui">Use N Partitions</span>. The partition already computed for that number is taken at once – there is no need to partition again.</li>
+</ol>
+<figure class="narrow"><img src="images/part_opt.png" alt="Optimise Partitions dialog"><figcaption>OPT on a 14-core processor: the numbers tried, with cut points, largest partition, max. load and estimated speed-up.</figcaption></figure>
+<p>When the largest partition stops getting smaller as the number of partitions grows, OPT says why under the table: <i>a group of N nodes is kept whole</i> – for example a ponding area or a pumping station with its wet well – and that group blinks on the map. More partitions do not run faster then. To allow cuts there, look at the Advanced settings (for example untick <i>Keep ponding areas whole</i>, or raise the 2D ponding depth) and partition again.</p>
 <h2>Map markings and legend</h2>
-<p>While the panel is open the map shows the partition colours, the cut points (red ⊗), pipes that are not cut (purple dashed) and ponding areas (blue dashed circles), with a legend at the bottom right. These markings are shown whatever the layer visibility. The <b>eye button</b> at the top left of the map (or <kbd>T</kbd>) hides and shows them together.</p>
+<p>While the panel is open the map shows the partition colours, the cut points (red ⊗; orange when on a pipe with oscillating flow), pipes that are not cut (purple dashed) and ponding areas (blue dashed circles), with a legend at the bottom right. These markings are shown whatever the layer visibility. The <b>eye button</b> at the top left of the map (or <kbd>T</kbd>) hides and shows them together.</p>
 <h2>Advanced settings</h2>
 <figure class="narrow"><img src="images/part_advanced.png" alt="Advanced settings of the partition"></figure>
 <div class="tablewrap"><table>
@@ -47,16 +85,47 @@
 <tr><td>Keep ponding areas whole</td><td>Manholes of one ponding area stay in the same partition.</td></tr>
 <tr><td>2D ponding depth</td><td>With 1D-2D base results: cells at least this deep form ponding areas (0 = the Flood Depth Threshold, else 0.3 m / 1 ft).</td></tr>
 <tr><td>1D ponding</td><td>Without 2D results: manholes flooded for at least this long that are closer than the given distance form one ponding area (0 = 50 m).</td></tr>
-<tr><td>Size tolerance</td><td>How far a partition may differ from the average size (± 25 %). A larger tolerance allows fewer cuts.</td></tr>
+<tr><td>Size tolerance</td><td>How far a partition may differ from its target size (± 25 %). A larger tolerance allows fewer cuts.</td></tr>
 </table></div>
 <p>The reverse-flow rule is the same rule as the flag <i>Reverse flow event</i> (<a href="#flags">Flags</a>), with its own values here. Click <span class="ui">Partition Again</span> after changing them.</p>
-<h2>Adjust the boundaries</h2>
-<p>The number of partitions never changes here; only the boundary between two neighbouring partitions moves.</p>
+<h2 id="part-adjust">Adjust the result</h2>
+<p>Section 3 changes the partition by hand. Every change can be undone with <span class="ui">Undo</span> (one step per change), and the result, the checks and the map update after each change.</p>
+<h3>Split Partition</h3>
+<p>Use it when one partition is too large – for example the one with the highest load.</p>
+<ol class="steps">
+<li>Click the partition's row in the table (it is highlighted on the map).</li>
+<li>Click <span class="ui">Split Partition…</span>. The dialog shows the partition's nodes and cut points and suggests a number of parts so that each part has about the target size.</li>
+<li>Change <b>Split into</b> if needed. The rules (flow counts, oscillating flow, ponding areas) are those of the main partition and can be changed for this split only.</li>
+<li>Click <span class="ui">Preview</span>. The new parts are shown on the map and in a table with their nodes and cut points; the line below gives the number of new cut points, whether they are all one-way in the base run, and the estimated speed-up before → after.</li>
+<li>Click <span class="ui">Apply</span>, or <span class="ui">Cancel</span> to leave everything as it was.</li>
+</ol>
+<p>The other partitions and their cut points do not change. The split partition keeps its number and the new parts get the next free numbers. If the partition cannot be split as set, a message names the groups that must stay together (they blink on the map) and offers the largest number of parts that is possible, or <span class="ui">Change Settings</span>.</p>
+<figure class="narrow"><img src="images/part_split.png" alt="Split Partition dialog with preview"><figcaption>Split Partition: settings for this split only, and the preview of the new parts.</figcaption></figure>
+<h3>Merge Partitions</h3>
+<ol class="steps">
+<li>Click <span class="ui">Merge Partitions…</span>.</li>
+<li>Choose the first partition and the adjacent one to join it. Only partitions that share a cut point can be merged; the two smallest adjacent partitions are suggested.</li>
+<li>Click <span class="ui">Merge</span>. The higher number is joined into the lower one.</li>
+</ol>
+<figure class="narrow"><img src="images/part_merge.png" alt="Merge Partitions dialog"></figure>
+<h3>Move Cut and Add Cut</h3>
+<p>These never change the number of partitions; only the boundary between two neighbouring partitions moves.</p>
 <ul>
 <li><span class="ui">Move Cut…</span>: click a cut point ⊗; the conduits nearby where the cut may go blink; click one. Only the two partitions next to it change.</li>
 <li><span class="ui">Add Cut…</span>: click a conduit; its upstream branch joins the neighbouring partition. It is refused, with the reason, if it would create a new partition or cut a pump, weir or similar; you are warned for oscillating flow and ponding areas.</li>
 </ul>
-<p>Press <kbd>Esc</kbd> or click <span class="ui">Finish</span> when done. The checks update after each change.</p>
+<p>Press <kbd>Esc</kbd> or click <span class="ui">Finish</span> when done.</p>
+<h2>Checks</h2>
+<div class="tablewrap"><table>
+<tr><th>Check</th><th>Meaning</th></tr>
+<tr><td>No cut on pumps, orifices …</td><td>Always fulfilled by the automatic partition.</td></tr>
+<tr><td>Cuts on pipes with oscillating flow</td><td>⚠ when some had to be cut (groups larger than one partition); the least oscillating ones are cut.</td></tr>
+<tr><td>Ponding areas</td><td>⚠ when a cut goes through a ponding area (added by hand), or when the largest ponding area is larger than one partition.</td></tr>
+<tr><td>Every partition drains to an outfall or a cut point</td><td>✗ otherwise – such a partition cannot be run.</td></tr>
+<tr><td>Load on its core</td><td>⚠ for partitions above the size tolerance, with the advice to split the largest. Shown when the partitions fit the cores of this computer.</td></tr>
+<tr><td>Partitions and processor cores</td><td>⚠ when there are more partitions than cores here: fine for a run on a computer with more cores; to run here, merge partitions or use the number from Detect.</td></tr>
+<tr><td>Nodes per partition</td><td>⚠ below about 100 nodes per partition: too little work per sub-model.</td></tr>
+</table></div>
 <h2>Generate the sub-models</h2>
 <div class="tablewrap"><table>
 <tr><th>Setting</th><th>Meaning</th></tr>
@@ -66,7 +135,7 @@
 <tr><td>Partition areas</td><td>Calculates the surface area of each partition from the DEM (D8 flow directions) and writes it as the sub-model's 2D boundary.</td></tr>
 </table></div>
 <figure class="narrow"><img src="images/folder_dialog.png" alt="Folder dialog with New Folder"><figcaption>The folder dialog: <span class="ui">New Folder</span> creates a folder in the current location.</figcaption></figure>
-<p>Avaris2 CS writes the sub-models (<code>.inp</code> with <code>.prj</code>), and <code>&lt;model&gt;.partition.json</code> next to the model, which describes the partition. The Run dialog finds it there.</p>
+<p>Avaris2 CS writes the sub-models (<code>.inp</code> with <code>.prj</code>), and <code>&lt;model&gt;.partition.json</code> next to the model, which describes the partition (also the processor it was balanced for). The Run dialog finds it there.</p>
 <h2>After the model changes: Regenerate</h2>
 <p>When you edit the master model after partitioning, the sub-models are out of date and the coupled run is blocked until they are updated. Open <span class="ui">Partition Model ▸ Regenerate</span>:</p>
 <ul>
@@ -85,15 +154,34 @@
 <li>Partition the model and generate the sub-models (<a href="#partition">Model partition</a>).</li>
 <li>Click <span class="ui">Simulation ▸ Run</span>. In the <b>Run</b> section of the dialog choose <b>Coupled parallel</b>. It shows the number of sub-models and cut points, and a speed hint for this computer.</li>
 <li>Enter a name and click <span class="ui">Run</span>. The progress dialog shows the overall progress; <span class="ui">Stop</span> ends all sub-models.</li>
+<li>When the run ends, the <b>Run Status</b> dialog shows the run mode, the run time, the continuity errors and the convergence, and – under <b>Sub-models</b> – the timing of every sub-model.</li>
 </ol>
 <figure class="narrow"><img src="images/run_name.png" alt="Run dialog with the coupled parallel option"></figure>
-<p>The results of the sub-models are merged into one results file and one report of the <b>whole model</b>, under the run name. Everything works as after a normal run: map, themes, flags, profiles, graphs, report, CSO statistics, 2D analysis and comparison. In the <a href="#database">Database</a> the run type is <i>1D coupled</i> or <i>1D-2D coupled</i>, and the run summary shows the run time.</p>
+<p>The results of the sub-models are merged into one results file and one report of the <b>whole model</b>, under the run name. Everything works as after a normal run: map, themes, flags, profiles, graphs, report, CSO statistics, 2D analysis and comparison. In the <a href="#database">Database</a> the run type is <i>1D coupled</i> or <i>1D-2D coupled</i>, and the run summary shows the run time. Deleting such a run in the Database also deletes its sub-model folder <code>&lt;run&gt;_parts</code>.</p>
+<h2>Cores: automatic binding</h2>
+<p>Every coupled run binds the sub-models to the processor cores automatically – you do not choose anything:</p>
+<ul>
+<li>the largest sub-model (nodes and 2D cells) runs on the fastest core, the next largest on the next fastest, and so on;</li>
+<li>one sub-model per physical core; the second thread of a core is used only when there are more sub-models than cores;</li>
+<li>Windows power throttling is switched off for the engine processes, so that Windows does not move them to the slow cores.</li>
+</ul>
+<p>The binding follows the current sizes of the sub-models, so it needs no earlier run. With more sub-models than logical processors the binding is left to Windows.</p>
+<h2>Run Status: timing of the sub-models</h2>
+<figure><img src="images/cpl_status.png" alt="Run Status with the sub-model timing table"><figcaption>Run Status after a coupled 1D-2D run: P02 computes longest and sets the speed of the run.</figcaption></figure>
+<p>Open <b>Sub-models</b> in the Run Status dialog. For each sub-model it lists the nodes, the <b>computing</b> time, the <b>waiting</b> time (time it waited for the others in every step) and the core it ran on. The headline names the sub-model that computes longest and the use of the cores (100 % = no waiting). The sub-model with the longest computing time sets the speed of the whole run: make it smaller with <span class="ui">Split Partition</span>, or partition again with <span class="ui">OPT</span>.</p>
 <h2>1D-2D models</h2>
-<p>When 2D flooding is enabled and the mesh exists, the coupled run is a 1D-2D run. The mesh is shared out over the sub-models when the run starts (cells inside a partition's area go to it, the others to the partition of their manholes or nearest neighbours), so you do not need to generate the sub-models again after rebuilding the mesh. 2D links that cross a partition boundary are exchanged in every iteration like cut pipes.</p>
+<p>When 2D flooding is enabled and the mesh exists, the coupled run is a 1D-2D run. The mesh is shared out over the sub-models when the run starts (cells inside a partition's area go to it, the others to the partition of their manholes or nearest neighbours), so you do not need to generate the sub-models again after rebuilding the mesh. 2D links that cross a partition boundary are exchanged in every iteration like cut pipes. Both mesh types (square grid and unstructured mesh) are supported.</p>
+<h2>Hot start files and data files</h2>
+<ul>
+<li><b>USE HOTSTART</b>: when the model starts from a hot start file of the whole model, the file is split per sub-model when the run starts (objects are matched by ID; boundary outfalls and 2D cells that the whole model did not have start empty). The split files are written to the run's <code>_parts</code> folder; the original file is not changed. <b>SAVE HOTSTART</b> of a sub-model is written there too.</li>
+<li>Rain gage files, time series files, the temperature file and the files of the <code>[FILES]</code> section may be given with relative paths (for example <code>../rain.dat</code>): they are resolved from the folder of the sub-model, also for the copies written to the <code>_parts</code> folder.</li>
+<li>Long node IDs are fully supported.</li>
+</ul>
 <h2>Speed</h2>
 <ul>
-<li>Use <b>at most one sub-model per processor core</b>. With more sub-models than cores the sub-models wait for each other and the run gets slower. The Run dialog and the partition checks warn about this.</li>
+<li>Use <a href="#part-detect">Detect</a> and <a href="#part-opt">OPT</a> on the computer that runs the model. As a rule, at most one sub-model per physical core; the second threads add little.</li>
 <li>Each sub-model needs enough work: with very small sub-models the exchange costs more than it saves. Large models (tens of thousands of objects) gain the most.</li>
+<li>Look at the Run Status timing: high waiting times on all sub-models but one mean that one is too large.</li>
 <li>Close other heavy programs during the run.</li>
 </ul>
 <p>Example on a 2-core computer: Riverside (593 nodes) – whole model 12.9 s, 2 sub-models 8.6 s. Riverside 1D-2D (1,578 cells) – whole model 133 s, 2 sub-models 95 s. Gains grow with the model size and the number of cores.</p>

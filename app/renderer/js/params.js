@@ -591,14 +591,15 @@
   AV.landUseEditor = (app, selName) => listEditor(app, { title: 'Landuse Editor', one: 'land use', prefix: 'LU_', width: 780,
     refs: [['COVERAGES', '*']],
     read: (m) => { const P = pollNames(m); const map = new Map();
-      for (const l of (m.raw.LANDUSES || []).filter(isData)) { const t = tok(l); map.set(t[0], { name: t[0], desc: '', interval: t[1] || '0', avail: t[2] || '0', last: t[3] || '0', B: {}, W: {} }); }
+      let dsc = ''; // a description is the comment line (;text) just before the land use line, as for other objects in the .inp file
+      for (const l of (m.raw.LANDUSES || [])) { const s0 = l.trim(); if (!s0) continue; if (s0[0] === ';') { dsc = s0.startsWith(';;') ? '' : s0.slice(1).trim(); continue; } const t = tok(l); map.set(t[0], { name: t[0], desc: dsc, interval: t[1] || '0', avail: t[2] || '0', last: t[3] || '0', B: {}, W: {} }); dsc = ''; }
       for (const l of (m.raw.BUILDUP || []).filter(isData)) { const t = tok(l); const it = map.get(t[0]); if (it) it.B[t[1]] = { fn: (t[2] || 'NONE').toUpperCase(), c1: t[3] || '0', c2: t[4] || '0', c3: t[5] || '0', norm: (t[6] || 'AREA').toUpperCase() }; }
       for (const l of (m.raw.WASHOFF || []).filter(isData)) { const t = tok(l); const it = map.get(t[0]); if (it) it.W[t[1]] = { fn: (t[2] || 'NONE').toUpperCase(), c1: t[3] || '0', c2: t[4] || '0', sweep: t[5] || '0', bmp: t[6] || '0' }; }
       for (const it of map.values()) for (const p of P) { it.B[p] = it.B[p] || { fn: 'NONE', c1: '0', c2: '0', c3: '0', norm: 'AREA' }; it.W[p] = it.W[p] || { fn: 'NONE', c1: '0', c2: '0', sweep: '0', bmp: '0' }; }
       return [...map.values()]; },
     blank: (name, m) => { const it = { name, desc: '', interval: '0', avail: '0', last: '0', B: {}, W: {} }; for (const p of pollNames(m)) { it.B[p] = { fn: 'NONE', c1: '0', c2: '0', c3: '0', norm: 'AREA' }; it.W[p] = { fn: 'NONE', c1: '0', c2: '0', sweep: '0', bmp: '0' }; } return it; },
     write: (items, m) => { const P = pollNames(m); const LU = [], BU = [], WO = [];
-      for (const it of items) { LU.push(line([it.name, it.interval, it.avail, it.last]));
+      for (const it of items) { if (it.desc) LU.push(';' + it.desc.replace(/[\r\n]+/g, ' ')); LU.push(line([it.name, it.interval, it.avail, it.last]));
         for (const p of P) { const b = it.B[p]; if (b && b.fn !== 'NONE') BU.push(line([it.name, p, b.fn, b.c1, b.c2, b.fn === 'EXT' ? b.c3 || '""' : b.c3, b.norm])); const w = it.W[p]; if (w && w.fn !== 'NONE') WO.push(line([it.name, p, w.fn, w.c1, w.c2, w.sweep, w.bmp])); } }
       return { LANDUSES: LU, BUILDUP: BU, WASHOFF: WO }; },
     form: (it, ctx) => { const P = pollNames(ctx.m); const nm = inp(it.name, 200), ds = inp(it.desc, 200), iv = inp(it.interval, 200), av = inp(it.avail, 200), ls = inp(it.last, 200);

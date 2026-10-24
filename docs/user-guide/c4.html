@@ -94,6 +94,33 @@
 </ul>
 <h2>Undo and redo</h2>
 <p>Every change, including bulk changes, can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and redone with <kbd>Ctrl</kbd>+<kbd>Y</kbd>, or with the arrows in the quick-access toolbar.</p>
+<h2>Property reference</h2>
+<p>The properties of every object type are explained field by field on these pages:</p>
+<ul><li><a href="#prop-common">Rows common to all objects</a></li><li><a href="#prop-subcatchment">Subcatchment properties</a></li><li><a href="#prop-junction">Junction properties</a></li><li><a href="#prop-outfall">Outfall properties</a></li><li><a href="#prop-divider">Divider properties</a></li><li><a href="#prop-storage">Storage unit properties</a></li><li><a href="#prop-conduit">Conduit properties</a></li><li><a href="#prop-pump">Pump properties</a></li><li><a href="#prop-orifice">Orifice properties</a></li><li><a href="#prop-weir">Weir properties</a></li><li><a href="#prop-outlet">Outlet properties</a></li><li><a href="#prop-raingage">Rain gage properties</a></li><li><a href="#prop-label">Map label properties</a></li></ul>
+</section>
+
+<section class="topic" id="edit-layers" data-ch="Editing the network" data-title="Edit GIS layers">
+<h1>Edit GIS layers</h1>
+<p class="lead">Imported vector layers – buildings, boundaries, cut-off lines, mesh zones and any other shapefile, GeoJSON, KML or geodatabase layer – can be edited directly in Avaris2 CS, as in Avaris DS. The usual tools (Select, Properties, Remove, Add, Edit Geometry) then work on the features of that layer instead of the network.</p>
+<figure><img src="images/layer_edit.png" alt="Editing a building layer"><figcaption>Editing <i>houses.shp</i>: nine buildings selected, the Properties panel sets the attribute <code>type</code> for all of them at once. ✎ in the Layer View marks the layer being edited, * unsaved edits.</figcaption></figure>
+<h2>Start and stop editing</h2>
+<ol class="steps">
+<li>In the Layer View, right-click the layer and choose <span class="ui">Start Editing</span>. A ✎ appears in front of the layer name. Only one layer is edited at a time.</li>
+<li>Edit the features (below). Every change is one undo step (<kbd>Ctrl</kbd>+<kbd>Z</kbd>). A * after the layer name shows that there are unsaved edits.</li>
+<li>Right-click the layer ▸ <span class="ui">Save Edits</span>. Shapefiles are written back in place – only the <code>.dbf</code> when no geometry changed, the geometry in the layer's own coordinate system. Geodatabase, GeoJSON and KML layers are saved as a new shapefile.</li>
+<li>Right-click ▸ <span class="ui">Stop Editing</span>. If there are unsaved edits you are asked whether to save them. Removing the layer, opening another model and Create Meshes also ask before unsaved edits are lost.</li>
+</ol>
+<h2>What you can do while editing</h2>
+<div class="tablewrap"><table>
+<tr><th>Task</th><th>How</th></tr>
+<tr><td>Select features</td><td><span class="ui">Select</span>, then click a feature or drag a box; <kbd>Ctrl</kbd> adds to the selection. Network nodes stay on top and can still be clicked.</td></tr>
+<tr><td>Edit attributes</td><td>The <b>Properties</b> panel shows the attributes of the selected features. With several features selected, a value you type is set for all of them; <i>(mixed)</i> marks different values. <span class="ui">+ Add Field…</span> adds an attribute.</td></tr>
+<tr><td>Delete features</td><td><span class="ui">Remove</span> or <kbd>Del</kbd>.</td></tr>
+<tr><td>Draw new features</td><td><span class="ui">Add</span>, then click the layer in the Layer View, and draw on the map (points: click; lines and polygons: click the vertices, double-click or <kbd>Enter</kbd> to finish; <kbd>Esc</kbd> stops drawing).</td></tr>
+<tr><td>Change the shape</td><td><span class="ui">Edit Geometry</span>: drag a vertex; double-click an edge to add a vertex; right-click a vertex to remove it.</td></tr>
+<tr><td>Table editing</td><td><span class="ui">Attribute Table</span> of the layer: edit cells; column menu ▸ <span class="ui">Delete Field</span>.</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>For the 2D model, edit the exclusion layer to give single buildings their own <code>type</code> (VOID, RAISED, POROUS), <code>height</code> or <code>porosity</code>, then save and rebuild the mesh.</p></div>
 </section>
 
 <section class="topic" id="history" data-ch="Editing the network" data-title="Change log and history">

@@ -16,10 +16,14 @@
   <a class="card" href="#calib-overview"><b>Auto Calibration</b><span>Calibrate the model against flow-survey data, in groups and within physical ranges.</span></a>
   <a class="card" href="#infer"><b>Model data tools</b><span>Fill missing data, generate dry weather flow, validate the model.</span></a>
 </div>
-<h2>New in versions 2.3 to 2.8</h2>
+<h2>New in versions 2.3 to 2.10</h2>
 <p>If you already know Avaris2 CS 2.2, these are the additions since then. Each item links to its topic.</p>
 <div class="tablewrap"><table>
 <tr><th>Area</th><th>What is new</th><th>Where</th></tr>
+<tr><td>Partition for your computer (HPS edition, 2.10)</td><td><a href="#part-detect">Detect</a> measures the processor (performance and efficiency cores) and sets the best number and sizes of the partitions; <a href="#part-opt">OPT</a> tries several numbers and takes the fastest; <a href="#part-adjust">Split and Merge Partitions</a>; every <a href="#coupled-run">coupled run</a> binds the sub-models to the cores automatically, and Run Status shows the timing of every sub-model.</td><td><span class="ui">Tools ▸ Partition ▸ Partition Model</span></td></tr>
+<tr><td>Unstructured 2D mesh (1D-2D edition, 2.9)</td><td><a href="#twod-setup">Square grid or unstructured mesh</a> of triangles that follows buildings, walls and break lines exactly; mesh zones for finer cells; exclusion layers of type VOID, RAISED or POROUS; recommended 2D routing step.</td><td><span class="ui">Simulation ▸ Options ▸ 2D Flood</span>, <span class="ui">Create Meshes</span></td></tr>
+<tr><td>GIS layers (2.9)</td><td><a href="#edit-layers">Edit imported layers</a> (attributes and geometry, save back to the shapefile); <a href="#add-data">File Geodatabase layers of any size</a>, with <i>Model Area Only</i>.</td><td>Layer View ▸ right-click a layer</td></tr>
+<tr><td>Coupled runs (2.9)</td><td>Hot start files of the whole model are split per sub-model; relative paths of rain and time-series files are kept working; long node IDs.</td><td><span class="ui">Simulation ▸ Run ▸ Coupled parallel</span></td></tr>
 <tr><td>Auto Calibration (HPS edition, 2.7–2.8)</td><td><a href="#calib-overview">Calibration against flow-survey data</a>: <a href="#calib-mapping">monitor mapping</a>, <a href="#calib-observed">automatic reading and cleaning of survey data</a>, <a href="#calib-params">parameter groups and sensitivity</a>, <a href="#calib-run">acceptance criteria and automatic calibration</a>, <a href="#calib-results">options, scorecard and apply</a>.</td><td><span class="ui">Simulation ▸ Calibration ▸ Auto Calibration</span></td></tr>
 <tr><td>Interface files (2.7)</td><td><a href="#sim-options">Files tab</a> of Simulation Options: hot start, rainfall, runoff, RDII, inflow and outflow files with relative paths.</td><td><span class="ui">Simulation ▸ Options ▸ Files</span></td></tr>
 <tr><td>High Performance Simulation (HPS edition)</td><td><a href="#partition">Model partition</a>: one click splits the model into sub-models along the flow; <a href="#coupled-run">coupled parallel simulation</a> runs them at the same time on several processor cores, for 1D and 1D-2D models, with results merged into one run of the whole model.</td><td><span class="ui">Tools ▸ Partition ▸ Partition Model</span>, <span class="ui">Simulation ▸ Run</span></td></tr>
@@ -30,7 +34,7 @@
 <tr><td>Interface</td><td>New Analysis group on the Simulation tab, Model Data group on the Tools tab, folder dialog with New Folder, results open outside play mode (click Play to animate).</td><td>Ribbon</td></tr>
 </table></div>
 <h2>What's new in Avaris2 CS</h2>
-<p>Avaris2 CS replaces Avaris CS 4.x. It opens the same <code>.inp</code> models, and also reads and writes EPA SWMM 5 and Avaris DS models. The main additions are:</p>
+<p>Avaris2 CS replaces Avaris CS 4.x. It opens the same <code>.inp</code> models, and also reads and writes Avaris DS models and other standard <code>.inp</code> models. The main additions are:</p>
 <ul>
 <li><b>Ribbon interface in the style of ArcGIS Pro</b>, with the Project, Operation, Tools, Simulation and Help tabs.</li>
 <li><b>Flag panel</b>: 12 built-in warning rules plus your own rules. You can edit their thresholds directly in the rule text, and units follow the model.</li>
@@ -56,7 +60,7 @@
 <tr><td>Display</td><td>1366 × 768</td><td>1920 × 1080 or larger</td></tr>
 <tr><td>Internet</td><td>Not required</td><td>Required only for online basemaps and the online user guide</td></tr>
 </table></div>
-<p>Avaris2 CS installs next to Avaris CS 4.x, EPA SWMM and Avaris DS, and does not change their settings or file associations.</p>
+<p>Avaris2 CS installs next to Avaris CS 4.x, Avaris DS and other modelling programs, and does not change their settings or file associations.</p>
 </section>
 
 <section class="topic" id="install" data-ch="Get started" data-title="Install Avaris2 CS">
@@ -200,7 +204,7 @@ ktZW5nLmNvbSIsImNvZGUiOiJBVjItRjdaQS1TR0dBLUtEN0wtU0pBRyIsImh3Ijp7ImciOiJkMz
 <h2>1. Open a model</h2>
 <ol class="steps">
 <li>Start Avaris2 CS and sign in. The start dialog lists recently used models.</li>
-<li>Click <span class="ui">Open Sample</span> to copy the sample model to <code>Documents\Avaris2 CS\Samples</code> and open it. To open your own model, click <span class="ui">Open Model…</span> and pick any EPA SWMM 5.x or Avaris <code>.inp</code> file.</li>
+<li>Click <span class="ui">Open Sample</span> to copy the sample model to <code>Documents\Avaris2 CS\Samples</code> and open it. To open your own model, click <span class="ui">Open Model…</span> and pick any Avaris or standard <code>.inp</code> model file.</li>
 </ol>
 <figure><img src="images/start_empty.png" alt="Start dialog"><figcaption>The start dialog: open a model, start a new project or open the sample.</figcaption></figure>
 <h2>2. Look around the map</h2>

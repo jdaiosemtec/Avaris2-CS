@@ -1,7 +1,7 @@
 
 <section class="topic" id="projects" data-ch="Projects and data" data-title="Create, open and save models">
 <h1>Create, open and save models</h1>
-<p>An Avaris2 CS model is an <code>.inp</code> file in the EPA SWMM 5 format. Avaris2 CS opens models written by EPA SWMM 5.x, Avaris CS, Avaris DS and other programs that use this format, and saves them so that these programs can still read them.</p>
+<p>An Avaris2 CS model is an <code>.inp</code> file in the standard collection-system model format. Avaris2 CS opens models written by Avaris CS, Avaris DS and other programs that use this format, and saves them so that these programs can still read them.</p>
 <h2>Commands</h2>
 <div class="tablewrap"><table>
 <tr><th>Command</th><th>Where</th><th>What it does</th></tr>
@@ -33,6 +33,7 @@
 <li>Every run has a <b>name</b> that you choose when you start it. Running again under the same name replaces that run; a new name keeps the earlier results.</li>
 <li>Click a run to load its results onto the map, into the report and into graphs.</li>
 <li>Right-click a run for <span class="ui">Open Results</span>, <span class="ui">View Report</span>, <span class="ui">Add to Comparison (Scenario)</span> (adds it to the graph windows as an extra run), <span class="ui">Rename…</span>, <span class="ui">Show in Explorer</span> and <span class="ui">Delete</span>. Right-click the base model to run a simulation, to close the results (<i>Base Model Only</i>) or to open another model.</li>
+<li><span class="ui">Delete</span> removes the run from the list and deletes its files (results, report, run information and, for a coupled parallel run, the sub-model folder <code>&lt;run&gt;_parts</code>; the confirmation lists them). Results that are still open – on the map, in a comparison or a flood map – are closed first. If Windows keeps a file locked (for example opened in another program), the file is named in a message and stays on disk; close that program and delete the run again.</li>
 </ul>
 </section>
 
@@ -63,6 +64,16 @@
 <tr><td>Raster</td><td>GeoTIFF, images with a world file, ESRI ASCII grid.</td></tr>
 </table></div>
 <p>Layers with a <code>.prj</code> file, or with a coordinate system stored inside the file, are reprojected to the map's coordinate system as they are added.</p>
+<h2>Large File Geodatabase layers</h2>
+<p>Feature classes of an Esri File Geodatabase (<code>.gdb</code> folder) can be of any size – for example a state-wide building layer with millions of polygons. They are read feature by feature, so memory is not the limit.</p>
+<ol class="steps">
+<li>In the Catalog, open the <code>.gdb</code> folder; its feature classes are listed. Double-click one (or drag it onto the map).</li>
+<li>For a feature class with more than 100,000 features Avaris2 CS asks how much to read: <span class="ui">Model Area Only</span> reads only the features within the model extent plus 15 % (in the model's coordinate system), <span class="ui">All N</span> reads everything.</li>
+<li>Model Area Only is usually the right choice: a 2,000,000-polygon layer gave 895 features for a town model in about 2 s, against almost 2 minutes for all of them.</li>
+</ol>
+<p>Exclusion layers for the 2D mesh that come from a geodatabase are always read only within the 2D boundary.</p>
+<h2>Layer menu</h2>
+<p>Right-click a layer in the Layer View for: <span class="ui">Zoom to Layer</span>, <span class="ui">Attribute Table</span>, <span class="ui">Symbology…</span>, <span class="ui">Start Editing</span> (<a href="#edit-layers">Edit GIS layers</a>), <span class="ui">Export as Shapefile…</span>, <span class="ui">Use as Exclusion Layer…</span> (polygons, 1D-2D edition) and <span class="ui">Import into Network…</span>.</p>
 <h2>Import GIS data into the network</h2>
 <p>To turn GIS features into model objects, right-click an added layer and choose <span class="ui">Import into Network…</span>, or use <span class="ui">Project ▸ Import</span>.</p>
 <ul>

@@ -55,6 +55,10 @@
 <p>Default values for new nodes, conduits and subcatchments: depths, diameter, roughness, length, area, width, imperviousness and slope. They are saved with your Avaris2 CS settings, not in the model.</p>
 <h2>2D Flood</h2>
 <p>The settings of the 1D-2D flood module. See <a href="#twod-setup">Set up a 2D model</a>.</p>
+<h2>Option reference</h2>
+<p>Every tab is explained option by option:</p>
+<ul><li><a href="#opt-general">Options: General</a></li><li><a href="#opt-dates">Options: Dates</a></li><li><a href="#opt-timesteps">Options: Time Steps</a></li><li><a href="#opt-dynwave">Options: Dynamic Wave</a></li><li><a href="#opt-files">Options: Files</a></li><li><a href="#opt-engine">Options: Avaris Engine</a></li><li><a href="#opt-defaults">Options: Object Defaults</a></li><li><a href="#run-status">Run Status and status report</a></li></ul>
+<p>The 2D Flood tab is described in <a href="#twod-setup">Set up a 2D model</a>.</p>
 </section>
 
 <section class="topic" id="run" data-ch="Simulation" data-title="Run a simulation">
@@ -66,7 +70,7 @@
 </ol>
 <figure class="narrow"><img src="images/run_name.png" alt="Run Simulation dialog"></figure>
 <figure class="narrow"><img src="images/run_progress.png" alt="Running Simulation progress"></figure>
-<p>When the run finishes, the results are loaded automatically. The status bar shows the number of reporting steps, and a summary lists the continuity errors, flooding and warnings.</p>
+<p>When the run finishes, the results are loaded automatically. The status bar shows the number of reporting steps, and the <a href="#run-status">Run Status</a> dialog lists the run time, the continuity errors, the warnings and the convergence.</p>
 <h2>Whole model or coupled parallel</h2>
 <p>When the model has been partitioned (<a href="#partition">Model partition</a>, HPS edition), the Run dialog has a <b>Run</b> section: <i>Whole model</i> runs the model as usual, <i>Coupled parallel</i> runs the sub-models at the same time on several processor cores. See <a href="#coupled-run">Coupled parallel simulation</a>.</p>
 <h2>Results and play mode</h2>
@@ -86,38 +90,87 @@
 <section class="topic" id="twod-overview" data-ch="2D flood modelling" data-title="2D flood modelling overview">
 <h1>2D flood modelling overview</h1>
 <span class="badge">🔒 Avaris2 CS 1D-2D</span>
-<p class="lead">The 2D flood module covers the ground surface with a mesh of square cells, coupled to the manholes of the pipe network. Water that surcharges out of a manhole flows over the surface, following the terrain, and can re-enter the network downstream.</p>
+<p class="lead">The 2D flood module covers the ground surface with a mesh of cells, coupled to the manholes of the pipe network. Water that surcharges out of a manhole flows over the surface, following the terrain, and can re-enter the network downstream.</p>
 <figure><video poster="images/clip_2d_poster.jpg" controls muted loop playsinline preload="none"><source src="media/clip_2d.webm" type="video/webm"><source src="media/clip_2d.mp4" type="video/mp4"></video><figcaption>Video: water depth on the 2D surface during a storm.</figcaption></figure>
 <h2>How it works</h2>
 <ul>
 <li>A <b>2D boundary</b> polygon defines the area. Its attributes set the cell size (<code>length</code>) and the Manning roughness of the ground (<code>roughness</code>).</li>
 <li>The cells take their ground elevation from a <b>DEM</b> (GeoTIFF or ASCII grid).</li>
-<li>Optional <b>water front</b> lines let surface water leave the model, for example at a river bank or coast. <b>Cut-off lines</b> block flow across walls and embankments, and <b>exclusion polygons</b> remove buildings and other areas without cells.</li>
+<li>Two <b>mesh types</b> are available: a <b>square grid</b> (as in Avaris DS) and an <b>unstructured mesh</b> of triangles that follows the boundary, buildings, walls and break lines exactly and can be finer in <b>mesh zones</b>.</li>
+<li>Optional <b>water front</b> lines let surface water leave the model, for example at a river bank or coast. <b>Cut-off lines</b> block flow across walls and embankments. <b>Exclusion layers</b> (buildings and other structures) remove cells (VOID), raise the ground (RAISED) or narrow the flow (POROUS).</li>
 <li>Every junction, storage unit or divider tagged <code>Link2D</code> is coupled to the cell it lies in.</li>
-<li>The cells and the surface links between them are added to a copy of the model (<code>.finp</code>) and simulated together with the pipe network by the Avaris engine. The approach is compatible with Avaris DS, so models with 2D settings in the Avaris DS project file (<code>.ini [2D]</code>) are taken over automatically when you open them.</li>
+<li>The cells and the surface links between them are added to a copy of the model (<code>.finp</code>) and simulated together with the pipe network by the Avaris engine. The model file itself is not changed. The approach is compatible with Avaris DS, so models with 2D settings in the Avaris DS project file (<code>.ini [2D]</code>) are taken over automatically when you open them.</li>
 </ul>
+<h2>Workflow</h2>
+<ol class="steps">
+<li>Prepare the layers: boundary, DEM, and optionally water front, cut-off lines, buildings, mesh zones and break lines (<a href="#add-data">Add Data</a> shows them on the map; buildings can also come from a large File Geodatabase).</li>
+<li>Enter them in <span class="ui">Simulation ▸ Options ▸ 2D Flood</span> (<a href="#twod-setup">Set up a 2D model</a>).</li>
+<li>Click <span class="ui">Create Meshes</span> and choose the mesh type.</li>
+<li>Run the model. 1D-2D runs can also be <a href="#coupled-run">coupled parallel runs</a>.</li>
+<li>Analyse the flooding (<a href="#twod-results">2D results</a>, <a href="#flood-analysis">2D Flood Analysis</a>).</li>
+</ol>
 </section>
 
 <section class="topic" id="twod-setup" data-ch="2D flood modelling" data-title="Set up a 2D model">
 <h1>Set up a 2D model</h1>
+<h2>Step by step</h2>
 <ol class="steps">
 <li>Open <span class="ui">Simulation ▸ Options ▸ 2D Flood</span> and tick <span class="ui">Enable 1D-2D flood simulation</span>.</li>
-<li>Choose the input layers:
-  <ul><li>2D Boundary (polygon);</li>
-  <li>Digital Elevation Model;</li>
-  <li>optionally the Water Front, Cut-off Lines and Exclusion Polygons.</li></ul>
-  Paths inside the model folder are stored as relative paths.</li>
-<li>Set the cell size and roughness, or leave them blank to use the boundary attributes.</li>
-<li>Set the <b>Mesh Units</b>:
-  <ul><li><i>MODEL</i>, as in Avaris DS, uses the values as they are;</li>
-  <li><i>CONVERT</i> converts them from the map units to the model units, for example a metre DEM in a US-units model.</li></ul></li>
-<li>Tick <span class="ui">Tag all nodes "Link2D"</span> to couple every manhole, or tag selected nodes yourself.</li>
-<li>Click <span class="ui">Simulation ▸ Setup ▸ Create Meshes</span>. The mesh is saved as <code>Model.mesh2d.json</code> and appears as the <i>2D Meshes</i> layer, coloured by ground elevation.</li>
-<li>Run the simulation. 1D-2D runs write <code>.finp</code>, <code>.frpt</code> and <code>.fout</code> files.</li>
+<li>Choose the input layers (with <span class="ui">…</span>): the <b>2D Boundary</b> and the <b>Digital Elevation Model</b> are required; the <b>Water Front</b>, <b>Cut-off Lines</b>, <b>Exclusion Layers</b>, <b>Mesh Zones</b> and <b>Break Lines</b> are optional. Paths inside the model folder are stored as relative paths.</li>
+<li>Choose the <b>Mesh Type</b> (it can also be chosen in Create Meshes) and, for the unstructured mesh, how <b>Buildings</b> are handled.</li>
+<li>Set the <b>Cell Size</b> and <b>Surface Roughness</b>, or leave them blank to use the boundary attributes <code>length</code> and <code>roughness</code>.</li>
+<li>Set the <b>Mesh Units</b> and, if needed, the <b>2D Routing Step</b> and the <b>Flood Depth Threshold</b>.</li>
+<li>Tick <span class="ui">Tag all nodes "Link2D"</span> to couple every manhole, or tag selected nodes yourself (property <i>Tag</i> = <code>Link2D</code>). When any node carries the tag, only tagged nodes are coupled.</li>
+<li>Click <span class="ui">OK</span>, then <span class="ui">Simulation ▸ Setup ▸ Create Meshes</span> (or right-click the <i>2D Meshes</i> layer). Choose <b>Square grid</b> or <b>Unstructured mesh</b> and click <span class="ui">Create Meshes</span>.</li>
+<li>Read the summary (see below), save the model, and run the simulation. 1D-2D runs write <code>.finp</code>, <code>.frpt</code> and <code>.fout</code> files.</li>
 </ol>
-<figure><img src="images/opt_2d.png" alt="2D Flood options"></figure>
+<figure><img src="images/opt_2d.png" alt="2D Flood options"><figcaption>Simulation Options ▸ 2D Flood: input layers, exclusion layers with their type, mesh zones and break lines, and the mesh settings.</figcaption></figure>
+<h2>Settings</h2>
+<div class="tablewrap"><table>
+<tr><th>Setting</th><th>Meaning</th></tr>
+<tr><td>2D Boundary (polygon)</td><td>Polygon(s) of the area to flood. Attribute <code>length</code> = cell size (map units), <code>roughness</code> = Manning n of the ground surface.</td></tr>
+<tr><td>Digital Elevation Model</td><td>GeoTIFF or ASCII grid in the map coordinate system; cell elevations are read at the cell centres.</td></tr>
+<tr><td>Water Front (line)</td><td>Lines where surface water leaves the model (river bank, coast); attribute <code>elev</code> = outlet elevation.</td></tr>
+<tr><td>Cut-off Lines</td><td>Walls and embankments: no surface flow across them.</td></tr>
+<tr><td>Exclusion Layers</td><td>Buildings and other structures, one row per layer (see below).</td></tr>
+<tr><td>Mesh Zones (polygon)</td><td>Unstructured mesh only. Attribute <code>size</code> = cell size inside the polygon: finer along streets and streams, coarser in open land. Sizes change gradually between zones.</td></tr>
+<tr><td>Break Lines (line)</td><td>Unstructured mesh only. Cell edges follow these lines (road centre lines, kerbs, ridges); water can cross them. Optional attribute <code>size</code> = cell size along the line.</td></tr>
+<tr><td>Mesh Type</td><td>SQUARE: square grid as Avaris DS. UNSTRUCTURED: triangles that follow the boundary, buildings, cut-off and break lines, with finer cells in mesh zones.</td></tr>
+<tr><td>Buildings (unstructured mesh)</td><td>LARGE (default): buildings larger than one cell shape the mesh; smaller ones reduce the area and flow width of their cells. ALL: every building shapes the mesh (fine cells around each building, much shorter time steps, slow runs). NONE: no building shapes the mesh; all reduce the area and flow width of the cells they cover (fastest).</td></tr>
+<tr><td>Cell Size</td><td>In map units, the same number for both mesh types: square cells of this side, or triangles with about the same area (edge about 1.5 × the size), so both give about the same number of cells. Cells of ½ to ⅓ of the typical street width resolve streets; mesh zones make them finer only where needed.</td></tr>
+<tr><td>Surface Roughness</td><td>Manning n of the ground (blank = boundary attribute <code>roughness</code>).</td></tr>
+<tr><td>Mesh Units</td><td>MODEL (as Avaris DS): cell size and DEM / water-front elevations are used as they are, in the model units. CONVERT: they are converted from the map units to the model units when the mesh is built (for example map and DEM in metres, model in US units: 100 m cells become 328 ft). Rebuild the mesh after changing.</td></tr>
+<tr><td>2D Routing Step</td><td>Time step of the surface flow in seconds (blank = the model's routing step). Create Meshes recommends a value for the smallest cells.</td></tr>
+<tr><td>Flood Depth Threshold</td><td>Cells deeper than this count as flooded for Time Ponded and Time to Recede.</td></tr>
+</table></div>
+<h2>Exclusion layers: buildings and structures</h2>
+<p>The table <b>Exclusion Layers</b> takes any number of polygon layers. <span class="ui">+ Add Layer…</span> browses for a file; <span class="ui">+ From Map Layers ▾</span> offers the polygon layers already on the map. You can also right-click a layer in the Layer View and choose <span class="ui">Use as Exclusion Layer</span>.</p>
+<div class="tablewrap"><table>
+<tr><th>Type</th><th>Effect</th><th>Value</th></tr>
+<tr><td>VOID</td><td>No cells inside the polygon; water flows around it (closed buildings).</td><td>–</td></tr>
+<tr><td>RAISED</td><td>The ground inside is raised by the height (platforms, raised floors).</td><td>Height (DEM units; default 0.3 m / 1 ft)</td></tr>
+<tr><td>POROUS</td><td>The cell area and flow width are multiplied by the porosity (buildings water can enter, fences, dense vegetation).</td><td>Porosity (default 0.5)</td></tr>
+</table></div>
+<p>Type, height and porosity apply to the polygons of that layer that have no own <code>type</code> / <code>height</code> / <code>porosity</code> attribute. Where layers overlap, the upper layer counts; use ↑ ↓ to change the order. The <i>Polygons</i> column shows how many polygons the layer has when it is on the map.</p>
+<h2>Square grid or unstructured mesh?</h2>
+<figure class="narrow"><img src="images/mesh_type.png" alt="Create Meshes: choose the mesh type"></figure>
+<div class="tablewrap"><table>
+<tr><th></th><th>Square grid</th><th>Unstructured mesh</th></tr>
+<tr><td>Cells</td><td>Squares of the cell size</td><td>Triangles of about the same area; very small triangles are merged into quadrilaterals</td></tr>
+<tr><td>Edges of buildings, walls, boundary</td><td>Follow the cell centres (stair-step)</td><td>Followed exactly</td></tr>
+<tr><td>Local refinement</td><td>–</td><td>Mesh zones and break lines</td></tr>
+<tr><td>Compatibility</td><td>As Avaris DS</td><td>Same link-node engine scheme; all results, analyses, exports and coupled runs work</td></tr>
+<tr><td>Use it for</td><td>Open terrain, quick studies, comparison with Avaris DS</td><td>Dense urban areas, streets between buildings, walls and embankments</td></tr>
+</table></div>
+<figure><img src="images/mesh_unstructured.png" alt="Unstructured mesh around buildings"><figcaption>An unstructured mesh: the triangles follow the boundary and the cut-off lines.</figcaption></figure>
+<h2>What Create Meshes reports</h2>
+<p>After building the mesh a summary lists the number of cells (for the unstructured mesh also triangles, quadrilaterals and the smallest triangle angle), the surface links, the manholes coupled to the surface, the water-front outfalls, the cells removed, raised or made porous by exclusion layers, small buildings that only reduce the area of their cells, and cells skipped for missing DEM data. It also gives the length of the shortest surface links and a recommended <b>2D routing step</b>; if the current step is too long, you are asked whether to set the recommended one.</p>
+<ul>
+<li><b>Manholes in removed cells.</b> On the square grid a manhole whose cell was removed because its centre lies in a VOID building (often in a street next to a house) is coupled to the nearest kept cell of the eight around it, not across a cut-off line. The summary names these manholes.</li>
+<li><b>Older meshes.</b> If a mesh was built by an older version and newer rules apply to it, the run asks you to <span class="ui">Rebuild Mesh</span> first (or to run with the old mesh).</li>
+</ul>
 <figure><img src="images/mesh_ground.png" alt="2D mesh coloured by ground elevation"><figcaption>The 2D mesh coloured by ground elevation from the DEM.</figcaption></figure>
-<div class="callout"><b class="t">Note:</b><p>Rebuild the mesh after you change the boundary, DEM, cell size, exclusions or the Link2D tags.</p></div>
+<div class="callout"><b class="t">Note:</b><p>Rebuild the mesh after you change the boundary, DEM, cell size, mesh type, exclusion layers, mesh zones, break lines or the Link2D tags. A run always uses the saved mesh. Unsaved edits of these layers (see <a href="#edit-layers">Edit GIS layers</a>) are offered for saving first.</p></div>
 </section>
 
 <section class="topic" id="twod-results" data-ch="2D flood modelling" data-title="2D results">

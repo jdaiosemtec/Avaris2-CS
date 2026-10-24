@@ -1,0 +1,463 @@
+<section class="topic" id="prop-common" data-ch="Object properties" data-title="Rows common to all objects">
+<h1>Rows common to all objects</h1>
+<p class="lead">Every object in the <a href="#properties">Properties pane</a> starts with the same few rows in the <b>General</b> group. The topics in this chapter then describe the rows of each object type. After a simulation, a read-only <b>Statistic Results</b> group follows, filled from the summary tables of the report file.</p>
+<h2>Units in the labels</h2>
+<p>The pane adds the unit to the label in brackets, for example <span class="ui">Chamber Floor Elevation (ft)</span>. The tables in this chapter give the label without that bracket, and give the unit in the <i>Meaning</i> column. The units depend on the <span class="ui">Flow Units</span> option of the model:</p>
+<div class="tablewrap"><table>
+<tr><th>Quantity</th><th>US units (CFS, GPM, MGD)</th><th>SI units (CMS, LPS, MLD)</th></tr>
+<tr><td>Length, elevation, depth of a structure</td><td>ft</td><td>m</td></tr>
+<tr><td>Small area (ponded area, chamber area)</td><td>ft²</td><td>m²</td></tr>
+<tr><td>Land area (subcatchment, sewershed)</td><td>ac</td><td>ha</td></tr>
+<tr><td>Flow</td><td colspan="2">The flow unit itself (CFS, GPM, MGD, CMS, LPS or MLD)</td></tr>
+<tr><td>Rate (infiltration, seepage)</td><td>in/hr</td><td>mm/hr</td></tr>
+<tr><td>Rainfall-type depth (depression storage, suction head)</td><td>in</td><td>mm</td></tr>
+</table></div>
+<p>Labels that carry a fixed unit, such as <span class="ui">Slope (%)</span> or <span class="ui">Time Interval (H:MM)</span>, are shown as they appear in the pane.</p>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Name</td><td>Unique ID of the object. Type a new name to rename it: the name must not contain spaces and must not be used by another object. References to the object are renamed with it.</td></tr>
+<tr><td>Tag</td><td>Free text used to classify objects, for example a material or a project phase. Saved in the <code>[TAGS]</code> section of the <code>.inp</code> file.</td></tr>
+<tr><td>Description</td><td>Free-text description. Saved as a comment line in front of the object in the <code>.inp</code> file.</td></tr>
+<tr><td>Upstream Node</td><td>Links only. ID of the node at the inlet end of the link. Type another existing node ID to reconnect the link.</td></tr>
+<tr><td>Downstream Node</td><td>Links only. ID of the node at the outlet end of the link.</td></tr>
+<tr><td>X-Coordinate, Y-Coordinate</td><td>Nodes and rain gages only. Map position, in the map units when they are set. Shown below the object's own rows.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>Type a value and press <kbd>Enter</kbd>, or leave the field. A numeric field that gets text shows a message and keeps the old value.</li>
+<li>Rows with a pencil button (✎) open an editor: the Direct Inflows, Dry Weather Flows, Groundwater and LID Usages editors, the Cross Section Editor, the Curve Editor or the Time Series Editor. Next to a curve or time-series list, the pencil opens the chosen item; with <i>&lt;Empty&gt;</i> chosen it opens the right curve group so that you can create one. The list is refreshed when the editor closes.</li>
+<li>Click a property name to filter the change <a href="#history">Log</a> by that variable.</li>
+<li>With several objects selected, the heading <b>Common Properties</b> lists only the rows that every selected object of the chosen type shows. Rows with different values show <i>*Multiple Values</i>. Editor (pencil) rows are left out; use <span class="ui">Batch Edit...</span>, <span class="ui">Open in Table</span>, <span class="ui">Zoom To</span> or <span class="ui">Delete</span> below the grid.</li>
+<li>After a run, <span class="ui">Graph</span> plots the results of the selected object and, for nodes and links, <span class="ui">Long Section</span> opens the profile tool.</li>
+<li>Every change can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-subcatchment" data-ch="Object properties" data-title="Subcatchment properties">
+<h1>Subcatchment</h1>
+<p class="lead">A subcatchment is a piece of land that drains to one point: a node of the network or another subcatchment. Rain from its rain gage falls on an impervious and a pervious sub-area. The model takes off depression storage, infiltration (pervious area only) and evaporation, and routes the excess as overland flow, treated as a non-linear reservoir, to the outlet. Optional groundwater, LID units and pollutant buildup are attached to the subcatchment.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Outlet</td><td>ID of the node or subcatchment that receives the runoff. The field suggests existing IDs. A new subcatchment gets the node nearest to the centroid of its polygon.</td></tr>
+<tr><td>Rain Gage</td><td>Rain gage that supplies the rainfall. Choose from the gages in the model, or <i>&lt;Empty&gt;</i>. A new subcatchment gets the first gage.</td></tr>
+<tr><td>Snow Pack</td><td>Snow pack parameter set for snowmelt, or <i>&lt;Empty&gt;</i> for none.</td></tr>
+<tr><td>Curb Length</td><td>Total length of curbs in the subcatchment (ft or m). Used only when pollutant buildup is normalised to curb length.</td></tr>
+<tr><td>Area</td><td>Area of the subcatchment (ac or ha). A drawn subcatchment gets its polygon area when map units are set; otherwise the default from <span class="ui">Simulation ▸ Options ▸ Object Defaults</span> (5).</td></tr>
+<tr><td>Width</td><td>Characteristic width of the overland flow path (ft or m): the area divided by the average maximum overland flow length. Larger widths give faster, higher runoff peaks. Default 500.</td></tr>
+<tr><td>Slope (%)</td><td>Average surface slope in percent. Default 0.5.</td></tr>
+<tr><td>Imperv. (%)</td><td>Percentage of the area that is impervious. Default 25.</td></tr>
+<tr><td>N-Imperv.</td><td>Manning's n for overland flow on the impervious area. Default 0.01.</td></tr>
+<tr><td>N-Perv.</td><td>Manning's n for overland flow on the pervious area. Default 0.1.</td></tr>
+<tr><td>Dstore-Imperv.</td><td>Depression storage of the impervious area (in or mm): water held in small hollows and lost to evaporation, not to runoff. Default 0.05.</td></tr>
+<tr><td>Dstore-Perv.</td><td>Depression storage of the pervious area (in or mm). Default 0.05.</td></tr>
+<tr><td>Zero-Imperv. (%)</td><td>Percentage of the impervious area with no depression storage, so that runoff starts at once. Default 25.</td></tr>
+<tr><td>Subarea Routing</td><td>Internal routing between the sub-areas: <i>Outlet</i> (both sub-areas drain directly to the outlet; default), <i>Impervious</i> (runoff of the pervious area flows over the impervious area) or <i>Pervious</i> (runoff of the impervious area flows over the pervious area, where part of it can infiltrate).</td></tr>
+<tr><td>Percent Routed (%)</td><td>Percentage of the runoff routed between the sub-areas as chosen in <span class="ui">Subarea Routing</span>; the rest goes to the outlet.</td></tr>
+<tr><td>Imperv. Runoff Coef.</td><td>Fraction (0–1) of the runoff of the impervious area that reaches the outlet; default 1. An Avaris2 CS extension, saved in the <code>.inp</code> file as a comment line that other programs ignore.</td></tr>
+<tr><td>Infiltration Type</td><td>Infiltration model of this subcatchment: <i>Default (…)</i> uses the <span class="ui">Infiltration Model</span> of the simulation options; or choose <i>Horton</i>, <i>Modified Horton</i>, <i>Green-Ampt</i>, <i>Modified Green-Ampt</i> or <i>Curve Number</i>. The parameter rows below change with the type (see <a href="#prop-subcatchment-infil">Infiltration parameters</a>).</td></tr>
+<tr><td>Groundwater</td><td>Shows the aquifer name, or <i>No</i>. The pencil opens the Groundwater Editor (see below).</td></tr>
+<tr><td>LID Usages</td><td>Number of LID units placed in the subcatchment. The pencil opens the LID Usages Editor (see below).</td></tr>
+<tr><td>N-Perv Pattern</td><td>Monthly time pattern that adjusts the pervious Manning's n month by month, or <i>&lt;Empty&gt;</i>.</td></tr>
+<tr><td>Dstore Pattern</td><td>Monthly time pattern that adjusts the depression storage values.</td></tr>
+<tr><td>Infiltration Pattern</td><td>Monthly time pattern that adjusts the infiltration rates (for example for frozen or dry soils).</td></tr>
+<tr><td>Land Uses</td><td>Shown only when the model has land uses. The pencil opens a table of the land uses and the percentage of the subcatchment area each one covers; buildup and washoff of pollutants are computed per land use.</td></tr>
+<tr><td>Polygon Area</td><td>Read-only. Area of the drawn polygon (ac or ha), for comparison with <span class="ui">Area</span>.</td></tr>
+</table></div>
+<h3 id="prop-subcatchment-infil">Infiltration parameters</h3>
+<p>These rows follow <span class="ui">Infiltration Type</span> and are written to the <code>[INFILTRATION]</code> section. Unused parameters are hidden.</p>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td colspan="2"><b>Horton</b> and <b>Modified Horton</b> – the infiltration capacity decays exponentially from a maximum to a minimum rate during rain and recovers when the soil dries. The modified method bases the decay on the infiltrated volume above the minimum rate.</td></tr>
+<tr><td>Max. Infil. Rate</td><td>Initial (maximum) infiltration capacity of the dry soil (in/hr or mm/hr). Default 3.</td></tr>
+<tr><td>Min. Infil. Rate</td><td>Final (minimum) infiltration capacity of the saturated soil, close to the saturated hydraulic conductivity (in/hr or mm/hr). Default 0.5.</td></tr>
+<tr><td>Decay Constant</td><td>Rate of decay of the capacity (1/hr). Default 4.</td></tr>
+<tr><td>Drying Time</td><td>Days a fully saturated soil needs to dry out completely. Default 7.</td></tr>
+<tr><td>Max. Infil. Volume</td><td>Maximum infiltration volume the soil can take (in or mm); 0 means no limit.</td></tr>
+<tr><td colspan="2"><b>Green-Ampt</b> and <b>Modified Green-Ampt</b> – a sharp wetting front moves down into the soil; infiltration depends on the suction at the front, the conductivity and the moisture deficit.</td></tr>
+<tr><td>Suction Head</td><td>Average capillary suction at the wetting front (in or mm).</td></tr>
+<tr><td>Conductivity</td><td>Saturated hydraulic conductivity of the soil (in/hr or mm/hr).</td></tr>
+<tr><td>Initial Deficit</td><td>Fraction (0–1) of the soil volume that is initially dry: porosity minus initial moisture content.</td></tr>
+<tr><td colspan="2"><b>Curve Number</b> – infiltration capacity from the NRCS (SCS) curve number of the soil and cover.</td></tr>
+<tr><td>Curve Number</td><td>Curve number (0–100); higher values give more runoff.</td></tr>
+<tr><td>Drying Time</td><td>Days a fully saturated soil needs to dry out completely.</td></tr>
+</table></div>
+<h3>Initial Buildup</h3>
+<p>Shown only when the model has pollutants. One row per pollutant: the buildup on the subcatchment surface at the start of the simulation, in <i>lbs/ac</i> (US) or <i>kg/ha</i> (SI). 0 means the buildup comes only from the land-use buildup functions.</p>
+<h3>Groundwater Editor</h3>
+<p>Connects the subcatchment to an aquifer. The flow between the aquifer and the receiving node is computed with the lateral and deep flow equations shown in the editor.</p>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td>Aquifer</td><td>Aquifer below the subcatchment. <i>&lt;Empty&gt;</i> removes the groundwater link.</td></tr>
+<tr><td>Receiving Node</td><td>Node that receives the lateral groundwater flow. Required when an aquifer is chosen.</td></tr>
+<tr><td>A1 Coefficient, B1 Exponent</td><td>Coefficient and exponent of the groundwater term of the lateral flow equation.</td></tr>
+<tr><td>A2 Coefficient, B2 Exponent</td><td>Coefficient and exponent of the surface water term (water in the receiving channel pushing back).</td></tr>
+<tr><td>A3 Coefficient</td><td>Coefficient of the interaction term.</td></tr>
+<tr><td>Unsaturated Zone Moisture</td><td>Initial moisture content of the unsaturated zone; blank uses the aquifer value.</td></tr>
+<tr><td>Custom Lateral Flow Equation, Custom Deep Flow Equation</td><td>Optional expressions that replace the standard equations.</td></tr>
+<tr><td>Surface Elev.</td><td>Ground surface elevation above the aquifer (ft or m). For a new link it is proposed from the rim of the outlet node.</td></tr>
+<tr><td>Init Water Table Elev.</td><td>Initial water table elevation; blank uses the aquifer value.</td></tr>
+<tr><td>Surface Water Depth</td><td>Fixed depth of water in the receiving channel above the minimum water table.</td></tr>
+<tr><td>Min. Water Table Elev.</td><td>Water table elevation below which there is no lateral flow, usually the channel bottom; blank uses the receiving node invert.</td></tr>
+<tr><td>Aquifer Bottom Elev.</td><td>Elevation of the aquifer bottom; blank uses the aquifer value.</td></tr>
+</table></div>
+<h3>LID Usages Editor</h3>
+<p>Places units of LID controls (defined under <span class="ui">Hydrology ▸ LID Controls</span>) in the subcatchment. Click <span class="ui">+</span> to add a unit and <span class="ui">−</span> to remove it.</p>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td>LID Process</td><td>LID control used by the unit.</td></tr>
+<tr><td>Area of Each Unit</td><td>Surface area of one unit (ft² or m²).</td></tr>
+<tr><td>Number of Units</td><td>Number of identical units.</td></tr>
+<tr><td>Width of Each Unit</td><td>Width of the outflow face of one unit (ft or m), for surface outflow.</td></tr>
+<tr><td>Initially Saturated (%)</td><td>Initial saturation of the unit's soil and storage layers.</td></tr>
+<tr><td>Impervious Area Applied (%)</td><td>Share of the runoff of the impervious area that is treated by the units.</td></tr>
+<tr><td>Pervious Area Applied (%)</td><td>Share of the runoff of the pervious area that is treated by the units.</td></tr>
+<tr><td>Outlet Module (drain to)</td><td>Node or subcatchment that receives the underdrain flow; blank sends it to the subcatchment outlet.</td></tr>
+<tr><td>Return all Outflows to Pervious Area</td><td>When checked, the outflow of the units goes back onto the pervious area instead of to the outlet.</td></tr>
+<tr><td>Report File (Optional)</td><td>Name of a file that receives a detailed time series of the unit's performance.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>The infiltration rows change at once when you change <span class="ui">Infiltration Type</span>.</li>
+<li>Compare <span class="ui">Area</span> with the read-only <span class="ui">Polygon Area</span> after you reshape a subcatchment.</li>
+<li>The Groundwater, LID Usages and Land Uses rows are not shown when several subcatchments are selected.</li>
+<li>After a run, the <b>Runoff</b> group of Statistic Results shows total precipitation, run-on, evaporation, infiltration, impervious, pervious and total runoff, peak runoff and the runoff coefficient.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-junction" data-ch="Object properties" data-title="Junction properties">
+<h1>Junction</h1>
+<p class="lead">A junction is a point where links meet: a manhole, a chamber or a confluence of channels. It has no storage volume of its own apart from a small surface area. When the water level rises above the rim plus the surcharge depth, the excess leaves the network as flooding: it is lost, or it ponds on the surface and returns later when ponding is allowed.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Chamber Floor Elevation</td><td>Invert (floor) elevation of the chamber (ft or m). A new junction takes the elevation of the nearest node.</td></tr>
+<tr><td>Direct Inflows</td><td>External inflows, such as measured flows or a hydrograph from an upstream area. The pencil opens the Direct Inflows Editor (see <a href="#prop-node-inflows">Inflows and treatment</a>).</td></tr>
+<tr><td>Dry Weather Flows</td><td>Sanitary or base flow with its time patterns. The pencil opens the Dry Weather Flows Editor.</td></tr>
+<tr><td>Chamber Depth</td><td>Depth from the floor to the rim (ft or m). 0 means the depth to the crown of the highest connected link. New nodes get the <span class="ui">Node max. depth</span> of <span class="ui">Simulation ▸ Options ▸ Object Defaults</span> (10).</td></tr>
+<tr><td>Rim Elevation</td><td>Ground (cover) elevation = floor elevation + chamber depth. Editing it changes <span class="ui">Chamber Depth</span>.</td></tr>
+<tr><td>Initial Depth</td><td>Water depth in the chamber at the start of the simulation (ft or m).</td></tr>
+<tr><td>Surcharge Depth</td><td>Extra depth above the rim that the water may reach before flooding starts (ft or m), for example for a bolted or sealed cover. The chamber is then pressurised.</td></tr>
+<tr><td>Ponded Area</td><td>Surface area over which flood water ponds above the rim (ft² or m²). Used when the <span class="ui">Allow Ponding</span> option is on: the ponded water flows back into the junction when the level falls. 0 means flood water is lost.</td></tr>
+<tr><td>Chamber Area</td><td>Plan area of the chamber (ft² or m²), giving the junction its storage volume in dynamic-wave routing. 0 uses the <span class="ui">Minimum Nodal Surface Area</span> of the simulation options. An Avaris2 CS extension, saved in the <code>.inp</code> file as a comment line that other programs ignore.</td></tr>
+</table></div>
+<h3>RDII</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Unit Hydrograph Group</td><td>Unit hydrograph group that converts rainfall into rainfall-dependent infiltration and inflow (RDII) at this node, or <i>&lt;Empty&gt;</i>.</td></tr>
+<tr><td>Sewershed Area</td><td>Area of the sewershed that contributes RDII to the node (ac or ha). Set the unit hydrograph group first.</td></tr>
+</table></div>
+<h3>Pollutant Treatment</h3>
+<p>Shown only when the model has pollutants: one row per pollutant (see <a href="#prop-node-inflows">Inflows and treatment</a>).</p>
+<h3 id="prop-node-inflows">Inflows and treatment (all node types)</h3>
+<p>Junctions, outfalls, dividers and storage units share these editors and rows.</p>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td colspan="2"><b>Direct Inflows Editor</b> – one entry per constituent (Flow and each pollutant). Inflow = Baseline × Baseline Pattern + Scale Factor × Time Series.</td></tr>
+<tr><td>Baseline</td><td>Constant inflow (in the flow units for Flow; a concentration or mass rate for pollutants).</td></tr>
+<tr><td>Baseline Pattern</td><td>Time pattern whose multipliers vary the baseline.</td></tr>
+<tr><td>Time Series</td><td>Time series of the inflow. The pencil opens it in the Time Series Editor.</td></tr>
+<tr><td>Scale Factor</td><td>Multiplier applied to the time series. Default 1.0.</td></tr>
+<tr><td>Inflow Type</td><td>Pollutants only: <i>CONCEN</i> (concentration) or <i>MASS</i> (mass flow rate).</td></tr>
+<tr><td>Units Factor</td><td>Pollutants with MASS inflow: converts the mass rate of the series to the model's mass units per second.</td></tr>
+<tr><td colspan="2"><b>Dry Weather Flows Editor</b> – one entry per constituent. Dry weather inflow = Average Value × the multipliers of the selected patterns.</td></tr>
+<tr><td>Average Value</td><td>Average dry weather flow (flow units), or the average concentration of a pollutant.</td></tr>
+<tr><td>Monthly / Daily / Hourly / Weekend Pattern</td><td>Time patterns that vary the flow by month, day of the week, hour of weekdays and hour of the weekend.</td></tr>
+<tr><td colspan="2"><b>Pollutant Treatment</b> rows</td></tr>
+<tr><td>(pollutant name)</td><td>Treatment expression applied to the water leaving the node, either a removal fraction, such as <code>R = 0.5</code>, or the outflow concentration, such as <code>C = TSS * exp(-0.1*HRT)</code>. Blank means no treatment.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>Edit <span class="ui">Rim Elevation</span> when you know the ground level; the chamber depth is computed for you.</li>
+<li>After a run, Statistic Results show <b>Node Depth</b>, <b>Node Inflow</b>, <b>Node Surcharge</b> and <b>Node Flooding</b>.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-outfall" data-ch="Object properties" data-title="Outfall properties">
+<h1>Outfall</h1>
+<p class="lead">An outfall is a terminal node of the drainage system: the discharge point into a river, lake or the sea, or a downstream boundary of the model. Its boundary condition sets the water level at the end of the network and so controls backwater in the pipes upstream.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Invert Elevation</td><td>Invert elevation of the outfall (ft or m).</td></tr>
+<tr><td>Direct Inflows, Dry Weather Flows</td><td>As for a <a href="#prop-node-inflows">junction</a>.</td></tr>
+<tr><td>Tide Gate</td><td>True if a tide (flap) gate prevents water from flowing back into the network from the receiving water.</td></tr>
+<tr><td>Route To</td><td>Optional subcatchment that receives the outfall discharge, for example for re-use as irrigation. Blank means the water leaves the system.</td></tr>
+<tr><td>Type</td><td>Boundary condition: <i>Free</i> (default; the level is the lower of critical and normal depth in the connected conduit), <i>Normal</i> (normal depth of the connected conduit), <i>Fixed</i> (a constant water level), <i>Tidal</i> (a level that repeats daily, from a tidal curve) or <i>Time Series</i> (a level that varies with time).</td></tr>
+<tr><td>Fixed Stage</td><td><i>Fixed</i> only. Water surface elevation at the outfall (ft or m).</td></tr>
+<tr><td>Tidal Curve</td><td><i>Tidal</i> only. Tidal curve of stage against hour of the day.</td></tr>
+<tr><td>Time Series</td><td><i>Time Series</i> only. Time series of the water surface elevation.</td></tr>
+</table></div>
+<h3>RDII and Pollutant Treatment</h3>
+<p>As for a <a href="#prop-junction">junction</a>.</p>
+<h2>Editing tips</h2>
+<ul>
+<li>Changing <span class="ui">Type</span> clears the stage, curve or series of the old type.</li>
+<li>The pencil next to <span class="ui">Tidal Curve</span> opens the Tidal Curves of the Curve Editor; the pencil next to <span class="ui">Time Series</span> opens the Time Series Editor.</li>
+<li>After a run, Statistic Results show <b>Node Depth</b>, <b>Node Inflow</b> and <b>Outfall Loading</b> (flow frequency, average and maximum flow, total volume).</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-divider" data-ch="Object properties" data-title="Divider properties">
+<h1>Divider</h1>
+<p class="lead">A flow divider is a node that splits its inflow between two outflow links by a fixed rule: a combined sewer overflow or a bypass, for example. Diversion takes place only under kinematic-wave and steady-flow routing; under dynamic-wave routing a divider behaves like a junction.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Chamber Floor Elevation</td><td>Invert elevation of the divider (ft or m).</td></tr>
+<tr><td>Direct Inflows, Dry Weather Flows</td><td>As for a <a href="#prop-node-inflows">junction</a>.</td></tr>
+<tr><td>Chamber Depth, Rim Elevation, Initial Depth, Surcharge Depth, Ponded Area, Chamber Area</td><td>As for a <a href="#prop-junction">junction</a>.</td></tr>
+<tr><td>Diverted Link</td><td>ID of the link that receives the diverted flow. The field suggests existing link IDs.</td></tr>
+<tr><td>Divider Type</td><td>Rule for the diverted flow: <i>Overflow</i> (default; all inflow above the full flow capacity of the non-diverted link), <i>Cutoff</i> (all inflow above a cutoff flow), <i>Tabular</i> (from a diversion curve) or <i>Weir</i> (from a weir equation).</td></tr>
+<tr><td>Cutoff Flow</td><td><i>Cutoff</i> only. Inflow above which flow is diverted (flow units).</td></tr>
+<tr><td>Diversion Curve</td><td><i>Tabular</i> only. Diversion curve of diverted flow against total inflow.</td></tr>
+<tr><td>Min. Flow</td><td><i>Weir</i> only. Inflow at which diversion begins (flow units).</td></tr>
+<tr><td>Max. Depth</td><td><i>Weir</i> only. Height of the weir (ft or m).</td></tr>
+<tr><td>Discharge Coefficient</td><td><i>Weir</i> only. Weir discharge coefficient.</td></tr>
+</table></div>
+<h3>RDII and Pollutant Treatment</h3>
+<p>As for a <a href="#prop-junction">junction</a>.</p>
+<h2>Editing tips</h2>
+<ul>
+<li>Changing <span class="ui">Divider Type</span> resets its parameters (0 for the cutoff flow and the weir values).</li>
+<li>The pencil next to <span class="ui">Diversion Curve</span> opens the Diversion Curves of the Curve Editor.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-storage" data-ch="Object properties" data-title="Storage unit properties">
+<h1>Storage Unit</h1>
+<p class="lead">A storage unit is a node with a significant volume: a detention pond, a storage tank, a wet well or a wide chamber. Its volume is described by the surface area as a function of depth. Water can be lost from it by evaporation and by seepage into the soil.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Storage Floor Elevation</td><td>Invert (bottom) elevation of the storage unit (ft or m).</td></tr>
+<tr><td>Direct Inflows, Dry Weather Flows</td><td>As for a <a href="#prop-node-inflows">junction</a>.</td></tr>
+<tr><td>Storage Depth</td><td>Maximum depth of the storage unit (ft or m). Above it the unit floods.</td></tr>
+<tr><td>Initial Depth</td><td>Water depth at the start of the simulation (ft or m).</td></tr>
+<tr><td>Surcharge Depth</td><td>Extra depth above the storage depth that the water may reach before flooding (ft or m), for a closed tank.</td></tr>
+<tr><td>Evaporation Factor</td><td>Fraction (0–1) of the potential evaporation that applies to the water surface. Default 0.</td></tr>
+<tr><td>Storage Shape Type</td><td>How the surface area varies with depth: <i>Functional</i> (default), <i>Tabular</i>, <i>Cylindrical</i>, <i>Conical</i>, <i>Parabolic</i> or <i>Pyramidal</i>.</td></tr>
+<tr><td>Constant (a0), Coefficient (a1), Exponent (a2)</td><td><i>Functional</i> only. Surface area = a0 + a1 × depth<sup>a2</sup> (ft² or m², depth in ft or m). The defaults (a0 = 1000, a1 = 0, a2 = 0) describe a constant area of 1000.</td></tr>
+<tr><td>Storage Curve</td><td><i>Tabular</i> only. Storage curve of surface area against depth.</td></tr>
+<tr><td>Major Axis Length, Minor Axis Width</td><td><i>Cylindrical</i>, <i>Conical</i>, <i>Parabolic</i> and <i>Pyramidal</i>. Length and width of the base (ft or m): the axes of the elliptical base, or the sides of the rectangular base of a pyramid.</td></tr>
+<tr><td>Side Slope (run/rise)</td><td><i>Conical</i> and <i>Pyramidal</i> only. Slope of the side walls, horizontal over vertical.</td></tr>
+<tr><td>Surface Height</td><td><i>Parabolic</i> only. Height at which the axis length and width apply (ft or m).</td></tr>
+</table></div>
+<h3>Seepage Loss</h3>
+<p>Seepage into the native soil through the bottom and sides, computed with the Green-Ampt method. Leave the rows blank for a sealed unit.</p>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Suction Head</td><td>Soil capillary suction head (in or mm).</td></tr>
+<tr><td>Initial Deficit</td><td>Initial moisture deficit of the soil (fraction).</td></tr>
+<tr><td>Conductivity</td><td>Saturated hydraulic conductivity of the soil (in/hr or mm/hr).</td></tr>
+</table></div>
+<h3>RDII and Pollutant Treatment</h3>
+<p>As for a <a href="#prop-junction">junction</a>. Treatment expressions can use the hydraulic residence time <code>HRT</code> of the storage unit.</p>
+<h2>Editing tips</h2>
+<ul>
+<li>The shape rows change with <span class="ui">Storage Shape Type</span>. Changing to <i>Tabular</i> clears the curve; changing back keeps the numeric values.</li>
+<li>The pencil next to <span class="ui">Storage Curve</span> opens the Storage Curves of the Curve Editor.</li>
+<li>After a run, Statistic Results also show <b>Storage Volume</b> (average and maximum volume and percent full, evaporation and exfiltration loss, maximum outflow).</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-conduit" data-ch="Object properties" data-title="Conduit properties">
+<h1>Conduit</h1>
+<p class="lead">A conduit is a pipe or an open channel that carries water from its upstream to its downstream node. Flow is computed from its cross section, length, roughness (Manning's equation, or Hazen-Williams / Darcy-Weisbach for force mains) and the water levels at both ends. Its invert at each end is the node invert plus an offset.</p>
+<h2>Fields</h2>
+<h3>Cross Section</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Cross Section Shape</td><td>Shape of the cross section; default <i>Circular</i>. The pencil opens the Cross Section Editor with a picture of every shape. The rows below depend on the shape (see <a href="#prop-xsect">Cross-section shapes</a>).</td></tr>
+<tr><td>Maximum Height, Bottom Width, …</td><td>Dimensions of the shape. New conduits get the <span class="ui">Conduit diameter / geom1</span> of the object defaults (1.0).</td></tr>
+</table></div>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Length</td><td>Length of the conduit (ft or m). A new conduit gets its length from the map when map units are set and <span class="ui">Auto length from map</span> is on; otherwise the default length (400).</td></tr>
+<tr><td>Roughness</td><td>Manning's roughness coefficient n. Default 0.013 (object defaults). For a force main the friction is set in the cross section instead.</td></tr>
+<tr><td>Inlet Offset</td><td>Height of the conduit invert above the invert of the upstream node (ft or m). When the <span class="ui">Link Offsets</span> option is <i>ELEVATION</i>, the row is called <span class="ui">Inlet Offset Elev.</span> and holds the absolute invert elevation of the conduit end.</td></tr>
+<tr><td>Outlet Offset</td><td>The same at the downstream node (<span class="ui">Outlet Offset Elev.</span> with elevation offsets).</td></tr>
+<tr><td>Initial Flow</td><td>Flow in the conduit at the start of the simulation (flow units).</td></tr>
+<tr><td>Max. Flow</td><td>Upper limit of the flow (flow units); 0 means no limit.</td></tr>
+<tr><td>Entry Loss Coefficient</td><td>Minor loss coefficient at the entrance; the head loss is the coefficient times the velocity head v²/2g.</td></tr>
+<tr><td>Exit Loss Coefficient</td><td>Minor loss coefficient at the exit.</td></tr>
+<tr><td>Average Loss Coefficient</td><td>Minor loss coefficient spread along the length (bends, fittings).</td></tr>
+<tr><td>Flap Gate</td><td>True if a flap gate prevents reverse flow.</td></tr>
+<tr><td>Seepage Loss Rate</td><td>Rate of water loss through the bottom and sides of the conduit into the soil (in/hr or mm/hr).</td></tr>
+<tr><td>Number of Barrels</td><td>Number of identical parallel barrels. Default 1.</td></tr>
+<tr><td>Culvert</td><td>FHWA culvert inlet geometry code (1–57) for culverts; the flow can then be limited by inlet control. Blank means the conduit is not a culvert.</td></tr>
+<tr><td>Slope (%)</td><td>Read-only. (Upstream invert − downstream invert) / length, from the node inverts and offsets.</td></tr>
+<tr><td>Map Length</td><td>Read-only. Length of the drawn line in map units, for comparison with <span class="ui">Length</span>.</td></tr>
+</table></div>
+<h3 id="prop-xsect">Cross-section shapes</h3>
+<p>Dimensions are in ft or m unless stated otherwise.</p>
+<div class="tablewrap"><table>
+<tr><th>Shape</th><th>Parameters</th></tr>
+<tr><td>Circular</td><td>Maximum Height (diameter).</td></tr>
+<tr><td>Force Main</td><td>Maximum Height (diameter); Roughness (C-factor or D-W ε): the Hazen-Williams C-factor or the Darcy-Weisbach roughness height, as set by the <span class="ui">Force Main Equation</span> option. Used for pressurised pipes.</td></tr>
+<tr><td>Filled Circular</td><td>Maximum Height (diameter); Filled Depth (depth of sediment in the bottom).</td></tr>
+<tr><td>Closed Rectangular</td><td>Maximum Height; Bottom Width.</td></tr>
+<tr><td>Rectangular (open)</td><td>Maximum Height; Bottom Width; Sides in friction (0, 1, 2): how many side walls add friction.</td></tr>
+<tr><td>Trapezoidal</td><td>Maximum Height; Bottom Width; Left Side Slope (run/rise); Right Side Slope (run/rise).</td></tr>
+<tr><td>Triangular</td><td>Maximum Height; Top Width.</td></tr>
+<tr><td>Horizontal Elliptical, Vertical Elliptical</td><td>Maximum Height; Maximum Width.</td></tr>
+<tr><td>Arch</td><td>Maximum Height; Bottom Width.</td></tr>
+<tr><td>Parabolic</td><td>Maximum Height; Top Width.</td></tr>
+<tr><td>Power</td><td>Maximum Height; Top Width; Exponent of the power function that describes the sides.</td></tr>
+<tr><td>Rectangular Triangular</td><td>Maximum Height; Top Width; Triangle Height (triangular bottom).</td></tr>
+<tr><td>Rectangular Round</td><td>Maximum Height; Top Width; Bottom Radius (round bottom).</td></tr>
+<tr><td>Modified Baskethandle</td><td>Maximum Height; Bottom Width; Top Radius.</td></tr>
+<tr><td>Egg, Horseshoe, Gothic, Catenary, Semi-Elliptical, Baskethandle, Semi-Circular</td><td>Maximum Height; the other dimensions follow from the standard shape.</td></tr>
+<tr><td>Custom</td><td>Maximum Height; Shape Curve (a shape curve of width/full width against depth/full depth).</td></tr>
+<tr><td>Irregular</td><td>Transect: a natural channel cross section defined in the transects.</td></tr>
+<tr><td>Street</td><td>Street Section: a street cross section with curbs and gutters.</td></tr>
+<tr><td>Dummy</td><td>No parameters. A link without a cross section, for example to connect a pump or for an ideal connection.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>The pencil next to <span class="ui">Cross Section Shape</span> opens the Cross Section Editor. With several conduits selected, the editor sets the shape and dimensions of all of them. Barrels and culvert code are edited in the grid.</li>
+<li>The pencil next to <span class="ui">Shape Curve</span> opens the Shape Curves of the Curve Editor.</li>
+<li>Check <span class="ui">Slope (%)</span> after changing inverts or offsets: a negative slope means the conduit falls against its drawn direction.</li>
+<li>After a run, Statistic Results show <b>Flow</b> (maximum flow, velocity, max./full flow, capacity, surcharge), <b>Flow Classification</b> and <b>Surcharge</b> (hours full, hours capacity limited).</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-pump" data-ch="Object properties" data-title="Pump properties">
+<h1>Pump</h1>
+<p class="lead">A pump is a link that lifts water from its inlet node to its outlet node. Its flow is given by a pump curve, as a function of the wet-well volume, the inlet depth or the head across the pump, and it switches on and off by the water depth at the inlet node or by control rules.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Pump Curve</td><td>Pump curve that defines the flow. <i>&lt;Ideal&gt;</i> is an ideal pump: its flow equals the inflow to the inlet node, without a curve. The list shows the curves of the pump curve types (volume–flow, depth–flow and head–flow curves).</td></tr>
+<tr><td>Start initially</td><td>True if the pump is on at the start of the simulation (ON), False if it is off (OFF). Default ON.</td></tr>
+<tr><td>Startup Depth</td><td>Water depth at the inlet node at which the pump switches on (ft or m).</td></tr>
+<tr><td>Shutoff Depth</td><td>Water depth at the inlet node at which the pump switches off (ft or m).</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>The pencil next to <span class="ui">Pump Curve</span> opens the Pump Curves of the Curve Editor.</li>
+<li>After a run, Statistic Results show <b>Flow</b> and <b>Pumping</b> (percent utilised, number of start-ups, minimum, average and maximum flow, volume, power usage, time off the pump curve).</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-orifice" data-ch="Object properties" data-title="Orifice properties">
+<h1>Orifice</h1>
+<p class="lead">An orifice is an opening in the wall or floor of a chamber or tank, such as a throttle or a gate. Flow through it depends on the area of the opening, the discharge coefficient and the head on it; when the opening is only partly submerged it behaves like a weir. Control rules can change its opening.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Type</td><td><i>Side</i> (default; an opening in a side wall) or <i>Bottom</i> (an opening in the floor).</td></tr>
+<tr><td>Shape</td><td><i>Circular</i> or <i>Rectangular</i>.</td></tr>
+<tr><td>Height</td><td>Height of the opening; the diameter of a circular orifice (ft or m).</td></tr>
+<tr><td>Width</td><td><i>Rectangular</i> only. Width of the opening (ft or m).</td></tr>
+<tr><td>Inlet Offset</td><td>Height of the bottom of the opening above the invert of the inlet node (ft or m); <span class="ui">Inlet Offset Elev.</span> with elevation offsets.</td></tr>
+<tr><td>Discharge Coefficient</td><td>Orifice discharge coefficient. Default 0.65.</td></tr>
+<tr><td>Flap Gate</td><td>True if a flap gate prevents reverse flow.</td></tr>
+<tr><td>Time to Open/Close Gate (hr)</td><td>Time a gated orifice needs to move from fully closed to fully open when a control rule changes its setting. 0 means the change is instantaneous.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li><span class="ui">Width</span> appears only for a rectangular orifice.</li>
+<li>Right-click an orifice on the map and choose <span class="ui">Convert to Equivalent Conduit</span> when it causes convergence problems.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-weir" data-ch="Object properties" data-title="Weir properties">
+<h1>Weir</h1>
+<p class="lead">A weir is a structure over which water flows when the level at the inlet node rises above its crest: an overflow weir in a combined sewer overflow chamber, a side weir or a road embankment. The flow grows with the head over the crest to a power that depends on the weir type.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Type</td><td><i>Transverse</i> (default; a rectangular weir across the flow), <i>Side Flow</i> (a rectangular weir along the side of the channel), <i>V-Notch</i> (triangular), <i>Trapezoidal</i> or <i>Roadway</i> (flow over a road embankment).</td></tr>
+<tr><td>Height</td><td>Vertical height of the weir opening, from the crest to the top (ft or m).</td></tr>
+<tr><td>Width</td><td>Length of the crest (ft or m). For a V-notch weir the row is <span class="ui">Top Width</span>: the width of the notch at the top.</td></tr>
+<tr><td>Left Side Slope (run/rise), Right Side Slope (run/rise)</td><td><i>Trapezoidal</i> only. Slopes of the sides of the opening.</td></tr>
+<tr><td>Inlet Offset</td><td>Height of the crest above the invert of the inlet node (ft or m); <span class="ui">Inlet Offset Elev.</span> with elevation offsets.</td></tr>
+<tr><td>Discharge Coefficient</td><td>Weir discharge coefficient. Default 3.33, a value in US units; SI models need a coefficient in SI units.</td></tr>
+<tr><td>Flap Gate</td><td>True if a flap gate prevents reverse flow.</td></tr>
+<tr><td>Can Surcharge</td><td>True (default) if the weir may flow as an orifice when the water level is above the top of the opening.</td></tr>
+<tr><td>End Contractions</td><td>Number of end contractions of a transverse or trapezoidal weir (0, 1 or 2); each reduces the effective crest length.</td></tr>
+<tr><td>End Coefficient</td><td>Discharge coefficient of the triangular ends of a trapezoidal weir.</td></tr>
+<tr><td>Coefficient Curve</td><td>Optional weir curve of discharge coefficient against head, which replaces the constant coefficient.</td></tr>
+<tr><td>Road Width</td><td><i>Roadway</i> only. Width of the road across the flow direction (ft or m).</td></tr>
+<tr><td>Road Surface</td><td><i>Roadway</i> only. <i>Paved</i> or <i>Gravel</i>; sets the discharge coefficient of the roadway.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>Changing <span class="ui">Type</span> also sets the shape of the opening (rectangular, triangular or trapezoidal) and shows the rows of that type.</li>
+<li>The pencil next to <span class="ui">Coefficient Curve</span> opens the Weir Curves of the Curve Editor.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-outlet" data-ch="Object properties" data-title="Outlet properties">
+<h1>Outlet</h1>
+<p class="lead">An outlet is a flow control device whose discharge is given by a rating relation: a power function or a table of outflow against the water depth at the inlet node, or against the head difference across the device. Use it for vortex valves, throttles and other devices with a known head–discharge curve, or for outflow from a storage unit.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Inlet Offset</td><td>Height of the outlet above the invert of the inlet node (ft or m); <span class="ui">Inlet Offset Elev.</span> with elevation offsets.</td></tr>
+<tr><td>Flap Gate</td><td>True if a flap gate prevents reverse flow.</td></tr>
+<tr><td>Rating Curve Type</td><td><i>Functional/Depth</i> (default), <i>Functional/Head</i>, <i>Tabular/Depth</i> or <i>Tabular/Head</i>. <i>Depth</i> relates the outflow to the water depth above the outlet at the inlet node; <i>Head</i> relates it to the difference in water level between the inlet and outlet nodes.</td></tr>
+<tr><td>Coefficient</td><td><i>Functional</i> only. C in outflow = C × h<sup>e</sup>. Default 10.</td></tr>
+<tr><td>Exponent</td><td><i>Functional</i> only. e in outflow = C × h<sup>e</sup>. Default 0.5.</td></tr>
+<tr><td>Rating Curve</td><td><i>Tabular</i> only. Rating curve of outflow against depth or head.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>Changing between Functional and Tabular keeps a valid value: a curve name is cleared when you switch to Functional (coefficient 10), and a number is cleared when you switch to Tabular.</li>
+<li>The pencil next to <span class="ui">Rating Curve</span> opens the Rating Curves of the Curve Editor.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-raingage" data-ch="Object properties" data-title="Rain gage properties">
+<h1>Rain Gage</h1>
+<p class="lead">A rain gage supplies rainfall to the subcatchments that use it. On the map it is a point, but in the model it is a rainfall record: a time series in the model or an external rainfall file. Several subcatchments can share one gage.</p>
+<h2>Fields</h2>
+<h3>General</h3>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>Rain Format</td><td>How the values are recorded: <i>Intensity</i> (default; rate, in/hr or mm/hr), <i>Volume</i> (depth over each interval, in or mm) or <i>Cumulative</i> (depth accumulated since the start of the rain).</td></tr>
+<tr><td>Time Interval (H:MM)</td><td>Recording interval of the rainfall data, for example <code>0:05</code>. Default <code>1:00</code>.</td></tr>
+<tr><td>Snow Catch Factor</td><td>Factor that corrects the gage reading for snowfall (catch deficiency). Default 1.</td></tr>
+<tr><td>Data Source</td><td><i>Time Series</i> (default) or <i>File</i>.</td></tr>
+<tr><td>Time Series</td><td><i>Time Series</i> only. Time series that holds the rainfall. A new gage gets the first time series of the model.</td></tr>
+<tr><td>File Name</td><td><i>File</i> only. Path of the external rainfall file.</td></tr>
+<tr><td>Station ID</td><td><i>File</i> only. ID of the recording station in the file.</td></tr>
+<tr><td>Rain Units</td><td><i>File</i> only. Units of the rainfall in the file: <i>IN</i> or <i>MM</i>.</td></tr>
+<tr><td>X-Coordinate, Y-Coordinate</td><td>Position of the gage on the map.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>The pencil next to <span class="ui">Time Series</span> opens the series in the Time Series Editor.</li>
+<li>The rows change with <span class="ui">Data Source</span>.</li>
+</ul>
+</section>
+
+<section class="topic" id="prop-label" data-ch="Object properties" data-title="Map label properties">
+<h1>Map Label</h1>
+<p class="lead">A map label is a piece of text placed on the map, for example a street or area name. It is not part of the drainage model and does not affect the simulation. Labels are saved in the <code>[LABELS]</code> section of the <code>.inp</code> file.</p>
+<h2>Fields</h2>
+<p>The Properties pane shows the heading <b>Map Label</b> and the label text only; there are no editable rows.</p>
+<div class="tablewrap"><table>
+<tr><th>Property</th><th>Meaning</th></tr>
+<tr><td>(text under the heading)</td><td>The text of the label.</td></tr>
+</table></div>
+<h2>Editing tips</h2>
+<ul>
+<li>Right-click the label on the map and choose <span class="ui">Edit Label Text...</span> to change the text, or <span class="ui">Delete Label</span> to remove it.</li>
+<li>Drag the label to move it.</li>
+<li>Font, size and anchor read from an <code>.inp</code> file are kept when the model is saved.</li>
+<li>Labels are left out when several objects are selected in the Properties pane.</li>
+</ul>
+</section>

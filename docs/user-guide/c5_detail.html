@@ -1,0 +1,587 @@
+
+<section class="topic" id="pe-climatology" data-ch="Model parameters" data-title="Climatology Editor">
+<h1>Climatology Editor</h1>
+<p class="lead">The Climatology Editor holds the climate data of the model: air temperature, evaporation, wind speed, the snowmelt settings, the areal depletion of snow cover and monthly adjustments of temperature, evaporation, rainfall and soil conductivity. Open it from <span class="ui">Parameter View ▸ Climatology</span>: each entry (<span class="ui">Temperature</span>, <span class="ui">Evaporation</span>, <span class="ui">Wind Speed</span>, <span class="ui">Snow Melt</span>, <span class="ui">Areal Depletion</span>, <span class="ui">Adjustments</span>) opens the same editor on that tab. The <span class="ui">Climate File</span> tab has no entry of its own; reach it from any of the other tabs.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click an entry under <span class="ui">Parameter View ▸ Climatology</span>. The <span class="ui">Climatology Editor</span> opens on that tab.</li>
+<li>Switch between the tabs at the top as needed. All tabs are edited together.</li>
+<li>If Temperature, Evaporation or Wind Speed is to come from a climate file, choose the file on the <span class="ui">Climate File</span> tab first (button <span class="ui">…</span>).</li>
+<li>To use a time series (temperature or evaporation), pick it in the list. The <span class="ui">✎</span> button next to the list opens the <a href="#pe-timeseries">Time Series Editor</a>, so you can view, edit or create the series without leaving the dialog; the list is refreshed afterwards.</li>
+<li>Click <span class="ui">OK</span>. The editor checks that a climate file is chosen when a tab needs one and that the chosen time series are set; otherwise a message names the missing item and the dialog stays open. All changes are applied as one step that you can undo.</li>
+</ol>
+<div class="callout"><b class="t">Note:</b><p>Units follow the flow units of the model: °F, in, in/day and mph for US flow units (CFS, GPM, MGD); °C, mm, mm/day and km/hr for SI flow units (CMS, LPS, MLD).</p></div>
+<h2>Fields</h2>
+<h3>Climate File tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">From Climate File Path</span></td><td>Path of a climate file with daily maximum/minimum temperature, evaporation and wind speed (NCDC daily, Canadian or user-prepared format). Use <span class="ui">…</span> to browse (<code>.txt</code>, <code>.dat</code>, <code>.csv</code>, <code>.dly</code>). The file is used only by the tabs set to "From Climate File" / "Climate File" / "Temperatures".</td></tr>
+<tr><td><span class="ui">Reading File from</span></td><td>Tick to start reading the climate file at a given date (default shown <code>01/01/2000</code>) instead of at the start date of the simulation.</td></tr>
+</table></div>
+<h3>Temperature tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Temperature Source Type</span></td><td><b>No Data</b> – no air temperature (no snowmelt computed); <b>From Climate File</b> – daily max/min temperatures from the climate file; <b>Time Series</b> – air temperature (°F / °C) from the chosen time series.</td></tr>
+</table></div>
+<p>Air temperature drives snowmelt and the <i>Temperatures</i> evaporation method.</p>
+<h3>Evaporation tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Evaporation Source Type</span></td><td><b>Constant Value</b>, <b>Time Series</b>, <b>Climate File</b>, <b>Monthly Averages</b> or <b>Temperatures</b>. Default: Constant Value.</td></tr>
+<tr><td><span class="ui">Daily Evaporation</span> (in/day, mm/day)</td><td>Constant Value only: the same evaporation rate for the whole simulation. Default 0.</td></tr>
+<tr><td><span class="ui">Time Series</span> (in/day, mm/day)</td><td>Time Series only: the time series of evaporation rates.</td></tr>
+<tr><td><span class="ui">Monthly Daily Evaporation</span></td><td>Monthly Averages only: one average daily rate for each month (Jan–Dec).</td></tr>
+<tr><td><span class="ui">Monthly Pan Coefficients</span></td><td>Climate File only: the pan evaporation values of the climate file are multiplied by the coefficient of each month. Default 1.</td></tr>
+<tr><td>(Temperatures)</td><td>No input: evaporation is computed from the daily air temperatures with the Hargreaves method. The Temperature source must then be a climate file.</td></tr>
+<tr><td><span class="ui">Monthly Soil Recovery Pattern</span></td><td>Optional time pattern whose monthly multipliers adjust how fast the infiltration capacity of the soil recovers during dry periods.</td></tr>
+<tr><td><span class="ui">Evaporate only during dry periods</span></td><td>When ticked, evaporation is applied only in periods without rainfall.</td></tr>
+</table></div>
+<h3>Wind Speed tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Wind Speed Source Type</span></td><td><b>Monthly Averages</b> (enter values below) or <b>Climate File</b>.</td></tr>
+<tr><td><span class="ui">Monthly Wind Speed</span> (mph, km/hr)</td><td>Average wind speed for each month. Default 0.</td></tr>
+</table></div>
+<p>Wind speed is used only for snowmelt during rainfall.</p>
+<h3>Snow Melt tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Melting Point of Snow</span> (°F, °C)</td><td>Air temperature at which precipitation falls as snow rather than rain. Default 34 °F / 1 °C.</td></tr>
+<tr><td><span class="ui">ATI Weight (fraction)</span></td><td>Weight given to the previous day's antecedent temperature index when the snow pack temperature is updated. Default 0.5.</td></tr>
+<tr><td><span class="ui">Negative Melt Ratio (fraction)</span></td><td>Ratio of the heat transfer coefficient of the snow pack during non-melt conditions to that during melt conditions. Default 0.6.</td></tr>
+<tr><td><span class="ui">Elevation above MSL</span> (ft, m)</td><td>Average elevation of the study area, used for the rain-on-snow melt computation. Default 0.</td></tr>
+<tr><td><span class="ui">Latitude (degrees)</span></td><td>Latitude of the study area. Default 50. Also used by the Temperatures evaporation method.</td></tr>
+<tr><td><span class="ui">Longitude Correction (+/- minutes)</span></td><td>Difference in minutes between true solar time and the standard clock time of the study area. Default 0.</td></tr>
+</table></div>
+<p>These values are used by the snowmelt model (see <a href="#pe-snowpacks">Snow Packs</a>). They are written to the <code>.inp</code> file only when a value differs from the defaults or the model has snow packs.</p>
+<h3>Areal Depletion tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Impervious Area Depletion Type</span></td><td><b>No Depletion</b> (all values 1), <b>Natural Area</b> (a standard curve: 0.10, 0.35, 0.53, 0.66, 0.75, 0.82, 0.87, 0.92, 0.95, 0.98) or <b>Custom</b>. Choosing a type fills the Impervious column.</td></tr>
+<tr><td><span class="ui">Pervious Area Depletion Type</span></td><td>The same for the Pervious column.</td></tr>
+<tr><td><span class="ui">Fraction of Area Covered By Snow</span> table</td><td>For each <span class="ui">Depth Ratio</span> 0.0–0.9 (snow depth divided by the depth at 100 % cover), the fraction of the <span class="ui">Impervious</span> and <span class="ui">Pervious</span> area that is covered by snow. Typing in a cell switches the type to Custom.</td></tr>
+</table></div>
+<h3>Adjustments tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Temperature</span></td><td>Amount (+/− °F or °C) added to the air temperature in each month. Default 0.</td></tr>
+<tr><td><span class="ui">Evaporation</span></td><td>Amount (+/− in/day or mm/day) added to the evaporation rate in each month. Default 0.</td></tr>
+<tr><td><span class="ui">Rain</span></td><td>Multiplier applied to the rainfall in each month. Default 1.</td></tr>
+<tr><td><span class="ui">Conductivity</span></td><td>Multiplier applied to the soil hydraulic conductivity (infiltration) in each month. Default 1.</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>The Adjustments tab is convenient for climate-change scenarios: scale the rainfall of each month without editing the rainfall time series.</p></div>
+</section>
+
+<section class="topic" id="pe-raingages" data-ch="Model parameters" data-title="Rain Gage Editor">
+<h1>Rain Gage Editor</h1>
+<p class="lead">A rain gage supplies precipitation to the subcatchments that reference it, either from a time series in the model or from an external rainfall file. Open the <span class="ui">Rain Gage Editor</span> from <span class="ui">Parameter View ▸ Hydrology ▸ Rain Gages</span>. A single gage selected on the map can also be edited in the Properties pane.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydrology ▸ Rain Gages</span>. The list on the left shows all gages; the fields on the right belong to the selected one.</li>
+<li>To add a gage, click <span class="ui">+</span>. It gets a unique name (<code>RG_1</code>, <code>RG_2</code> …), the first time series of the model, a time interval of 1:00 and the rain units of the project. A new gage is placed at the upper-left corner of the model extent; move it on the map later if needed.</li>
+<li>To copy a gage, select it and click <span class="ui">⧉</span>. The copy is named <code><i>name</i>_copy</code>.</li>
+<li>To delete a gage, select it and click <span class="ui">−</span>. A gage that is still used by subcatchments cannot be deleted: assign another gage to those subcatchments first.</li>
+<li>Choose the <span class="ui">Data Source</span>. For <b>TIMESERIES</b> pick the series; the <span class="ui">✎</span> button opens the <a href="#pe-timeseries">Time Series Editor</a>. For <b>FILE</b> click <span class="ui">…</span> next to <span class="ui">File Name</span>; choosing a file switches the data source to FILE.</li>
+<li>Click <span class="ui">OK</span>. Renaming a gage also updates the subcatchments and unit hydrograph groups that use it. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Gage Name</span></td><td>Unique name. Spaces are replaced by underscores.</td></tr>
+<tr><td><span class="ui">Description</span></td><td>Optional text.</td></tr>
+<tr><td><span class="ui">Rain Format</span></td><td><b>INTENSITY</b> – each value is an average rate (in/hr, mm/hr) over the interval; <b>VOLUME</b> – each value is the depth (in, mm) that fell in the interval; <b>CUMULATIVE</b> – each value is the depth accumulated since the start of the storm.</td></tr>
+<tr><td><span class="ui">Time Interval (H:MM)</span></td><td>Recording interval of the rainfall data, for example <code>0:05</code> or <code>1:00</code>. Required format: hours, optionally followed by :minutes and :seconds.</td></tr>
+<tr><td><span class="ui">Snow Catch Factor</span></td><td>Multiplier that corrects the gage readings for snowfall (catch deficiency). Default 1.</td></tr>
+<tr><td><span class="ui">Data Source</span></td><td><b>TIMESERIES</b> (a time series of the model) or <b>FILE</b> (an external rainfall file).</td></tr>
+<tr><td><span class="ui">Time Series</span></td><td>TIMESERIES only: name of the rainfall time series.</td></tr>
+<tr><td><span class="ui">File Name</span></td><td>FILE only: path of the rainfall file (<code>.dat</code>, <code>.txt</code>, <code>.csv</code>, <code>.prn</code>).</td></tr>
+<tr><td><span class="ui">Station ID</span></td><td>FILE only: the station in the file whose data are used. Default <code>*</code>.</td></tr>
+<tr><td><span class="ui">Rain Units</span></td><td><b>IN</b> or <b>MM</b>: units of the rainfall values, for both data sources. A time series in other units than the project is converted when the model is run.</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="pe-aquifers" data-ch="Model parameters" data-title="Aquifer Editor">
+<h1>Aquifer Editor</h1>
+<p class="lead">An aquifer describes the soil below a subcatchment as an upper unsaturated zone and a lower saturated zone. Infiltrated water percolates into it, and the groundwater can flow to a node of the drainage system. Open the <span class="ui">Aquifer Editor</span> from <span class="ui">Parameter View ▸ Hydrology ▸ Aquifers</span>. An aquifer is linked to a subcatchment with the <span class="ui">Groundwater</span> row (pencil button) in the subcatchment's Properties.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydrology ▸ Aquifers</span>.</li>
+<li>Click <span class="ui">+</span> to add an aquifer (named <code>AQ1</code>, <code>AQ2</code> …, filled with the default values below), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Select an aquifer in the list and edit its values on the right.</li>
+<li>Click <span class="ui">OK</span>. Renaming an aquifer also updates the groundwater data of the subcatchments that use it. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Aquifer Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Porosity</span></td><td>Volume of voids divided by the total soil volume (fraction). Default 0.5.</td></tr>
+<tr><td><span class="ui">Wilting Point</span></td><td>Soil moisture content below which plants cannot extract water (fraction). Default 0.15.</td></tr>
+<tr><td><span class="ui">Field Capacity</span></td><td>Moisture content after the soil has drained freely (fraction). Percolation stops below this value. Default 0.30.</td></tr>
+<tr><td><span class="ui">Conductivity</span> (in/hr, mm/hr)</td><td>Saturated hydraulic conductivity. Default 5.0.</td></tr>
+<tr><td><span class="ui">Conductivity Slope</span></td><td>Slope of the logarithm of conductivity versus moisture deficit (porosity minus moisture content). Default 10.</td></tr>
+<tr><td><span class="ui">Tension Slope</span></td><td>Slope of soil tension versus moisture content. Default 15.</td></tr>
+<tr><td><span class="ui">Upper Evap. Fraction</span></td><td>Fraction of the total evaporation available for evapotranspiration from the upper unsaturated zone. Default 0.35.</td></tr>
+<tr><td><span class="ui">Lower Evap. Depth</span> (ft, m)</td><td>Maximum depth into the lower saturated zone over which evapotranspiration can occur. Default 14.</td></tr>
+<tr><td><span class="ui">Lower GW Loss</span> (in/hr, mm/hr)</td><td>Rate of percolation from the saturated zone to deep groundwater. Default 0.002.</td></tr>
+<tr><td><span class="ui">Bottom Elevation</span> (ft, m)</td><td>Elevation of the bottom of the aquifer. Default 0.</td></tr>
+<tr><td><span class="ui">Water Table Elevation</span> (ft, m)</td><td>Initial elevation of the water table. Default 10.</td></tr>
+<tr><td><span class="ui">Unsat. Zone Moisture</span></td><td>Initial moisture content of the unsaturated zone (fraction). Default 0.30.</td></tr>
+<tr><td><span class="ui">Upper Evap. Pattern</span></td><td>Optional time pattern whose monthly multipliers adjust the upper evaporation fraction. <code>&lt;Empty&gt;</code> = none.</td></tr>
+</table></div>
+<div class="callout"><b class="t">Note:</b><p>The values of an aquifer can be overridden per subcatchment (bottom elevation, initial water table, initial moisture) in its Groundwater data.</p></div>
+</section>
+
+<section class="topic" id="pe-snowpacks" data-ch="Model parameters" data-title="Snow Pack Editor">
+<h1>Snow Pack Editor</h1>
+<p class="lead">A snow pack defines how snow accumulates, melts and is removed on the plowable, impervious and pervious parts of a subcatchment. Open the <span class="ui">Snow Pack Editor</span> from <span class="ui">Parameter View ▸ Hydrology ▸ Snow Packs</span>. Assign a snow pack to a subcatchment with its <span class="ui">Snow Pack</span> property. Snowmelt also needs air temperature and the settings on the <a href="#pe-climatology">Climatology</a> Snow Melt and Areal Depletion tabs.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydrology ▸ Snow Packs</span>.</li>
+<li>Click <span class="ui">+</span> to add a snow pack (named <code>Snow1</code> …, with default values), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Edit the values on the <span class="ui">Snow Pack Parameters</span> tab, then the <span class="ui">Snow Removal Parameters</span> tab.</li>
+<li>Click <span class="ui">OK</span>. Renaming a snow pack also updates the subcatchments that use it. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<h3>Snow Pack Parameters tab</h3>
+<p>A table with one column each for the <span class="ui">Plowable</span>, <span class="ui">Impervious</span> and <span class="ui">Pervious</span> areas. A blank cell takes the default value. Depths are water equivalents.</p>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Snow Pack Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Min. Melt Coeff.</span> (in/hr/deg, mm/hr/deg)</td><td>Degree-day melt coefficient on December 21. Default 0.001 (US) / 0.025 (SI).</td></tr>
+<tr><td><span class="ui">Max. Melt Coeff.</span> (in/hr/deg, mm/hr/deg)</td><td>Degree-day melt coefficient on June 21. Default as Min. Melt Coeff.</td></tr>
+<tr><td><span class="ui">Base Temperature</span> (°F, °C)</td><td>Air temperature at which snow begins to melt. Default 32 °F / 0 °C.</td></tr>
+<tr><td><span class="ui">Fraction Free Water Capacity</span></td><td>Volume of liquid water the pack can hold, as a fraction of the snow depth. Default 0.10.</td></tr>
+<tr><td><span class="ui">Initial Snow Depth</span> (in, mm)</td><td>Snow depth at the start of the simulation. Default 0.</td></tr>
+<tr><td><span class="ui">Initial Free Water</span> (in, mm)</td><td>Liquid water in the pack at the start. Default 0.</td></tr>
+<tr><td><span class="ui">Depth at 100% Cover</span> (in, mm)</td><td>Snow depth above which the whole area is covered (used with the areal depletion curves). Impervious and Pervious only; default 1 in / 25 mm.</td></tr>
+<tr><td><span class="ui">Fraction of Impervious Area That is Plowable</span></td><td>Part of the impervious area that is plowed (the Plowable column). Default 0.</td></tr>
+</table></div>
+<h3>Snow Removal Parameters tab</h3>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Depth at which snow removal begins</span> (in, mm)</td><td>Depth on the plowable area above which snow is removed. Default 1 in / 25 mm.</td></tr>
+<tr><td><span class="ui">Fraction transferred out of the watershed</span></td><td>Part of the removed snow taken out of the study area.</td></tr>
+<tr><td><span class="ui">Fraction transferred to the impervious area</span></td><td>Part moved to the non-plowable impervious area.</td></tr>
+<tr><td><span class="ui">Fraction transferred to the pervious area</span></td><td>Part moved to the pervious area.</td></tr>
+<tr><td><span class="ui">Fraction converted into immediate melt</span></td><td>Part converted to liquid runoff at once.</td></tr>
+<tr><td><span class="ui">Fraction moved to another subcatchment</span></td><td>Part moved onto the pervious area of the subcatchment named below.</td></tr>
+<tr><td><span class="ui">Subcatchment name</span></td><td>The subcatchment that receives that part.</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="pe-unithydrographs" data-ch="Model parameters" data-title="Unit Hydrograph Editor">
+<h1>Unit Hydrograph Editor</h1>
+<p class="lead">A unit hydrograph group describes rainfall-derived inflow and infiltration (RDII): the part of the rainfall that enters the sewer through leaks and illicit connections. Each group has up to three triangular unit hydrographs (short, medium and long term) and can differ per month. Open the <span class="ui">Unit Hydrograph Editor</span> from <span class="ui">Parameter View ▸ Hydrology ▸ Unit Hydrographs</span>. A node receives RDII through its <span class="ui">Unit Hydrograph Group</span> and <span class="ui">Sewershed Area</span> properties (RDII group in the Properties pane).</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydrology ▸ Unit Hydrographs</span>.</li>
+<li>Click <span class="ui">+</span> to add a group (named <code>UH1</code> …, using the first rain gage of the model), <span class="ui">⧉</span> to copy the selected group, or <span class="ui">−</span> to delete it.</li>
+<li>Choose the <span class="ui">Rain Gage Used</span>. Every group needs a rain gage.</li>
+<li>Under <span class="ui">Hydrographs For</span> choose <b>All Months</b> or a single month.</li>
+<li>Enter R, T and K on the <span class="ui">Unit Hydrographs</span> tab and, if needed, the initial abstraction on the <span class="ui">Initial Abstraction Depth</span> tab. Switch to another month to enter values for it; the values of each month are kept.</li>
+<li>Click <span class="ui">OK</span>. Rows that are all zero are not written. Renaming a group also updates the nodes that use it. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Name of UH Group</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Rain Gage Used</span></td><td>Rain gage whose rainfall generates the RDII.</td></tr>
+<tr><td><span class="ui">Hydrographs For</span></td><td><b>All Months</b> or <b>Jan</b> … <b>Dec</b>. Parameters given for a single month replace those of All Months in that month.</td></tr>
+<tr><td><span class="ui">R</span></td><td>Fraction of the rainfall volume that becomes RDII, for the <span class="ui">Short-Term</span>, <span class="ui">Medium-Term</span> and <span class="ui">Long-Term</span> hydrograph.</td></tr>
+<tr><td><span class="ui">T</span></td><td>Time to the peak of the hydrograph (hours).</td></tr>
+<tr><td><span class="ui">K</span></td><td>Duration of the falling limb divided by the duration of the rising limb.</td></tr>
+<tr><td><span class="ui">Maximum Depth</span> (in, mm)</td><td>Maximum initial abstraction depth: rainfall that is held back before RDII starts.</td></tr>
+<tr><td><span class="ui">Recovery Rate</span> (in/day, mm/day)</td><td>Rate at which the abstraction capacity recovers in dry weather.</td></tr>
+<tr><td><span class="ui">Initial Depth</span> (in, mm)</td><td>Abstraction depth already used at the start of the simulation.</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>The sum of R of the three hydrographs is the total fraction of rainfall that enters the sewer as RDII. Typical short-term T values are a few hours; long-term values can be a day or more.</p></div>
+</section>
+
+<section class="topic" id="pe-lid" data-ch="Model parameters" data-title="LID Control Editor">
+<h1>LID Control Editor</h1>
+<p class="lead">An LID (low impact development) control describes a green infrastructure practice as a stack of layers: surface, pavement, soil, storage, drain or drain mat. Open the <span class="ui">LID Control Editor</span> from <span class="ui">Parameter View ▸ Hydrology ▸ LID Controls</span>. An LID control is placed in a subcatchment with the <span class="ui">LID Usages</span> row (pencil button) in the subcatchment's Properties, which sets the number and size of the units.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydrology ▸ LID Controls</span>.</li>
+<li>Click <span class="ui">+</span> to add a control (named <code>LID1</code> …, type Bio-Retention Cell), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Choose the <span class="ui">LID Type</span>. A schematic cross section of the type is drawn next to it, and the <span class="ui">Structure Layer</span> tabs change to the layers of that type.</li>
+<li>Fill in each layer tab. Values you leave blank take the defaults below.</li>
+<li>Click <span class="ui">OK</span>. Renaming a control also updates the LID usages that refer to it. The change can be undone.</li>
+</ol>
+<div class="tablewrap"><table>
+<tr><th>LID Type</th><th>Layer tabs</th></tr>
+<tr><td>Bio-Retention Cell</td><td>Surface, Soil, Storage, Drain</td></tr>
+<tr><td>Rain Garden</td><td>Surface, Soil, Storage</td></tr>
+<tr><td>Green Roof</td><td>Surface, Soil, Drain Mat</td></tr>
+<tr><td>Infiltration Trench</td><td>Surface, Storage, Drain</td></tr>
+<tr><td>Permeable Pavement</td><td>Surface, Pavement, Soil, Storage, Drain</td></tr>
+<tr><td>Rain Barrel</td><td>Storage, Drain</td></tr>
+<tr><td>Rooftop Disconnection</td><td>Surface, Drain</td></tr>
+<tr><td>Vegetative Swale</td><td>Surface</td></tr>
+</table></div>
+<h2>Fields</h2>
+<p>Defaults are given in US units; with SI flow units the depth and rate defaults are the metric equivalents (for example 6 in = 152.4 mm).</p>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">LID Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">LID Type</span></td><td>One of the eight types in the table above.</td></tr>
+<tr><th colspan="2">Surface</th></tr>
+<tr><td><span class="ui">Berm Height</span> (in, mm)</td><td>Maximum depth of water that can pond on the surface before overflow. Default 6.</td></tr>
+<tr><td><span class="ui">Vegetation Volume Fraction</span></td><td>Fraction of the ponding volume filled by plant stems and leaves. Default 0.</td></tr>
+<tr><td><span class="ui">Surface Roughness (Manning n)</span></td><td>Manning's n for overland flow across the surface (pavement, roof, swale). Default 0.1.</td></tr>
+<tr><td><span class="ui">Surface Slope (%)</span></td><td>Slope of the surface for overland flow. Default 1.</td></tr>
+<tr><td><span class="ui">Swale Side Slope (run/rise)</span></td><td>Side slope of the swale cross section (vegetative swales). Default 5.</td></tr>
+<tr><th colspan="2">Soil</th></tr>
+<tr><td><span class="ui">Thickness</span> (in, mm)</td><td>Thickness of the engineered soil layer. Default 12.</td></tr>
+<tr><td><span class="ui">Porosity (volume fraction)</span></td><td>Void volume divided by total volume. Default 0.5.</td></tr>
+<tr><td><span class="ui">Field Capacity (volume fraction)</span></td><td>Moisture content after free drainage; water drains to the layer below only above this value. Default 0.2.</td></tr>
+<tr><td><span class="ui">Wilting Point (volume fraction)</span></td><td>Moisture content below which evapotranspiration stops. Default 0.1.</td></tr>
+<tr><td><span class="ui">Conductivity</span> (in/hr, mm/hr)</td><td>Saturated hydraulic conductivity. Default 0.5.</td></tr>
+<tr><td><span class="ui">Conductivity Slope</span></td><td>Slope of log(conductivity) versus moisture content. Default 10.</td></tr>
+<tr><td><span class="ui">Suction Head</span> (in, mm)</td><td>Average capillary suction at the wetting front (Green-Ampt). Default 3.5.</td></tr>
+<tr><th colspan="2">Pavement</th></tr>
+<tr><td><span class="ui">Thickness</span> (in, mm)</td><td>Thickness of the pavement layer. Default 6.</td></tr>
+<tr><td><span class="ui">Void Ratio (voids / solids)</span></td><td>Void volume divided by solids volume. Default 0.15.</td></tr>
+<tr><td><span class="ui">Impervious Surface Fraction</span></td><td>Fraction of the surface that is impervious (for modular pavers). Default 0.</td></tr>
+<tr><td><span class="ui">Permeability</span> (in/hr, mm/hr)</td><td>Rate at which water passes through the pavement. Default 100.</td></tr>
+<tr><td><span class="ui">Clogging Factor</span></td><td>Number of pavement void volumes of treated runoff that completely clog the pavement. 0 = no clogging. Default 0.</td></tr>
+<tr><td><span class="ui">Regeneration Interval (days)</span></td><td>Days between treatments (for example vacuuming) that restore the permeability. 0 = none. Default 0.</td></tr>
+<tr><td><span class="ui">Regeneration Fraction</span></td><td>Fraction of the clogging removed by each treatment. Default 0.</td></tr>
+<tr><th colspan="2">Storage</th></tr>
+<tr><td><span class="ui">Thickness / Height</span> (in, mm)</td><td>Thickness of the gravel storage layer, or height of a rain barrel. Default 12.</td></tr>
+<tr><td><span class="ui">Void Ratio (voids / solids)</span></td><td>Void volume divided by solids volume (ignored for rain barrels). Default 0.75.</td></tr>
+<tr><td><span class="ui">Seepage Rate</span> (in/hr, mm/hr)</td><td>Rate at which water seeps from the bottom of the layer into the native soil. Default 0.5.</td></tr>
+<tr><td><span class="ui">Clogging Factor</span></td><td>Total volume of treated runoff, in storage void volumes, that clogs the bottom completely. 0 = no clogging. Default 0.</td></tr>
+<tr><td><span class="ui">Covered (YES / NO)</span></td><td>Rain barrels: YES if the barrel is covered (no rainfall enters directly). Default YES.</td></tr>
+<tr><th colspan="2">Drain</th></tr>
+<tr><td><span class="ui">Flow Coefficient</span></td><td>Coefficient C of the underdrain equation <i>q = C (h − H<sub>d</sub>)<sup>n</sup></i>. 0 = no underdrain. Default 0.</td></tr>
+<tr><td><span class="ui">Flow Exponent</span></td><td>Exponent n of the same equation (0.5 for flow through an orifice). Default 0.5.</td></tr>
+<tr><td><span class="ui">Offset</span> (in, mm)</td><td>Height H<sub>d</sub> of the drain above the bottom of the storage layer. Default 6.</td></tr>
+<tr><td><span class="ui">Drain Delay (hours)</span></td><td>Rain barrels: hours after the end of rainfall before the drain opens. Default 6.</td></tr>
+<tr><td><span class="ui">Flow Open Level</span> (in, mm)</td><td>Water height in the storage layer at which the drain opens. 0 = not used. Default 0.</td></tr>
+<tr><td><span class="ui">Flow Closed Level</span> (in, mm)</td><td>Water height at which the drain closes. 0 = not used. Default 0.</td></tr>
+<tr><td><span class="ui">Control Curve</span></td><td>Optional name of a Control curve that adjusts the drain flow with the head above the drain.</td></tr>
+<tr><th colspan="2">Drain Mat</th></tr>
+<tr><td><span class="ui">Thickness</span> (in, mm)</td><td>Thickness of the drainage mat of a green roof. Default 3.</td></tr>
+<tr><td><span class="ui">Void Fraction</span></td><td>Void volume divided by the total volume of the mat. Default 0.5.</td></tr>
+<tr><td><span class="ui">Roughness (Manning n)</span></td><td>Manning's n for flow through the mat. Default 0.1.</td></tr>
+</table></div>
+<div class="callout"><b class="t">Note:</b><p>Pollutant removal lines of an LID control that are read from an <code>.inp</code> file are kept when you edit the control, but they are not shown in this editor.</p></div>
+</section>
+
+<section class="topic" id="pe-transects" data-ch="Model parameters" data-title="Transect Editor">
+<h1>Transect Editor</h1>
+<p class="lead">A transect is the measured cross section of a natural channel, given as station/elevation pairs with separate roughness for the left overbank, the right overbank and the main channel. Conduits with the cross section shape <b>Irregular</b> use a transect. Open the <span class="ui">Transect Editor</span> from <span class="ui">Parameter View ▸ Hydraulics ▸ Transects</span>; pick the transect of a conduit in its <span class="ui">Transect</span> property (Cross Section group).</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydraulics ▸ Transects</span>.</li>
+<li>Click <span class="ui">+</span> to add a transect (named <code>TST_1</code> …), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Type the station and elevation of each point in the <span class="ui">Data</span> table (30 rows), from left to right looking downstream. The plot below the table is redrawn while you type; the bank stations appear as dashed lines marked L and R.</li>
+<li>Enter the roughness, bank stations and modifiers under <span class="ui">Properties</span>.</li>
+<li>Click <span class="ui">OK</span>. Every transect needs at least two points. Renaming a transect also updates the irregular conduits that use it. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Station</span> (ft, m)</td><td>Horizontal distance of the point from a reference on the left.</td></tr>
+<tr><td><span class="ui">Elevation</span> (ft, m)</td><td>Elevation of the channel bottom or bank at that station.</td></tr>
+<tr><td><span class="ui">Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Description</span></td><td>Optional text, saved as a comment line above the transect.</td></tr>
+<tr><td><span class="ui">Left Bank</span></td><td>Manning's n of the left overbank. Default 0.01.</td></tr>
+<tr><td><span class="ui">Right Bank</span></td><td>Manning's n of the right overbank. Default 0.01.</td></tr>
+<tr><td><span class="ui">Channel</span></td><td>Manning's n of the main channel. Default 0.01.</td></tr>
+<tr><td><span class="ui">Bank Stations ▸ Left</span> (ft, m)</td><td>Station where the main channel ends and the left overbank begins. 0 = no left overbank.</td></tr>
+<tr><td><span class="ui">Bank Stations ▸ Right</span> (ft, m)</td><td>Station where the main channel ends and the right overbank begins. 0 = no right overbank.</td></tr>
+<tr><td><span class="ui">Modifiers ▸ Stations</span></td><td>Factor by which all station distances are multiplied. 0 = no change.</td></tr>
+<tr><td><span class="ui">Modifiers ▸ Elevations</span></td><td>Constant added to all elevations. Default 0.</td></tr>
+<tr><td><span class="ui">Modifiers ▸ Meander</span></td><td>Ratio of the length of a meandering main channel to the length of the overbank area around it. Applied to the length of conduits using the transect. 0 = no change.</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="pe-controls" data-ch="Model parameters" data-title="Control Rule Editor">
+<h1>Control Rule Editor</h1>
+<p class="lead">Control rules change the setting of pumps, orifices, weirs and other links during the simulation depending on the state of the system, for example "start the pump when the wet well is deeper than 2 m". Open the <span class="ui">Control Rule Editor</span> from <span class="ui">Parameter View ▸ Hydraulics ▸ Controls</span>. Each rule is one item in the list; named variables and expressions are shared by all rules.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydraulics ▸ Controls</span>.</li>
+<li>Click <span class="ui">+</span> to add a rule (named <code>R1</code> …). A new rule starts with a template: <code>IF NODE  DEPTH &gt; 0</code> / <code>THEN PUMP  STATUS = ON</code> / <code>PRIORITY 1</code>. Fill in the object names.</li>
+<li>Use <span class="ui">⧉</span> to copy the selected rule or <span class="ui">−</span> to delete it.</li>
+<li>Edit the rule in the <span class="ui">Control Statement</span> box.</li>
+<li>Click <span class="ui">Variables</span> to edit the named variables (<span class="ui">Named Variables</span> dialog) or <span class="ui">Expressions</span> to edit the named expressions (<span class="ui">Named Expressions</span> dialog). Enter one definition per line.</li>
+<li>Click <span class="ui">OK</span>. The rules, variables and expressions are saved together and the change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Name</span></td><td>Unique name of the rule.</td></tr>
+<tr><td><span class="ui">Control Statement</span></td><td>The rule text, without the <code>RULE</code> line: <code>IF</code> condition, optional <code>AND</code> / <code>OR</code> conditions, <code>THEN</code> actions, optional <code>ELSE</code> actions (also joined with <code>AND</code>) and an optional <code>PRIORITY</code> value used when several rules act on the same link at once.</td></tr>
+<tr><td><span class="ui">Variables</span></td><td>Lines of the form <code>VARIABLE name = object id attribute</code>, for example <code>VARIABLE N1 = NODE J1 DEPTH</code>. The name can then be used in conditions. The word <code>VARIABLE</code> is added if you leave it out.</td></tr>
+<tr><td><span class="ui">Expressions</span></td><td>Lines of the form <code>EXPRESSION name = math expression</code> that combine variables, for example the average of two depths. The word <code>EXPRESSION</code> is added if you leave it out.</td></tr>
+</table></div>
+<p>Example of a complete statement:</p>
+<pre><code>IF NODE WW1 DEPTH &gt; 2
+THEN PUMP P1 STATUS = ON
+ELSE PUMP P1 STATUS = OFF
+PRIORITY 1</code></pre>
+<div class="callout"><b class="t">Note:</b><p>When you delete an object from the map, the rules that refer to it (directly or through a variable or expression) are removed as well.</p></div>
+</section>
+
+<section class="topic" id="pe-streets" data-ch="Model parameters" data-title="Streets">
+<h1>Streets</h1>
+<p class="lead">A street describes the cross section of a road with curb and gutter, used by conduits with the cross section shape <b>Street</b> (property <span class="ui">Street Section</span>) to model surface flow along the street. Open the table from <span class="ui">Parameter View ▸ Hydraulics ▸ Streets</span>.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydraulics ▸ Streets</span>. The <span class="ui">Streets</span> table shows one row per street.</li>
+<li>Click <span class="ui">+ Add Row</span> to add a street and type its values. Leave optional trailing values blank.</li>
+<li>Click <span class="ui">−</span> at the end of a row to delete it. Rows without a name are ignored.</li>
+<li>Click <span class="ui">OK</span>. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Name</span></td><td>Unique name of the street section.</td></tr>
+<tr><td><span class="ui">Crown Width</span> (ft, m)</td><td>Distance from the curb to the street crown.</td></tr>
+<tr><td><span class="ui">Curb Height</span> (ft, m)</td><td>Height of the curb.</td></tr>
+<tr><td><span class="ui">Cross Slope (%)</span></td><td>Cross slope of the road surface.</td></tr>
+<tr><td><span class="ui">Roughness</span></td><td>Manning's n of the road surface.</td></tr>
+<tr><td><span class="ui">Depression Height</span> (in, mm)</td><td>Depth of the gutter depression below the normal cross slope.</td></tr>
+<tr><td><span class="ui">Depression Width</span> (ft, m)</td><td>Width of the gutter depression.</td></tr>
+<tr><td><span class="ui">Sides (1/2)</span></td><td>1 for a one-sided street (one curb), 2 for both sides.</td></tr>
+<tr><td><span class="ui">Backing Width</span> (ft, m)</td><td>Width of the area behind the curb (sidewalk or verge) that carries flow when the curb is overtopped.</td></tr>
+<tr><td><span class="ui">Backing Slope (%)</span></td><td>Cross slope of the backing.</td></tr>
+<tr><td><span class="ui">Backing Roughness</span></td><td>Manning's n of the backing.</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="pe-inlets" data-ch="Model parameters" data-title="Inlets">
+<h1>Inlets</h1>
+<p class="lead">An inlet design describes a street inlet (grate, curb opening, slotted drain …) that captures part of the flow in a street conduit. Designs are defined here and placed on conduits in <a href="#pe-inletusage">Inlet Usage</a>. Open the table from <span class="ui">Parameter View ▸ Hydraulics ▸ Inlets</span>.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydraulics ▸ Inlets</span>.</li>
+<li>Click <span class="ui">+ Add Row</span>, enter a name, choose the <span class="ui">Type</span> and fill in the parameters that the type needs. Leave unused trailing parameters blank.</li>
+<li>Click <span class="ui">−</span> at the end of a row to delete it.</li>
+<li>Click <span class="ui">OK</span>. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Name</span></td><td>Unique name of the inlet design. One design may have several rows (for example a grate and a curb opening for a combination inlet).</td></tr>
+<tr><td><span class="ui">Type</span></td><td><b>GRATE</b>, <b>CURB</b>, <b>SLOTTED</b>, <b>DROP_GRATE</b>, <b>DROP_CURB</b> or <b>CUSTOM</b>.</td></tr>
+<tr><td><span class="ui">Param 1 (length / curve)</span></td><td>Length of the inlet (ft, m) along the street. CUSTOM: name of a Diversion or Rating curve that gives the captured flow.</td></tr>
+<tr><td><span class="ui">Param 2 (width / height)</span></td><td>Width of a grate or slot, or height of a curb opening (ft, m).</td></tr>
+<tr><td><span class="ui">Param 3 (grate type / throat)</span></td><td>GRATE / DROP_GRATE: the grate type (for example <code>P_BAR-50</code>, <code>CURVED_VANE</code>, <code>GENERIC</code>). CURB: the throat angle (<code>HORIZONTAL</code>, <code>INCLINED</code> or <code>VERTICAL</code>).</td></tr>
+<tr><td><span class="ui">Param 4 (open area)</span></td><td>GENERIC grates only: open area of the grate (ft², m²).</td></tr>
+<tr><td><span class="ui">Param 5 (splash velocity)</span></td><td>GENERIC grates only: splash-over velocity (ft/s, m/s).</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="pe-inletusage" data-ch="Model parameters" data-title="Inlet Usage">
+<h1>Inlet Usage</h1>
+<p class="lead">Inlet Usage places <a href="#pe-inlets">inlet designs</a> on street conduits and sends the captured flow to a node of the sewer system. Open the table from <span class="ui">Parameter View ▸ Hydraulics ▸ Inlet Usage</span>.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Hydraulics ▸ Inlet Usage</span>.</li>
+<li>Click <span class="ui">+ Add Row</span>. Type the conduit, inlet and capture node; the cells suggest matching names from the model as you type.</li>
+<li>Fill in the remaining values or leave optional trailing values blank.</li>
+<li>Click <span class="ui">−</span> at the end of a row to delete it, then <span class="ui">OK</span>. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Conduit</span></td><td>Street conduit on which the inlets are placed.</td></tr>
+<tr><td><span class="ui">Inlet</span></td><td>Name of the inlet design.</td></tr>
+<tr><td><span class="ui">Capture Node</span></td><td>Node of the sewer system that receives the captured flow.</td></tr>
+<tr><td><span class="ui">Number of Inlets</span></td><td>Number of inlets on each side of the street.</td></tr>
+<tr><td><span class="ui">% Clogged</span></td><td>Percentage by which the capture capacity is reduced by clogging.</td></tr>
+<tr><td><span class="ui">Flow Restriction</span></td><td>Maximum flow each inlet can capture (flow units). 0 = no limit.</td></tr>
+<tr><td><span class="ui">Local Depression Height</span></td><td>Height of a local gutter depression at the inlet (in, mm).</td></tr>
+<tr><td><span class="ui">Local Depression Width</span></td><td>Width of that local depression (ft, m).</td></tr>
+<tr><td><span class="ui">Placement</span></td><td><b>AUTOMATIC</b> (decided from the conduit slope), <b>ON_GRADE</b> or <b>ON_SAG</b> (at a low point).</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="pe-pollutants" data-ch="Model parameters" data-title="Pollutant Editor">
+<h1>Pollutant Editor</h1>
+<p class="lead">Pollutants are the water quality constituents the model tracks: they build up on land surfaces, wash off with runoff, enter with inflows and are routed through the network. Open the <span class="ui">Pollutant Editor</span> from <span class="ui">Parameter View ▸ Quality ▸ Pollutants</span>. Define the pollutants before the <a href="#pe-landuses">land uses</a>, because buildup and washoff are entered per pollutant.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Quality ▸ Pollutants</span>.</li>
+<li>Click <span class="ui">+</span> to add a pollutant (named <code>PLT_1</code> …, unit MG/L, all values 0), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Edit the properties on the right.</li>
+<li>Click <span class="ui">OK</span>. Renaming a pollutant also updates buildup, washoff, treatment, inflows, dry weather flows, co-pollutant references and LID removal data. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Unit Type</span></td><td>Concentration units: <b>MG/L</b>, <b>UG/L</b> or <b>#/L (counts)</b> (for bacteria). All concentrations below use this unit.</td></tr>
+<tr><td><span class="ui">Rain Concen.</span></td><td>Concentration in rainfall. Default 0.</td></tr>
+<tr><td><span class="ui">GW Concen.</span></td><td>Concentration in groundwater flow. Default 0.</td></tr>
+<tr><td><span class="ui">I&amp;I Concen.</span></td><td>Concentration in RDII (inflow and infiltration). Default 0.</td></tr>
+<tr><td><span class="ui">DWF Concen.</span></td><td>Concentration in dry weather flow (unless a node gives its own value). Default 0.</td></tr>
+<tr><td><span class="ui">Init. Concen.</span></td><td>Concentration in the conveyance system at the start of the simulation. Default 0.</td></tr>
+<tr><td><span class="ui">Decay Coeff. (1/days)</span></td><td>First-order decay coefficient in the network. Default 0.</td></tr>
+<tr><td><span class="ui">Co-Pollutant</span></td><td>Another pollutant whose runoff concentration contributes to this one. <code>&lt;None&gt;</code> = no co-pollutant.</td></tr>
+<tr><td><span class="ui">Co-Fraction</span></td><td>Fraction of the co-pollutant's runoff concentration added to this pollutant. Default 0.</td></tr>
+<tr><td><span class="ui">Snow Only</span></td><td>When ticked, buildup occurs only when there is snow cover (for example de-icing salt).</td></tr>
+</table></div>
+</section>
+
+<section class="topic" id="pe-landuses" data-ch="Model parameters" data-title="Landuse Editor">
+<h1>Landuse Editor</h1>
+<p class="lead">A land use (residential, commercial, roads …) defines how each pollutant builds up on the surface in dry weather and washes off during rain, and how street sweeping removes it. Open the <span class="ui">Landuse Editor</span> from <span class="ui">Parameter View ▸ Quality ▸ Land Uses</span>. A subcatchment is divided between land uses with the <span class="ui">Land Uses</span> row (pencil button) in its Properties, which sets the <span class="ui">% of Area</span> of each land use.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Define the pollutants first (<a href="#pe-pollutants">Pollutant Editor</a>). Without pollutants the editor shows only the General fields.</li>
+<li>Click <span class="ui">Parameter View ▸ Quality ▸ Land Uses</span>.</li>
+<li>Click <span class="ui">+</span> to add a land use (named <code>LU_1</code> …, no buildup or washoff), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Fill in the <span class="ui">General</span> fields.</li>
+<li>Under <span class="ui">Pollutant</span> there is one tab per pollutant. On each tab choose the buildup and washoff functions and enter their coefficients. Fields that the chosen function does not use are disabled.</li>
+<li>Click <span class="ui">OK</span>. Renaming a land use also updates the subcatchment coverages. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><th colspan="2">General</th></tr>
+<tr><td><span class="ui">Landuse Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Description</span></td><td>Optional text about the land use; saved as a comment line before the land use in the <code>.inp</code> file.</td></tr>
+<tr><td><span class="ui">Sweeping Interval (days)</span></td><td>Days between street sweepings. 0 = no sweeping.</td></tr>
+<tr><td><span class="ui">Availability (fraction)</span></td><td>Fraction of the buildup that is available for removal by sweeping.</td></tr>
+<tr><td><span class="ui">Last Swept (days)</span></td><td>Days since the last sweeping at the start of the simulation.</td></tr>
+<tr><th colspan="2">Buildup (per pollutant)</th></tr>
+<tr><td><span class="ui">Function</span></td><td><b>No Buildup</b>; <b>Power</b>: B = min(C1, C2·t<sup>C3</sup>); <b>Exponential</b>: B = C1·(1 − e<sup>−C2·t</sup>); <b>Saturation</b>: B = C1·t / (C3 + t); <b>External Time Series</b>: the buildup rate comes from a time series, scaled and limited to C1. t = days of dry weather.</td></tr>
+<tr><td><span class="ui">Max. Buildup</span></td><td>C1: maximum possible buildup (mass per unit of the normalizer).</td></tr>
+<tr><td><span class="ui">Rate Constant</span></td><td>C2: buildup rate constant (Power, Exponential). Shown as <span class="ui">Scaling Factor</span> for External Time Series.</td></tr>
+<tr><td><span class="ui">Power/Sat. Constant</span></td><td>C3: time exponent (Power). Shown as <span class="ui">Half-Saturation Constant (days)</span> for Saturation – the days needed to reach half the maximum – and as <span class="ui">Time Series</span> (with a <span class="ui">✎</span> button to open the Time Series Editor) for External Time Series.</td></tr>
+<tr><td><span class="ui">Normalizer</span></td><td><b>Area</b> (buildup per unit area) or <b>Curb Length</b> (buildup per unit curb length of the subcatchment).</td></tr>
+<tr><th colspan="2">Washoff (per pollutant)</th></tr>
+<tr><td><span class="ui">Function</span></td><td><b>No Washoff</b>; <b>Exponential</b>: washoff = C1·q<sup>C2</sup>·B (q = runoff rate per unit area, B = buildup); <b>Rating Curve</b>: washoff = C1·Q<sup>C2</sup> (Q = runoff flow); <b>Event Mean Concentration</b>: runoff has the constant concentration C1.</td></tr>
+<tr><td><span class="ui">Coefficient</span></td><td>C1 of the washoff function (the concentration for EMC).</td></tr>
+<tr><td><span class="ui">Exponent</span></td><td>C2 of the washoff function. Not used for Event Mean Concentration.</td></tr>
+<tr><td><span class="ui">Cleaning Effic. (%)</span></td><td>Percentage of the available buildup removed by each street sweeping.</td></tr>
+<tr><td><span class="ui">BMP Effic. (%)</span></td><td>Removal efficiency of best management practices applied to the washoff from this land use.</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>The initial buildup of a pollutant on a subcatchment is set in the subcatchment's Properties (Initial Buildup group). If it is 0, the buildup at the start is computed from the <span class="ui">Antecedent Dry Days</span> of the Simulation Options.</p></div>
+</section>
+
+<section class="topic" id="pe-curves" data-ch="Model parameters" data-title="Curve editors">
+<h1>Curve editors</h1>
+<p class="lead">Curves are x–y tables used by many objects: storage volume, pump performance, outlet ratings, custom conduit shapes, tidal stages and more. Each curve type has its own editor. Open one from <span class="ui">Parameter View ▸ Curves</span>: <span class="ui">Control Curves</span>, <span class="ui">Diversion Curves</span>, <span class="ui">Pump Curves</span>, <span class="ui">Rating Curves</span>, <span class="ui">Shape Curves</span>, <span class="ui">Storage Curves</span>, <span class="ui">Tidal Curves</span> or <span class="ui">Weir Curves</span>. In the Properties pane, the <span class="ui">✎</span> button next to a curve property (for example <span class="ui">Pump Curve</span> or <span class="ui">Storage Curve</span>) opens the matching editor with that curve selected.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click the curve type under <span class="ui">Parameter View ▸ Curves</span>. The list shows only curves of that type.</li>
+<li>Click <span class="ui">+</span> to add a curve (named <code>CV_1</code> …), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Type the x and y values in the table. A new empty row appears when you type in the last row.</li>
+<li>Use the toolbar above the table:
+<ul>
+<li><span class="ui">Import</span> reads x/y pairs from a text file (<code>.txt</code>, <code>.csv</code>, <code>.dat</code>, <code>.crv</code>). Values may be separated by spaces, tabs, commas or semicolons; lines that do not start with two numbers (for example a header) are skipped.</li>
+<li><span class="ui">Export</span> writes the table with a header row to <code>.txt</code> (tab-separated) or <code>.csv</code>.</li>
+<li><span class="ui">Copy</span> puts the table on the clipboard, ready to paste into Excel; <span class="ui">Paste</span> replaces the table with x/y pairs copied from Excel.</li>
+<li><span class="ui">Clear</span> empties the table; <span class="ui">View</span> shows the curve as a graph in the <span class="ui">Curve Viewer</span>.</li>
+</ul></li>
+<li>For pump curves, choose the pump curve <span class="ui">Type</span> (PUMP1 … PUMP5). The column headings and the explanation below the table change with the type.</li>
+<li>Click <span class="ui">OK</span>. Every curve needs at least one point, all values must be numbers and the x values must increase. A curve name must be unique among all curve types. Renaming a curve also updates the pumps, weirs, outlets, custom conduits, storage units, dividers, outfalls, control rules and LID drains that use it. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Curve Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Description</span></td><td>Optional text.</td></tr>
+<tr><td><span class="ui">Type</span></td><td>Pump curves only: PUMP1 … PUMP5 (see below).</td></tr>
+<tr><td>Data table</td><td>The x and y columns; headings and units depend on the curve type (table below).</td></tr>
+</table></div>
+<div class="tablewrap"><table>
+<tr><th>Curve type</th><th>Columns and use</th></tr>
+<tr><td>Control</td><td><span class="ui">Controller Value</span> / <span class="ui">Controller Setting</span>. Used by control rules that set a link from the value of a controlling variable.</td></tr>
+<tr><td>Diversion</td><td><span class="ui">Inflow</span> / <span class="ui">Outflow</span> (flow units). Diverted flow versus total inflow of a Tabular flow divider (<span class="ui">Diversion Curve</span> property); also usable by CUSTOM inlets.</td></tr>
+<tr><td>Pump – PUMP1</td><td><span class="ui">Volume</span> (ft³, m³) / <span class="ui">Flow</span>. Off-line pump with a wet well; flow increases in steps with the available wet well volume.</td></tr>
+<tr><td>Pump – PUMP2</td><td><span class="ui">Depth</span> / <span class="ui">Flow</span>. In-line pump; flow increases in steps with the inlet node depth.</td></tr>
+<tr><td>Pump – PUMP3</td><td><span class="ui">Head</span> / <span class="ui">Flow</span>. In-line pump; flow varies continuously with the head difference between outlet and inlet nodes.</td></tr>
+<tr><td>Pump – PUMP4</td><td><span class="ui">Depth</span> / <span class="ui">Flow</span>. Variable speed in-line pump; flow varies continuously with the inlet node depth.</td></tr>
+<tr><td>Pump – PUMP5</td><td><span class="ui">Head</span> / <span class="ui">Flow</span>. Variable speed version of PUMP3; the curve is for full speed and the pump setting scales it.</td></tr>
+<tr><td>Rating</td><td><span class="ui">Head</span> (ft, m) / <span class="ui">Outflow</span>. Outflow of an Outlet link with a Tabular rating curve.</td></tr>
+<tr><td>Shape</td><td><span class="ui">Depth / Full Depth</span> / <span class="ui">Width / Full Depth</span>. Cross section of a conduit with the Custom shape (<span class="ui">Shape Curve</span>), both columns relative to the full depth.</td></tr>
+<tr><td>Storage</td><td><span class="ui">Depth</span> (ft, m) / <span class="ui">Area</span> (ft², m²). Surface area of a Tabular storage unit versus depth.</td></tr>
+<tr><td>Tidal</td><td><span class="ui">Hour of Day</span> / <span class="ui">Stage</span> (ft, m). Water level of a Tidal outfall over the day.</td></tr>
+<tr><td>Weir</td><td><span class="ui">Head</span> (ft, m) / <span class="ui">Coefficient</span>. Discharge coefficient of a weir versus head (<span class="ui">Coefficient Curve</span> property).</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>For a quick start, copy two columns from an Excel sheet and click <span class="ui">Paste</span>; then click <span class="ui">View</span> to check the shape before you click OK.</p></div>
+</section>
+
+<section class="topic" id="pe-timeseries" data-ch="Model parameters" data-title="Time Series Editor">
+<h1>Time Series Editor</h1>
+<p class="lead">A time series is a list of time–value pairs: rainfall for a rain gage, an inflow hydrograph for a node, a tidal level for an outfall, air temperature or evaporation, or an external buildup rate. Open the <span class="ui">Time Series Editor</span> from <span class="ui">Parameter View ▸ Time Series</span>. The <span class="ui">✎</span> button next to a time series property in the Properties pane (for example the <span class="ui">Time Series</span> of a rain gage or outfall) and in other editors opens it with that series selected.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Time Series</span>.</li>
+<li>Click <span class="ui">+</span> to add a series (named <code>TS_1</code> …), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Choose where the data come from: <span class="ui">File</span> (an external data file, chosen with <span class="ui">…</span>) or <span class="ui">Data</span> (the table in the editor). Typing in the table selects Data; choosing a file selects File.</li>
+<li>Enter the data in the table: <span class="ui">Date (M/D/Y)</span>, <span class="ui">Time (H:M)</span> and <span class="ui">Value</span>. A new empty row appears when you type in the last row.</li>
+<li>Use the toolbar:
+<ul>
+<li><span class="ui">Import</span> reads a text file (<code>.txt</code>, <code>.csv</code>, <code>.dat</code>) with either <i>date time value</i> or <i>time value</i> on each line, separated by spaces, tabs, commas or semicolons. Lines that do not end with a number (such as a header) are skipped.</li>
+<li><span class="ui">Export</span> writes the series to <code>.dat</code> / <code>.txt</code> (tab-separated) or <code>.csv</code>.</li>
+<li><span class="ui">Copy</span> puts the table on the clipboard for Excel; <span class="ui">Paste</span> replaces the table with rows copied from Excel (three columns date/time/value, or two columns time/value; a header row is skipped).</li>
+<li><span class="ui">Clear</span> empties the table; <span class="ui">View</span> plots the series against elapsed hours. A series used as rainfall by a rain gage is drawn as bars.</li>
+</ul></li>
+<li>Click <span class="ui">OK</span>. A series with Data selected needs at least one row, and every row needs a time and a numeric value; a File series needs a file name. Renaming a series also updates the rain gages, outfalls, external inflows, temperature, evaporation, control rules and buildup functions that use it. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Description</span></td><td>Optional text.</td></tr>
+<tr><td><span class="ui">File</span></td><td>Path of an external time series file (<code>.dat</code>, <code>.txt</code>, <code>.csv</code>, <code>.tsf</code>). The data are read from it when the model runs.</td></tr>
+<tr><td><span class="ui">Data</span></td><td>Use the values in the table.</td></tr>
+<tr><td><span class="ui">Date (M/D/Y)</span></td><td>Optional date. A date applies to the row it is on and to all rows below it until the next date. Leave the dates blank to use elapsed time since the start of the simulation.</td></tr>
+<tr><td><span class="ui">Time (H:M)</span></td><td>Clock time (H:M) on the given date, or elapsed time since the start of the simulation, either as H:M or as decimal hours.</td></tr>
+<tr><td><span class="ui">Value</span></td><td>The value at that time, in the units expected by the object that uses the series (for example rainfall in the gage's rain units and format).</td></tr>
+</table></div>
+<div class="callout"><b class="t">Note:</b><p>Rainfall values are held constant over the gage's time interval. Other series (inflows, stages) are interpolated linearly between the points.</p></div>
+</section>
+
+<section class="topic" id="pe-patterns" data-ch="Model parameters" data-title="Time Pattern Editor">
+<h1>Time Pattern Editor</h1>
+<p class="lead">A time pattern is a set of multipliers that vary a value periodically: dry weather flow over the hours of the day or the days of the week, a baseline inflow, monthly soil recovery, or monthly adjustments of subcatchment parameters. Open the <span class="ui">Time Pattern Editor</span> from <span class="ui">Parameter View ▸ Time Patterns</span>.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Time Patterns</span>.</li>
+<li>Click <span class="ui">+</span> to add a pattern (named <code>PTN_1</code> …, type MONTHLY, all multipliers 1), <span class="ui">⧉</span> to copy the selected one, or <span class="ui">−</span> to delete it.</li>
+<li>Choose the <span class="ui">Type</span>. The table changes to 12 months, 7 days or 24 hours; values already entered are kept in order and new rows are set to 1.</li>
+<li>Enter the multipliers. Click <span class="ui">View</span> to see them as a bar chart.</li>
+<li>Click <span class="ui">OK</span>. Every pattern must have the full number of numeric multipliers for its type. Renaming a pattern also updates dry weather flows, external inflows, aquifers, the evaporation recovery pattern and subcatchment adjustment patterns. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Pattern Name</span></td><td>Unique name.</td></tr>
+<tr><td><span class="ui">Description</span></td><td>Optional text, saved as a comment line above the pattern.</td></tr>
+<tr><td><span class="ui">Type</span></td><td><b>MONTHLY</b> – one multiplier per month (Jan–Dec); <b>DAILY</b> – one per day of the week (Sun–Sat); <b>HOURLY</b> – one per hour of the day (12 AM – 11 PM); <b>WEEKEND</b> – hourly multipliers that replace the HOURLY ones on Saturdays and Sundays.</td></tr>
+<tr><td><span class="ui">Multiplier</span></td><td>Factor applied to the base value in that period. A blank cell is saved as 1.</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>For dry weather flow, make the 24 hourly multipliers average 1.0, so that the average value entered at the node stays the true daily average.</p></div>
+</section>
+
+<section class="topic" id="pe-reporting" data-ch="Model parameters" data-title="Reporting Options">
+<h1>Reporting Options</h1>
+<p class="lead">The Reporting Options decide what is written to the status report (<code>.rpt</code>) of a run: the input summary, the control actions, average results and the tables for selected nodes, links and subcatchments. Open them from <span class="ui">Parameter View ▸ Options ▸ Reporting</span>. The binary results file always holds every object, so maps, plots and themes are not affected by these settings.</p>
+<h2>Step by step</h2>
+<ol class="steps">
+<li>Click <span class="ui">Parameter View ▸ Options ▸ Reporting</span>. The dialog has the tabs <span class="ui">Nodes</span>, <span class="ui">Links</span> and <span class="ui">Subcatchments</span>.</li>
+<li>To report all objects of a kind, tick <span class="ui">All Nodes</span> (<span class="ui">All Links</span>, <span class="ui">All Subcatchments</span>).</li>
+<li>To report only some objects, type a name in the box (names are suggested as you type) and click <span class="ui">+</span>; or select objects on the map and click <span class="ui">Add Map Selection</span>. Adding a name clears the All check box. Unknown names are refused.</li>
+<li>To remove names, select them in the list and click <span class="ui">−</span>; <span class="ui">✕</span> clears the whole list.</li>
+<li>Tick the report options at the bottom as required, then click <span class="ui">OK</span>. The change can be undone.</li>
+</ol>
+<h2>Fields</h2>
+<div class="tablewrap"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td><span class="ui">All Nodes</span> / <span class="ui">All Links</span> / <span class="ui">All Subcatchments</span></td><td>Report every object of that kind. When unticked, only the objects in the list are reported; an empty list reports none.</td></tr>
+<tr><td>Object list</td><td>The objects reported when the All box is not ticked.</td></tr>
+<tr><td><span class="ui">Report Input Summary</span></td><td>Write a summary of the input data at the top of the report.</td></tr>
+<tr><td><span class="ui">Report Control Actions</span></td><td>List every action taken by the control rules during the run.</td></tr>
+<tr><td><span class="ui">Report Average Results</span></td><td>Report time-averaged results instead of point values for each reporting period in the object tables.</td></tr>
+</table></div>
+<div class="callout tip"><b class="t">Tip:</b><p>For large models, report only a few key objects. Full time series tables for every object make the <code>.rpt</code> file very large without adding information that the results file does not already hold.</p></div>
+</section>

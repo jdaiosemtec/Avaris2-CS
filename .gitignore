@@ -5,3 +5,4 @@ app/gdal/
 license-tools/private_key.pem
 license-tools/licence_ledger.csv
 docs/user-guide/build/
+docs/user-guide/web/out/

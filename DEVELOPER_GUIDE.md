@@ -557,3 +557,13 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - CSS：`.pchip.pspeed`、`.popt`、`.poptbar`（注意已有 `.pbar` 是表里的节点条，不能重名）、`.pbest`。
 - 后续（未做）：用耦合计算的实测子模型用时校正每个区域的工作量。
 
+## 33. 2.10.5：用户手册 2.10 与官网页面生成；两个小修复
+
+- 手册新增/重写：c7b（Detect/OPT/Split/Merge/绑核/Run Status 计时）、c7（网格类型、Mesh Zones、Break Lines、排除层类型、网格报告）、c4 `edit-layers`、c3（大型 GDB、图层菜单、Database 删除）、c7c（大窗口）、c1/c9 版本表。
+  新参考章节：`c4_props.html`（各对象属性逐项）、`c5_detail.html`（各参数编辑器逐项）、`c7_opts.html`（Simulation Options 各页 + Run Status）。`build.py` 文件列表已加入（不存在则跳过）。手册不得出现 SWMM。
+- 官网页面：`docs/user-guide/web/make_web.py` 用 `web/avaris_template.html`（官网 avaris.html 原样）生成 `web/out/avaris.html` + `images/avaris2cs/` + `media/avaris2cs/`。
+  保留模板的导航栏、搜索、侧栏/showPage/面包屑/目录脚本和 CSS 类；侧栏和 pageMapping 由章节生成（SIDEBAR 定义分组，未归组的主题会报错退出）；
+  模板的 Conceptual Model 页面原样保留（版本条换成当前版本，"Avaris CS"→"Avaris2 CS"）；其余旧页面由新内容替代。主题 id 与模板 id 的对应见 IDMAP；
+  页内小节链接用新增的 `showPageAt(page, anchor)`。转换：h2/h3 → avaris-h2/h3，表格 → avaris-table-wrapper/avaris-table，callout → note-box/tip-box，figure → img + 居中说明。
+- 修复：Dynamic Wave 页 MIN_SURFAREA / HEAD_TOLERANCE 的缺省显示值按模型单位（SI：1.167 m² / 0.0015 m；US：12.566 ft² / 0.005 ft）。Landuse Editor 的 Description 以注释行（;text）写在 [LANDUSES] 该行之前并能读回。
+

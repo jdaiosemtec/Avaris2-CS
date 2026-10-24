@@ -1,0 +1,259 @@
+
+<section class="topic" id="opt-general" data-ch="Simulation" data-title="Options: General">
+<h1>Options: General</h1>
+<p class="lead">The <span class="ui">General</span> tab sets the units, the routing and infiltration methods and which process models take part in the run. Open it with <span class="ui">Simulation ▸ Setup ▸ Options</span>, or in the Parameter View with <span class="ui">Options ▸ Simulation Options</span>. The values are stored in the <code>[OPTIONS]</code> section of the <code>.inp</code> file; clicking <span class="ui">OK</span> applies all changes of the dialog as one undo step.</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Flow Units</span></td><td><code>CFS</code>, <code>GPM</code>, <code>MGD</code>, <code>CMS</code>, <code>LPS</code> or <code>MLD</code>. The flow units also set the unit system of the whole model: CFS, GPM and MGD use US units (ft), CMS, LPS and MLD use SI units (m). A new value is not simply written into the file: after <span class="ui">OK</span> the same units switch as in the status bar opens and asks whether the values of the model are converted to the new units.</td></tr>
+<tr><td><span class="ui">Routing Model</span></td><td>How flow is carried through the network:
+<ul>
+<li><code>STEADY</code> – steady flow: the inflow at the upstream end of each conduit is passed straight to the downstream end in every time step, without delay, storage or backwater.</li>
+<li><code>KINWAVE</code> – kinematic wave: the continuity equation with a simplified momentum equation (water surface slope equal to the conduit slope). Flow is attenuated and delayed, but backwater, flow reversal, pressurised flow and looped networks are not represented. Shown when the file has no routing option.</li>
+<li><code>DYNWAVE</code> – dynamic wave: the full one-dimensional Saint-Venant equations, solved together for conduits and nodes. Represents backwater, storage in the pipes, flow reversal, surcharge and pressurised flow, and looped and branched networks. Needs a short routing step; its settings are on the <a href="#opt-dynwave">Dynamic Wave</a> tab.</li>
+</ul></td></tr>
+<tr><td><span class="ui">Infiltration Model</span></td><td>How infiltration into the pervious area of the subcatchments is computed: <code>HORTON</code>, <code>MODIFIED_HORTON</code>, <code>GREEN_AMPT</code>, <code>MODIFIED_GREEN_AMPT</code> or <code>CURVE_NUMBER</code>. The parameters each subcatchment needs depend on this choice (Horton: maximum and minimum rate, decay constant, drying time; Green-Ampt: suction head, conductivity, initial deficit; Curve Number: curve number and drying time). Default <code>HORTON</code>.</td></tr>
+<tr><td><span class="ui">Link Offsets</span></td><td>How the inlet and outlet offsets of links are entered. <code>DEPTH</code> (default): height of the link invert above the invert of its node. <code>ELEVATION</code>: absolute elevation of the link invert.</td></tr>
+<tr><td><span class="ui">Minimum Conduit Slope (%)</span></td><td>Smallest slope used for any conduit, in percent; a conduit with a smaller computed slope uses this value instead. <code>0</code> (default) means no minimum is applied. The engine accepts values from 0 to below 100.</td></tr>
+<tr><td><span class="ui">Allow Ponding</span></td><td><code>YES</code>: water above the top of a node is stored in a pond over the node (using the node's ponded area) and returns to the network when there is room again. <code>NO</code> (default): water above the top of the node leaves the system as flooding and is lost.</td></tr>
+<tr><td><span class="ui">Skip Steady State</span></td><td><code>YES</code>: during periods in which the flows hardly change (within the steady-state tolerances on the <a href="#opt-timesteps">Time Steps</a> tab) the routing calculation is skipped and the previous flows are kept, which shortens long dry-weather periods. Default <code>NO</code>.</td></tr>
+<tr><th colspan="2">Process models</th></tr>
+<tr><td><span class="ui">Ignore Rainfall/Runoff</span></td><td><code>YES</code>: rainfall, snowmelt and runoff from subcatchments are not computed; the network receives only the other inflows (dry weather, direct inflows, RDII, interface files).</td></tr>
+<tr><td><span class="ui">Ignore Snowmelt</span></td><td><code>YES</code>: snowpacks and snowmelt are not computed, even if the model has snow data.</td></tr>
+<tr><td><span class="ui">Ignore Groundwater</span></td><td><code>YES</code>: the groundwater of the subcatchments and its flow to the network are not computed.</td></tr>
+<tr><td><span class="ui">Ignore RDII</span></td><td><code>YES</code>: rainfall-dependent infiltration/inflow (unit hydrographs assigned to nodes) is not added.</td></tr>
+<tr><td><span class="ui">Ignore Flow Routing</span></td><td><code>YES</code>: only runoff (and the processes above) is computed; no flow is routed through the network.</td></tr>
+<tr><td><span class="ui">Ignore Water Quality</span></td><td><code>YES</code>: pollutant buildup, washoff and transport are not computed, even if the model has pollutants.</td></tr>
+</table></div>
+<p>All <span class="ui">Ignore …</span> options default to <code>NO</code>. An <span class="ui">Ignore …</span> option left at <code>NO</code> is not written to the <code>.inp</code> file unless the file already contained it.</p>
+<h2>Recommended settings</h2>
+<ul>
+<li>Use <code>DYNWAVE</code> for networks with backwater, surcharge, loops, pumps or storage; <code>KINWAVE</code> and <code>STEADY</code> only for simple dendritic networks or quick runoff studies.</li>
+<li>Change the flow units with the conversion offered after <span class="ui">OK</span>, so that lengths, depths and elevations stay consistent with the unit system.</li>
+<li>Use the <span class="ui">Ignore …</span> options to switch off processes for a test run instead of deleting data from the model.</li>
+</ul>
+</section>
+
+<section class="topic" id="opt-dates" data-ch="Simulation" data-title="Options: Dates">
+<h1>Options: Dates</h1>
+<p class="lead">The <span class="ui">Dates</span> tab sets the simulated period, the start of reporting and the dates used for pollutant buildup. Open it with <span class="ui">Simulation ▸ Setup ▸ Options</span> (or Parameter View ▸ <span class="ui">Options ▸ Simulation Options</span>) and click the <span class="ui">Dates</span> tab. Dates are entered as <code>MM/DD/YYYY</code> and times as <code>HH:MM:SS</code>, as the note on the tab says.</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Start Analysis Date</span></td><td>Date on which the simulation begins. Shown as <code>01/01/2026</code> when the file has none.</td></tr>
+<tr><td><span class="ui">Start Analysis Time</span></td><td>Time of day at which the simulation begins (default <code>00:00:00</code>).</td></tr>
+<tr><td><span class="ui">Start Reporting Date</span></td><td>Date from which results are written to the results file and the report. Defaults to the start analysis date. Reporting can start later than the analysis, for example to leave out a warm-up period.</td></tr>
+<tr><td><span class="ui">Start Reporting Time</span></td><td>Time of day at which reporting starts (defaults to the start analysis time).</td></tr>
+<tr><td><span class="ui">End Analysis Date</span></td><td>Date on which the simulation ends (defaults to the start analysis date).</td></tr>
+<tr><td><span class="ui">End Analysis Time</span></td><td>Time of day at which the simulation ends (default <code>06:00:00</code>).</td></tr>
+<tr><td><span class="ui">Street Sweeping Start (MM/DD)</span></td><td>First day of the year on which street sweeping is applied to the land uses (default <code>01/01</code>). Only affects water quality.</td></tr>
+<tr><td><span class="ui">Street Sweeping End (MM/DD)</span></td><td>Last day of the year on which street sweeping is applied (default <code>12/31</code>).</td></tr>
+<tr><td><span class="ui">Antecedent Dry Days</span></td><td>Number of days without rain before the start of the simulation (default <code>0</code>). Used to compute the initial pollutant buildup on the subcatchments.</td></tr>
+</table></div>
+<p>When you click <span class="ui">OK</span>, the start analysis date, end analysis date and start reporting date are checked. An invalid date is reported (for example <i>Invalid date for END_DATE</i>) and the options are not changed.</p>
+<h2>Recommended settings</h2>
+<ul>
+<li>Make the analysis period long enough for the network to drain after the storm, so that the continuity errors and peak values are complete.</li>
+<li>When the model starts dry and needs time to fill (for example base flow in a large network), start reporting after that warm-up period, or start from a hot start file (<a href="#opt-files">Files</a>).</li>
+</ul>
+</section>
+
+<section class="topic" id="opt-timesteps" data-ch="Simulation" data-title="Options: Time Steps">
+<h1>Options: Time Steps</h1>
+<p class="lead">The <span class="ui">Time Steps</span> tab sets how often results are saved and the computational steps of runoff, routing and control rules. Open it with <span class="ui">Simulation ▸ Setup ▸ Options</span> (or Parameter View ▸ <span class="ui">Options ▸ Simulation Options</span>) and click <span class="ui">Time Steps</span>.</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Reporting Step (H:M:S)</span></td><td>Interval at which results are saved to the results file (default <code>00:15:00</code>). It decides the number of time steps in the results, which you see in play mode, graphs and tables; peak values in the statistics are still taken from every routing step.</td></tr>
+<tr><td><span class="ui">Runoff Wet Step</span></td><td>Time step for computing runoff from the subcatchments during rainfall or while water is still ponded on the surface (default <code>00:05:00</code>, H:M:S).</td></tr>
+<tr><td><span class="ui">Runoff Dry Step</span></td><td>Time step for computing runoff in dry periods without rainfall or ponded water (default <code>01:00:00</code>, H:M:S). It should not be shorter than the wet step.</td></tr>
+<tr><td><span class="ui">Routing Step (H:M:S or sec)</span></td><td>Time step for routing flow through the network, entered as H:M:S or as decimal seconds (default <code>0:00:20</code> = 20 s). With dynamic wave and a variable step (<a href="#opt-dynwave">Dynamic Wave</a> tab) this is the largest step allowed.</td></tr>
+<tr><td><span class="ui">Control Rule Step</span></td><td>Interval at which the control rules are evaluated (H:M:S). <code>00:00:00</code> (default) evaluates them in every routing step.</td></tr>
+<tr><td><span class="ui">Steady State System Flow Tol. (%)</span></td><td>Used with <span class="ui">Skip Steady State</span> (<a href="#opt-general">General</a>): the system is treated as steady only while the difference between total system inflow and outflow is below this percentage (default <code>5</code>).</td></tr>
+<tr><td><span class="ui">Steady State Lateral Flow Tol. (%)</span></td><td>Used with <span class="ui">Skip Steady State</span>: the system is treated as steady only while the change in lateral inflow at every node from one step to the next is below this percentage (default <code>5</code>).</td></tr>
+</table></div>
+<h2>Recommended settings</h2>
+<ul>
+<li>A reporting step of 15 minutes is a good compromise for most storm events. Shorter steps give smoother hydrographs and animations but larger results files.</li>
+<li>Do not set the reporting step shorter than the routing step.</li>
+<li>For dynamic wave, use the variable step (<a href="#opt-dynwave">Dynamic Wave</a> tab) so that the routing step is only the upper limit.</li>
+</ul>
+</section>
+
+<section class="topic" id="opt-dynwave" data-ch="Simulation" data-title="Options: Dynamic Wave">
+<h1>Options: Dynamic Wave</h1>
+<p class="lead">The <span class="ui">Dynamic Wave</span> tab controls the numerical solution of dynamic-wave routing. The settings have an effect only when the <span class="ui">Routing Model</span> on the <a href="#opt-general">General</a> tab is <code>DYNWAVE</code>. Open it with <span class="ui">Simulation ▸ Setup ▸ Options</span> (or Parameter View ▸ <span class="ui">Options ▸ Simulation Options</span>) and click <span class="ui">Dynamic Wave</span>. In each time step the Avaris engine computes the conduit flows and node heads in repeated iterations until the heads change less than the head tolerance; the settings below control these iterations and the length of the step.</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Inertial Terms</span></td><td>How much the inertial (local and convective acceleration) terms of the momentum equation are damped. The list shows the damping level written to the <code>.inp</code> file (<code>INERTIAL_DAMPING</code>):
+<ul>
+<li><code>PARTIAL</code> (default) – the inertial terms are reduced as the flow approaches critical (Froude number 1) and dropped for supercritical flow. This keeps the solution stable at transitions between sub- and supercritical flow.</li>
+<li><code>FULL</code> – full damping: the inertial terms are ignored everywhere (a diffusion-wave solution). Most stable, least exact for fast-changing flows.</li>
+<li><code>NONE</code> – no damping: the inertial terms are kept in full.</li>
+</ul>
+In a surcharged closed conduit the engine always uses full damping.</td></tr>
+<tr><td><span class="ui">Normal Flow Criterion</span></td><td>When the flow in a conduit is limited to normal flow (the Manning flow at the upstream depth):
+<ul>
+<li><code>BOTH</code> (default) – when the water surface slope is less than the conduit slope, or the Froude number at the upstream end is 1 or more.</li>
+<li><code>SLOPE</code> – only when the water surface slope is less than the conduit slope.</li>
+<li><code>FROUDE</code> – only when the Froude number at the upstream end is 1 or more.</li>
+</ul>
+The limit applies only while the conduit is not full.</td></tr>
+<tr><td><span class="ui">Force Main Equation</span></td><td>Friction equation for conduits with a force-main cross-section when they flow full: <code>H-W</code> (Hazen-Williams, default) or <code>D-W</code> (Darcy-Weisbach). The roughness entered for force mains must match the equation (a C-factor for H-W, a roughness height for D-W). When partly full, force mains use the Manning equation.</td></tr>
+<tr><td><span class="ui">Surcharge Method</span></td><td>How surcharged (pressurised) flow is computed:
+<ul>
+<li><code>EXTRAN</code> (default) – when a node is surcharged it has no storage; its head is found from the balance of the flows entering and leaving it.</li>
+<li><code>SLOT</code> – a narrow Preissmann slot is added on top of closed conduits, so that pressurised flow is computed with the same open-channel equations. Often gives smoother transitions between free-surface and pressurised flow.</li>
+</ul>
+<code>EXTRAN</code> is not written to the <code>.inp</code> file unless the file already contained a surcharge method.</td></tr>
+<tr><td><span class="ui">Variable Step Safety Factor (0 = off)</span></td><td>When above 0, the routing step is recomputed in every step from the Courant condition of the conduits (and the rate of change of the node depths) and multiplied by this factor; it is never longer than the <span class="ui">Routing Step</span>. <code>0</code> uses the fixed routing step. Default <code>0.75</code>; the engine accepts 0 to 2.</td></tr>
+<tr><td><span class="ui">Minimum Variable Step (sec)</span></td><td>Smallest step the variable step may take, in seconds (default <code>0.5</code>). The engine limits it to between 0.001 s and the routing step.</td></tr>
+<tr><td><span class="ui">Conduit Lengthening Step (sec)</span></td><td>When above 0, conduits so short that a wave passes through them in less than this time (or the routing step, if that is shorter) are artificially lengthened for the computation, with their roughness adjusted to compensate. This relaxes the Courant condition so that longer steps can be used. <code>0</code> (default) = no lengthening.</td></tr>
+<tr><td><span class="ui">Minimum Nodal Surface Area</span></td><td>Smallest surface area given to a node when its depth is updated, in ft² (US units) or m² (SI units). Prevents very small manhole areas from making the node depths unstable. Default <code>12.566</code> (the area of a 4 ft diameter manhole); <code>0</code> also uses 12.566 ft².</td></tr>
+<tr><td><span class="ui">Maximum Trials per Step</span></td><td>Maximum number of iterations per time step to reach convergence of the node heads (default <code>8</code>; <code>0</code> also uses 8). If the heads have not converged after this number, the step is counted as not converging and the engine continues with the last values.</td></tr>
+<tr><td><span class="ui">Head Convergence Tolerance</span></td><td>The iterations of a step stop when the head at every node changes by less than this value between two iterations, in ft (US units) or m (SI units). Default <code>0.005</code>; <code>0</code> also uses 0.005 ft.</td></tr>
+</table></div>
+<div class="callout"><b class="t">Note:</b><p>The minimum nodal surface area and the head tolerance are in the length units of the model. When the model file has no values, the dialog shows the engine defaults in the model units: 12.566 ft² and 0.005 ft in a US-units model, 1.167 m² and 0.0015 m in an SI model. Changing the Flow Units between US and SI converts both values.</p></div>
+<h2>Recommended settings</h2>
+<ul>
+<li>The defaults (<code>PARTIAL</code>, <code>BOTH</code>, <code>H-W</code>, <code>EXTRAN</code>, safety factor 0.75, minimum step 0.5 s, 8 trials, tolerance 0.005) are the engine's own defaults and a sound starting point.</li>
+<li>When many steps do not converge, look at <a href="#run">Convergence diagnostics</a> first, then consider a shorter routing step or a lower under-relaxation factor (<a href="#opt-engine">Avaris Engine</a>).</li>
+<li>Compare the hydrographs before and after any change of these settings to make sure the results did not change materially.</li>
+</ul>
+</section>
+
+<section class="topic" id="opt-files" data-ch="Simulation" data-title="Options: Files">
+<h1>Options: Files</h1>
+<p class="lead">The <span class="ui">Files</span> tab lists the <b>interface files</b> of the model: files that a run reads at its start or writes during the run, stored in the <code>[FILES]</code> section of the <code>.inp</code> file. Open it with <span class="ui">Simulation ▸ Setup ▸ Options</span> and the <span class="ui">Files</span> tab, or in the Parameter View with <span class="ui">Options ▸ Interface Files (hot start, rainfall)</span>, which opens the dialog on this tab. The Parameter View shows the number of files after the entry.</p>
+<h2>Interface Files list</h2>
+<p>Each line shows the usage (<i>Use</i> or <i>Save</i>), the file type and the file path, for example <code>Use  Hotstart  hs.hsf</code>. Above the list:</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">+</span></td><td>Adds a file (initially <i>Use Hotstart</i> without a path) and selects it, ready for its path.</td></tr>
+<tr><td><span class="ui">−</span></td><td>Removes the selected file from the list.</td></tr>
+<tr><td><span class="ui">Clear All</span></td><td>Removes all files from the list, after confirmation.</td></tr>
+</table></div>
+<h2>File Property</h2>
+<p>The fields below the list edit the selected line.</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">File Type</span></td><td>
+<ul>
+<li><i>Hotstart</i> – the state of the model (such as node depths and link flows) at the end of a run. <i>Save</i> writes the state at the end of the run; <i>Use</i> starts a run from that state instead of from a dry network. Extension <code>.hsf</code>.</li>
+<li><i>Rainfall</i> – binary rainfall interface file with the rain gage data of a run (extension <code>.dat</code> or <code>.rff</code>).</li>
+<li><i>Runoff</i> – binary runoff interface file with the runoff results of a run (extension <code>.rof</code> or <code>.dat</code>); with <i>Use</i>, a later run reads the runoff instead of computing it.</li>
+<li><i>RDII</i> – rainfall-dependent infiltration/inflow at the nodes (extension <code>.rdi</code>, <code>.txt</code> or <code>.dat</code>).</li>
+<li><i>Inflows</i> – a routing interface file with inflow hydrographs (and pollutographs) for nodes of this model, usually the <i>Outflows</i> file of an upstream model (<code>.txt</code> or <code>.dat</code>).</li>
+<li><i>Outflows</i> – a routing interface file with the outflows at the outfalls of this model, to be used as <i>Inflows</i> of a downstream model (<code>.txt</code> or <code>.dat</code>).</li>
+</ul></td></tr>
+<tr><td><span class="ui">Usage Type</span></td><td><i>Use</i> = read the file at the start of the run (for example a hot start file with the initial state). <i>Save</i> = write it during the run (for example a hot start file of the state at the end, for the next run).</td></tr>
+<tr><td><span class="ui">File Path</span></td><td>Type the file name or click <span class="ui">…</span>. For <i>Save</i> the button opens a save dialog (suggested name <code>hotstart.hsf</code> or <code>&lt;type&gt;.&lt;ext&gt;</code>), for <i>Use</i> an open dialog; both filter by the extensions above. A file name without a folder is in the model folder, and paths are stored relative to the model folder, so the model can be moved with its files.</td></tr>
+</table></div>
+<p>When you click <span class="ui">OK</span>, lines without a file name are left out (a message says so). Comment lines and other lines of the <code>[FILES]</code> section are kept. The change is one undo step.</p>
+<div class="callout"><b class="t">Rain data files:</b><p><i>Rainfall</i>, <i>Runoff</i> and <i>RDII</i> files on this tab are binary interface files written by <i>Save</i> of an earlier run. A text file of rain data is linked in the Rain Gage Editor (Data Source <i>FILE</i>), not here. When a <i>Use Rainfall</i> or <i>Use Runoff</i> line names the data file of a rain gage, the line is shown in red with "⚠ rain gage data file" and a warning explains that the run would stop with a file format error; remove that line.</p></div>
+<p>Before each run, files the model needs that are missing or cannot be used are listed; see <a href="#run-status">Run Status and status report</a>.</p>
+<h2>Recommended settings</h2>
+<ul>
+<li>To avoid a long warm-up in every run, run the model once with <i>Save Hotstart</i>, then use that file with <i>Use Hotstart</i> in the following runs.</li>
+<li>Keep interface files in the model folder (or a folder below it), so that the relative paths stay valid when the model is copied.</li>
+</ul>
+</section>
+
+<section class="topic" id="opt-engine" data-ch="Simulation" data-title="Options: Avaris Engine">
+<h1>Options: Avaris Engine</h1>
+<p class="lead">The <span class="ui">Avaris Engine</span> tab holds the settings that the Avaris engine adds to the standard options: parallel computation, the relaxation of the dynamic-wave iterations, the nonconvergence report and the size of the report file. Open it with <span class="ui">Simulation ▸ Setup ▸ Options</span> (or Parameter View ▸ <span class="ui">Options ▸ Simulation Options</span>) and click <span class="ui">Avaris Engine</span>.</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Number of Threads (0 = all cores)</span></td><td>Number of processor threads used for dynamic-wave routing (default <code>1</code>). Conduit flows and node depths are solved in parallel (OpenMP); results are identical for any number of threads. <code>0</code> uses all logical processors; a larger number than the computer has is reduced to that. The engine uses 1 thread when the model has fewer than 4 links per thread. Scenarios running at the same time always use 1 thread each.</td></tr>
+<tr><td><span class="ui">Detect &amp; Recommend</span></td><td>Scans the processors of this computer and shows:
+<ul>
+<li><b>This computer:</b> processor model, number of cores, logical processors and memory;</li>
+<li><b>Maximum recommended:</b> logical processors − 1 (one is left for Avaris2 CS and Windows);</li>
+<li><b>For this model:</b> the number of nodes and links (including the 2D cells and surface links when 2D flooding is on) and the recommended number of threads, with a <span class="ui">Use N</span> button that enters it.</li>
+</ul>
+The recommendation depends on the number of links: 1 thread below 1,000 links, 2 below 3,000, 4 below 10,000, 6 below 30,000 and 8 above, but never more than the maximum recommended, the number of physical cores, or one thread per 4 links.</td></tr>
+<tr><td><span class="ui">Under-Relaxation Factor (0.1 - 1.0)</span></td><td>Weight given to the new iterate in the dynamic-wave Picard iterations; the standard value is <code>0.5</code>. Lower values damp oscillation at hard-to-converge nodes; higher values converge faster on well-behaved networks. A value outside 0.1–1.0 is refused when you click <span class="ui">OK</span>. The value 0.5 is not written to the <code>.inp</code> file unless the file already contained it.</td></tr>
+<tr><td><span class="ui">Nonconverging Nodes Listed in Report</span></td><td>Length of the "Most Frequent Nonconverging Nodes" list in the report file (default <code>100</code>; the standard report lists 5; maximum 500). This list feeds <a href="#run">Convergence diagnostics</a>. The value 100 is not written to the file unless it already contained it.</td></tr>
+<tr><td><span class="ui">Write time-series tables to report file</span></td><td>Off by default: results are read from the binary results file, which keeps the report file small for large models. Switch it on to have the time-series tables written into the report as well. This setting belongs to the current Avaris2 CS session, not to the <code>.inp</code> file.</td></tr>
+</table></div>
+<h2>Recommended settings</h2>
+<ul>
+<li>Click <span class="ui">Detect &amp; Recommend</span> and <span class="ui">Use N</span> instead of entering <code>0</code>: small models gain nothing from many threads, and using all logical processors leaves none for the user interface.</li>
+<li>Keep the under-relaxation factor at 0.5; lower it (for example to 0.3) only when convergence diagnostics show oscillating nodes.</li>
+<li>Leave <span class="ui">Write time-series tables to report file</span> off for large models.</li>
+</ul>
+</section>
+
+<section class="topic" id="opt-defaults" data-ch="Simulation" data-title="Options: Object Defaults">
+<h1>Options: Object Defaults</h1>
+<p class="lead">The <span class="ui">Object Defaults</span> tab sets the values given to nodes, conduits and subcatchments that you add from now on. They are saved with your Avaris2 CS settings, not in the <code>.inp</code> file, and do not change existing objects. Open it with <span class="ui">Simulation ▸ Setup ▸ Options</span> (or Parameter View ▸ <span class="ui">Options ▸ Simulation Options</span>) and click <span class="ui">Object Defaults</span>. Values are in the units of the model.</p>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><th colspan="2">Nodes</th></tr>
+<tr><td><span class="ui">Node max. depth</span></td><td>Maximum depth (invert to rim) of new junctions, storage units and dividers. Initial value 10 (US units) or 3 (a new project in SI units).</td></tr>
+<tr><th colspan="2">Conduits</th></tr>
+<tr><td><span class="ui">Conduit diameter / geom1</span></td><td>First geometry value of new conduits (the diameter of a circular pipe, otherwise the full height). Initial value 1.0 (US) or 0.3 (new SI project).</td></tr>
+<tr><td><span class="ui">Conduit roughness</span></td><td>Manning roughness of new conduits (initial value 0.013).</td></tr>
+<tr><td><span class="ui">Conduit length (if not auto)</span></td><td>Length of new conduits when the length is not measured from the map. Initial value 400 (US) or 100 (new SI project).</td></tr>
+<tr><td><span class="ui">Auto length from map</span></td><td>When ticked (default), a new conduit gets the length of its drawn line, provided the map has map units (not <i>None</i>); otherwise the length above is used.</td></tr>
+<tr><th colspan="2">Subcatchments</th></tr>
+<tr><td><span class="ui">Area (if no map units)</span></td><td>Area of new subcatchments when it cannot be taken from the map. Initial value 5 (US) or 2 (new SI project).</td></tr>
+<tr><td><span class="ui">Width</span></td><td>Characteristic width of the overland flow path of new subcatchments. Initial value 500 (US) or 150 (new SI project).</td></tr>
+<tr><td><span class="ui">% Impervious</span></td><td>Percentage of impervious area of new subcatchments (initial value 25).</td></tr>
+<tr><td><span class="ui">% Slope</span></td><td>Average surface slope of new subcatchments in percent (initial value 0.5).</td></tr>
+</table></div>
+<p>Every value must be a number; otherwise a message names the default and nothing is saved.</p>
+<h2>Recommended settings</h2>
+<ul>
+<li>Set the defaults to the most common values of the network before digitising a new model, so that fewer objects need editing afterwards.</li>
+<li>Keep <span class="ui">Auto length from map</span> on when the map has real coordinates.</li>
+</ul>
+</section>
+
+<section class="topic" id="run-status" data-ch="Simulation" data-title="Run Status and status report">
+<h1>Run Status and status report</h1>
+<p class="lead">A run goes through four dialogs: checks before the run, the <span class="ui">Run Simulation</span> dialog with the run name, the progress dialog, and finally <span class="ui">Run Status</span> with the continuity errors, convergence and warnings. Start a run with <span class="ui">Simulation ▸ Run ▸ Run</span> or <kbd>F5</kbd> (see <a href="#run">Run a simulation</a>).</p>
+<h2>Checks before the run</h2>
+<ul>
+<li>A model without nodes is not run.</li>
+<li>The quick checks of <a href="#validate">Validate Model</a> are run; any problems (up to 15 are shown, with the total) are listed with the choice <span class="ui">Run</span> anyway or cancel.</li>
+<li>With 2D flooding, a mesh made by an older version of Avaris2 CS offers <span class="ui">Run with Old Mesh</span> or <span class="ui">Rebuild Mesh, then Run</span>; if no mesh exists yet you can choose <span class="ui">Create Meshes</span> or <span class="ui">Run 1D only</span>.</li>
+<li>Files the model uses but that are not found or cannot be used (interface files, rain gage and time-series files) are listed with their full path. <span class="ui">Open Interface Files</span> opens the <a href="#opt-files">Files</a> tab. If all missing files are optional interface files, <span class="ui">Run Without Them</span> leaves them out of this run only (a run without its hot start file starts dry).</li>
+</ul>
+<h2>Run Simulation dialog</h2>
+<div class="tablewrap"><table>
+<tr><th>Option</th><th>Meaning</th></tr>
+<tr><td><span class="ui">Simulation name</span></td><td>Name of the run; its files are saved under this name in the <code>&lt;model&gt;_Results</code> folder next to the model and listed in the <a href="#database">Database</a> panel. The suggestion is the last name used, or <code>Run_YYYYMMDD_HHMM</code>. Only letters, digits, spaces and <code>_ - . ( )</code> are allowed. A new name keeps the earlier results; an existing name replaces them after confirmation.</td></tr>
+<tr><td><span class="ui">Description</span></td><td>Optional text saved with the run, for example "100-yr storm, pumps upgraded".</td></tr>
+<tr><td><span class="ui">Run</span></td><td>Shown only when the model has been partitioned: <i>Whole model</i> or <i>Coupled parallel – N sub-models, M cut points</i>, with a note on the expected speed. The coupled option is unavailable without the High Performance Simulation edition, when the model changed after it was partitioned, or when sub-model files are missing; a note says which. See <a href="#coupled-run">Coupled parallel simulation</a>.</td></tr>
+<tr><td><span class="ui">Existing results (click to reuse a name)</span></td><td>The latest 12 runs of the model with date and type. Clicking one copies its name and description into the fields.</td></tr>
+</table></div>
+<p>If the model has not been saved, a note says that the results go to a temporary folder; save the model to keep its results in the Database. Click <span class="ui">Run</span> to start.</p>
+<h2>Progress dialog</h2>
+<p>The dialog <span class="ui">Running Simulation - &lt;name&gt;</span> shows what is being run – for example <i>Avaris engine: DYNWAVE routing, 1520 nodes, 1610 links</i>, plus the number of 2D cells and surface links for a 1D-2D run – and a progress bar with the percentage, the elapsed time and the estimated remaining time. <span class="ui">Stop</span> cancels the run; the status bar then shows <i>Simulation stopped by user.</i> and no results are loaded.</p>
+<h2>Run Status - Errors</h2>
+<p>If the engine reports errors, <span class="ui">Run Status - Errors</span> says <i>The run was not successful.</i> and lists up to 40 error lines from the report (or the engine exit code). <span class="ui">View Report</span> opens the report file; <span class="ui">Close</span> closes the dialog.</p>
+<h2>Run Status</h2>
+<p>After a successful run the results are loaded and <span class="ui">Run Status</span> opens. Its first line is green, <i>Run was successful.</i>, when both continuity errors are below 5 %; otherwise it reads <i>Run completed - continuity errors are high, check the report.</i></p>
+<div class="tablewrap"><table>
+<tr><th>Line</th><th>Meaning</th></tr>
+<tr><td>Run time</td><td>Wall-clock time of the run in seconds.</td></tr>
+<tr><td>Runoff continuity error</td><td>Percentage difference in the runoff mass balance: rainfall and initial storage against infiltration, evaporation, runoff and final storage on the subcatchments.</td></tr>
+<tr><td>Flow routing continuity error</td><td>Percentage difference in the network mass balance: all inflows and initial stored volume against outflows, flooding, losses and final stored volume. A high value points to numerical problems in the routing (often too long a routing step or nonconverging nodes).</td></tr>
+<tr><td>Warnings</td><td>Number of <code>WARNING</code> lines in the report. Up to 20 of them are listed below the table.</td></tr>
+<tr><td>% of steps not converging</td><td>From the routing time step summary of the report (dynamic wave): the share of routing steps in which at least one node did not reach the head tolerance within the maximum trials.</td></tr>
+<tr><td>Average iterations per step</td><td>From the same summary: the mean number of iterations needed per routing step.</td></tr>
+<tr><td>Worst nonconverging node</td><td>The first node of the "Most Frequent Nonconverging Nodes" list, with its percentage of steps not converged.</td></tr>
+</table></div>
+<p>The last three lines appear only when the report contains them. The buttons are:</p>
+<ul>
+<li><span class="ui">Convergence Diagnostics</span> – opens the Nonconvergence Diagnostics view (<a href="#run">Convergence diagnostics</a>).</li>
+<li><span class="ui">View Report</span> – opens the report of the run.</li>
+<li><span class="ui">OK</span> – closes the dialog; the results stay loaded.</li>
+</ul>
+<p>After a coupled parallel run the dialog also shows the <b>Run mode</b> (number of sub-models and cut 2D links), the run time with the engine time, a note that the sub-model results were merged into one run of the master model, and a <b>Sub-models</b> table (nodes + 2D cells, computing and waiting seconds, core) naming the sub-model that computes longest. It has only <span class="ui">View Report</span> and <span class="ui">OK</span>.</p>
+<p>Every run, successful or not, is recorded in the Database with its name, description, date, type (1D, 1D-2D or coupled), run time, continuity errors, number of warnings and share of steps not converging.</p>
+<h2>Recommended checks</h2>
+<ul>
+<li>Continuity errors below 5 % give the green message; higher values mean the report should be checked.</li>
+<li>Read the warnings; they often name objects with doubtful data.</li>
+<li>When steps do not converge, open <span class="ui">Convergence Diagnostics</span> and follow the tips in <a href="#run">Run a simulation</a>.</li>
+</ul>
+</section>

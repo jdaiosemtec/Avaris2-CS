@@ -94,7 +94,7 @@ ds_type = 'OUTFALL'</code></pre>
 <li>The 2D surface mesh for 1D-2D runs.</li>
 </ul>
 <figure class="narrow"><img src="images/about.png" alt="About Avaris2 CS"><figcaption><span class="ui">Help ▸ About</span> shows the program and engine versions and the number of CPU threads.</figcaption></figure>
-<p>A model saved by Avaris2 CS can also be run by EPA SWMM 5.2. The Avaris-specific settings are then ignored.</p>
+<p>A model saved by Avaris2 CS stays a standard <code>.inp</code> file that other programs using this format can read; the Avaris-specific settings are then ignored.</p>
 </section>
 
 <section class="topic" id="troubleshooting" data-ch="Reference" data-title="Troubleshooting and FAQ">
@@ -153,6 +153,8 @@ ds_type = 'OUTFALL'</code></pre>
 <h1>Version history</h1>
 <div class="tablewrap"><table>
 <tr><th>Version</th><th>Highlights</th></tr>
+<tr><td>2.10</td><td>Model partition balanced for the computer: Detect (processor kinds of core and their speed, built-in benchmark), partition sizes weighted by core speed, automatic core binding of every coupled run, Core and Load per partition, estimated speed-up, OPT (try several numbers of partitions and take the fastest), Split and Merge Partitions with undo, timing of every sub-model in Run Status. More partitions than cores are allowed (for a run on another computer). Fixes for very large models (180,000+ nodes).</td></tr>
+<tr><td>2.9</td><td>Unstructured 2D mesh (triangles) besides the square grid, mesh zones, break lines, building handling (LARGE / ALL / NONE), exclusion layers with type VOID / RAISED / POROUS, recommended 2D routing step. Editing of imported GIS layers. File Geodatabase layers of any size (Model Area Only). Auto Calibration in a large window. Coupled runs: hot start split per sub-model, relative data-file paths, long IDs. Database Delete also removes coupled-run sub-model folders. Manholes in cells removed by buildings are coupled to the nearest cell.</td></tr>
 <tr><td>2.8</td><td>Auto Calibration complete (HPS): parameter groups and ranges, sensitivity analysis, acceptance criteria (CIWEM/WaPUG, MSDGC 2013, EPA 1999), monitor weights, automatic calibration (NSGA-II, SCE-UA, DDS) with parallel event runs, options, scorecard, diagnosis, apply as user System, calibration report.</td></tr>
 <tr><td>2.7</td><td>Simulation Options ▸ Files tab for interface files (hot start, rainfall …) with relative paths. Auto Calibration (HPS) steps 1–2: mapping, automatic reading of survey files, rainfall events, data cleaning with confirmation, data checks.</td></tr>
 <tr><td>2.6</td><td>High Performance Simulation edition. 2D results: velocity, Defra hazard rating, depth × velocity, arrival time, flow arrows, heat-map rendering, 2D cell graph, 2D Flood Analysis (areas by class, statistics by zone, comparison of 1D-2D runs, cross section), flood extent shapefiles and GeoTIFF grids. Coupled parallel 1D-2D runs. Analysis group on the Simulation tab. Scenario Comparison lists every run of the model and drives the graphs. Scenarios panel replaced by named runs.</td></tr>
