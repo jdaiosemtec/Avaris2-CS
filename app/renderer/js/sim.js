@@ -417,6 +417,7 @@
       this.progEls = { bar, pct, t0 };
       app.status('Running the coupled parallel simulation...');
       const job = Object.assign(AV.partitionRunJob(app, ci), { dir, base, threads, id: 'main' });
+      job.srcDirs = job.parts.map(x => AV.dirname(x.inp)); // relative [FILES] paths of the sub-model files (the 1D-2D copies are written elsewhere)
       // 1D-2D: the mesh is shared out over the sub-models (partition.js AV.partition2DJob)
       let f2 = null;
       if (AV.f2dEnabled(m) && AV.has2D(app)) {
@@ -425,6 +426,9 @@
           try { f2 = await AV.partition2DJob(app, ci, job, AV.joinPath(dir, base.replace(/[^\w\-. ]/g, '_') + '_parts')); }
           catch (e) { this.runDlg.close(); this.runDlg = null; AV.alert('The 2D mesh could not be shared over the sub-models: ' + e.message, 'Coupled parallel run'); return; }
           pct.textContent = 'Starting ' + ci.parts.length + ' sub-models (1D-2D: ' + app.mesh2d.cells.length.toLocaleString() + ' cells, ' + f2.cuts2D + ' cut 2D links)...'; } }
+      // hot start of the whole model: its text (1D, and 1D-2D) tells the main process the order of the saved objects
+      if ((m.raw.FILES || []).some(l => /^\s*USE\s+HOTSTART\b/i.test(l))) { const t1 = m.toINP({ reportAll: true }); job.masterTexts = [t1]; job.masterDir = app.filePath ? AV.dirname(app.filePath) : '';
+        if (AV.f2dEnabled(m) && AV.has2D(app) && app.mesh2d && app.mesh2d.cells.length) { try { job.masterTexts.push(AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m)); } catch (e) { /* 1D text only */ } } }
       const res = await window.host.runCoupled(job);
       this.runDlg.close(); this.runDlg = null;
       const secs = ((Date.now() - t0) / 1000).toFixed(1);

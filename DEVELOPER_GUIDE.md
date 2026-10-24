@@ -495,3 +495,10 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - `extedit.js`（`AV.extEdit`）：`app.editLayer` 为正在编辑的外部图层（同时只能一个）；选择存在 `L.sel`（与属性表共用）。map.js 选择工具在编辑图层时先测节点，再测图层要素（`E.hit`：最小的包含多边形，或 6 px 内的线 / 点），空白处拖框 `drag.ext`；Edit Geometry 时 `E.vertexHit` / `moveVertex` / `insertVertex` / `removeVertex`，叠加层画顶点。panels.showProps 无网络选择时调 `E.props`；app.deleteSelection、pickAddType('EXT')、onSelectionChanged、checkSave 有钩子；features.onDraw 对编辑图层走 `E.addFeature`。所有修改 `app.exec` 可撤销；`L.dirty` / `L.geomDirty`。保存：shp 只改属性时只写 .dbf；改了几何按 `L.srcWKT` 反投影写回（`finishVector` 记录 `srcWKT`、`reprojected`）；其他格式另存 shp（地图坐标系 + .prj）。
 - 排除图层：`AV.exclusionLayers(m)` = [EXCLUSION/EXCL_* 一行] + `EXCL_MORE`（JSON）。Options 里 `AV.exclTable` 生成表格，返回伪 input（value getter）给对话框读取。Create Meshes 按顺序读取，每层自己的默认类型。
 - `BLDG_MESH`（umesh.js `opt.buildings`）：LARGE 面积 < 1 个单元的建筑按遮挡面积处理，轮廓加密下限 h/2；ALL 为原来的做法（下限 h/4）；NONE 全部按遮挡面积。跨多个单元的建筑按 h/4 采样点分摊面积。
+
+## 24. 2.9.8：分区耦合运行的热启动文件
+
+- 热启动文件（SWMM5-HOTSTART4/5）头部存对象数量，记录按输入文件顺序排列；子模型对象不同 → 引擎 ERROR 333。
+- `app/hssplit.js`：`engineOrder(text)` 从整体模型文本得到子汇水区 / 节点 / 管段顺序和记录长度（地下水 4、积雪 15、储存节点多 1 个 float、污染物项）；`split(hsBuf, masterTexts, subText)` 按 ID 拷贝记录到子模型顺序，整体模型没有的对象填 0，管段 setting 填 1（0 会让 link_getInflow 返回 0，2D 耦合连接被堵死），OFF 的水泵填 0。v5 文件自带名称。
+- `main.js engine:runCoupled` 的 `fixInp`：USE HOTSTART → `<parts>/Pnn.hsf`；SAVE HOTSTART → `<parts>/Pnn_saved.hsf`；相对路径按 子模型文件目录（`job.srcDirs`，1D-2D 时子模型拷贝在别处）→ 整体模型目录 查找；出错时整次运行返回说明。
+- `sim.js runCoupled`：模型有 USE HOTSTART 时把整体模型文本（1D，有网格时再加 1D-2D 文本）放进 `job.masterTexts`，按对象数量匹配热启动文件。

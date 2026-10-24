@@ -398,9 +398,22 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
   for (const [h, r] of outFiles) if (path.resolve(r.file) === path.resolve(out)) { r.close(); outFiles.delete(h); }
   // sub-models written by 2.3–2.9.5 could have the coupling inflow "CPL_Q_<node>" glued to its type FLOW when the node
   // ID is long (ERROR 209 undefined object CPL_Q_…FLOW): such lines are repaired in a copy in the parts folder
-  const fixInp = (f, k) => { try { const t = fs.readFileSync(f, 'utf8'); const fx = t.replace(/^(\s*\S+\s+FLOW\s+CPL_Q_\S+?)FLOW(\s+[-\d.eE+]+\s+[-\d.eE+]+\s*)$/gm, '$1 FLOW$2'); if (fx === t) return f;
-    const c = path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '_fixed' + path.extname(f)); fs.writeFileSync(c, fx); return c; } catch (err) { return f; } };
+  // Hot start (2.9.8): USE HOTSTART of the whole model is split into one file per sub-model (hssplit.js; the engine
+  // refuses a file with other object counts, ERROR 333); SAVE HOTSTART of a sub-model goes to the parts folder.
+  const hsErr = []; let hsCache = null; const HS = require('./hssplit');
+  const fixInp = (f, k) => { try { const t = fs.readFileSync(f, 'utf8'); let fx = t.replace(/^(\s*\S+\s+FLOW\s+CPL_Q_\S+?)FLOW(\s+[-\d.eE+]+\s+[-\d.eE+]+\s*)$/gm, '$1 FLOW$2');
+      const nn = 'P' + String(k + 1).padStart(2, '0'); const lines = fx.split(/\r?\n/); let changed = fx !== t;
+      for (const F of HS.filesLines(lines)) { if (F.type !== 'HOTSTART') continue; const q = F.path.replace(/^"|"$/g, '');
+        if (F.use === 'SAVE') { lines[F.i] = 'SAVE HOTSTART "' + path.join(pdir, nn + '_saved.hsf') + '"'; changed = true; continue; }
+        const cands = path.isAbsolute(q) ? [q] : [path.resolve(path.dirname(f), q), job.srcDirs && job.srcDirs[k] ? path.resolve(job.srcDirs[k], q) : null, job.masterDir ? path.resolve(job.masterDir, q) : null].filter(Boolean); const src = cands.find(x => fs.existsSync(x));
+        if (!src) { hsErr.push(nn + ': hot start file not found: ' + q); continue; }
+        try { if (!hsCache || hsCache.src !== src) hsCache = { src, buf: fs.readFileSync(src) }; const r = HS.split(hsCache.buf, job.masterTexts || [], lines.join('\n'));
+          const out = path.join(pdir, nn + '.hsf'); fs.writeFileSync(out, r.buf); lines[F.i] = 'USE HOTSTART "' + out + '"'; changed = true; }
+        catch (err) { hsErr.push(nn + ': ' + err.message + ' (' + src + ')'); } }
+      if (!changed) return f;
+      const c = path.join(pdir, nn + '_fixed' + path.extname(f)); fs.writeFileSync(c, lines.join('\r\n')); return c; } catch (err) { return f; } };
   job.parts.forEach((p, k) => { p.inp = fixInp(p.inp, k); });
+  if (hsErr.length) return { code: 1, errors: ['Hot start for the sub-models: ' + hsErr.slice(0, 5).join('; ') + '. Save the hot start again with the current model (SAVE HOTSTART in a run of the whole model), or remove USE HOTSTART (Simulation Options → Files).'], rpt, out, coupled: { parts: [], dir: pdir } };
   const parts = job.parts.map((p, k) => ({ inp: p.inp, level: p.level || 0, rpt: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.rpt'), out: path.join(pdir, 'P' + String(k + 1).padStart(2, '0') + '.out') }));
   const cfg = path.join(pdir, 'run.cpl');
   const L = ['AVCPL\t1', 'SHM\t' + path.join(pdir, 'run.shm'), 'MODE\t0', 'THREADS\t' + Math.max(1, job.threads || 1)];
