@@ -329,6 +329,11 @@
       if (v.length) { if (!await AV.confirm('Possible problems found:\n\n' + v.slice(0, 15).join('\n') + (v.length > 15 ? '\n... (' + v.length + ' total)' : '') + '\n\nRun anyway?', 'Run Simulation', 'Run')) return; }
       // every run is named; its files go to <model>_Results (Database panel)
       const ci = await AV.partitionRunInfo(app);
+      // an unstructured mesh made by an older version: the surface links are only rebuilt by Create Meshes
+      if (AV.f2dEnabled(m) && AV.has2D(app) && app.mesh2d && app.mesh2d.type === 'tri' && (app.mesh2d.gen || 1) < AV.UMESH_GEN) {
+        const a = await AV.modal({ title: 'Run Simulation', body: h('div', { style: { maxWidth: '520px', lineHeight: 1.5 } }, 'The 2D mesh was created with an older version of Avaris2 CS (' + (app.mesh2d.created || '').slice(0, 10) + '). Rebuilding it gives the improved surface links of this version (cells with buildings no longer get short, steep links, which made runs unstable). The run uses the saved mesh until it is rebuilt.'),
+          buttons: [{ label: 'Cancel', value: null }, { label: 'Run with Old Mesh', value: 'old' }, { label: 'Rebuild Mesh, then Run', primary: true, value: 'new' }] }).done;
+        if (!a) return; if (a === 'new') { await AV.createMeshes(app); if (!app.mesh2d || (app.mesh2d.gen || 1) < AV.UMESH_GEN) return; } }
       const rn = await AV.askRunName(app, null, { coupled: ci }); if (!rn) return;
       if (rn.coupled) return this.runCoupled(rn, ci);
       const dir = app.filePath ? AV.resultsDir(app.filePath) : AV.joinPath(app.info.temp, 'osemcm-runs');

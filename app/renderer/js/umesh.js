@@ -262,11 +262,14 @@
     // quality: smallest angle of the triangles kept
     let minAng = 180, bad = 0; for (const t of T) { if (cells0[t.cell] && cells0[t.cell].v.length !== 3) continue; const v = t.v; const ang = []; for (let e = 0; e < 3; e++) { const a = v[e], b = v[(e + 1) % 3], c = v[(e + 2) % 3]; const ux = X[b] - X[a], uy = Y[b] - Y[a], wx = X[c] - X[a], wy = Y[c] - Y[a]; ang.push(Math.acos(Math.max(-1, Math.min(1, (ux * wx + uy * wy) / Math.hypot(ux, uy) / Math.hypot(wx, wy)))) * 180 / Math.PI); }
       const m = Math.min(...ang); if (m < minAng) minAng = m; if (m < 20) bad++; }
-    return { version: 2, type: 'tri', created: new Date().toISOString(), lenFactor: lf, verts,
+    return { version: 2, type: 'tri', gen: AV.UMESH_GEN, created: new Date().toISOString(), lenFactor: lf, verts,
       cells: cells.map(c => { const o = { id: c.id, x: +c.x.toFixed(4), y: +c.y.toFixed(4), s: +Math.sqrt(c.A).toFixed(4), a: +c.A.toFixed(3), v: c.v, elev: c.elev, n: c.n, deg: c.deg }; if (c.bt) o.bt = c.bt; if (c.por < 1) o.por = c.por; return o; }),
       links, outfalls, couplings,
       stats: { cells: cells.length, links: links.length, outfalls: outfalls.length, couplings: couplings.length, skippedNoData, skippedExcl, raised: nRaised, porous: nPorous, smallBuildings: nSmall, points: X.length, missingConstraints: missing,
         triangles: T.length, quads: cells.filter(c => c.v.length > 3).length, minAngle: +minAng.toFixed(1), below20: bad, seconds: (Date.now() - t0) / 1000 } };
   };
+  // generator version: raised when the cells / links of a new mesh differ (2: 2.9.5 link lengths of porous cells);
+  // runs offer to rebuild an older unstructured mesh
+  AV.UMESH_GEN = 2;
   AV.UMESH_SQ = SQ; AV.polyIndex = polyIndex;
 })(typeof window !== 'undefined' ? window.AV : module.exports);
