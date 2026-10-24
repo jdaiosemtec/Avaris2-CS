@@ -1121,3 +1121,12 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .calkpis.three .calkpi .kv { font-size: 22px; }
 .calgrid .calkpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .calgrid .calkpi .kv { font-size: 20px; }
+/* Auto Calibration as a large dialog (2.9.1) */
+.calback { position: fixed; inset: 0; background: rgba(20, 30, 40, .35); z-index: 900; display: flex; align-items: center; justify-content: center; }
+.calwin { width: calc(100vw - 24px); height: calc(100vh - 24px); background: #f2f4f7; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.35); display: flex; flex-direction: column; overflow: hidden; }
+.calwinh { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 14px; background: #fff; border-bottom: 1px solid var(--line, #dde3e8); font-weight: 600; font-size: 14px; flex: none; }
+.calwinh img { width: 20px; height: 20px; } .calwinh .sp { flex: 1; }
+.calwinh .x { border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: #546e7a; padding: 2px 8px; border-radius: 4px; } .calwinh .x:hover { background: #eceff1; color: #c62828; }
+.calwin > .calview { flex: 1; min-height: 0; }
+.calmapbar { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 901; display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; background: #fff; border: 1px solid #90caf9; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-size: 13px; }
+.calmapbar img { width: 18px; height: 18px; }

@@ -45,11 +45,32 @@
     async open() {
       const app = this.app;
       if (!app.filePath) { AV.alert('Save the model first: the calibration project is kept in a folder next to the model file.', 'Auto Calibration'); return; }
+      // a large dialog over the whole window (the side panels do not take room from it)
       if (!this.el) {
-        this.el = h('div', { class: 'calview' }); app.addView('calib', 'Auto Calibration', this.el, { onClose: () => { this.el = null; this.charts = null; } });
-      } else app.activateView('calib');
+        this.el = h('div', { class: 'calview' });
+        const head = h('div', { class: 'calwinh' }, h('img', { src: 'icons/calibration.png', alt: '' }), h('span', null, 'Auto Calibration'), h('span', { class: 'sp' }),
+          h('button', { class: 'x', title: 'Close (the project stays as saved; open it again from Simulation ▸ Auto Calibration)', onclick: () => this.close() }, '×'));
+        this.win = h('div', { class: 'calback' }, h('div', { class: 'calwin' }, head, this.el)); document.body.appendChild(this.win);
+        this._onKey = (e) => { if (e.key === 'Escape' && this.win && this.win.style.display !== 'none' && !document.querySelector('.modal-back')) { e.stopPropagation(); this.close(); } }; document.addEventListener('keydown', this._onKey, true);
+      } else this.showWin();
       if (!this.P || this.P._model !== app.filePath) await this.loadLast();
       this.render();
+    }
+    async close() {
+      if (this._live || this._sensRun) { if (!await AV.confirm('The calibration is running. Close the window? The runs go on and the results are kept in the project; open Auto Calibration again to see them.', 'Auto Calibration', 'Close', 'Cancel')) return; }
+      if (this.dirty && this.save && await AV.confirm('Save the changes of the calibration project "' + this.P.name + '"?', 'Auto Calibration', 'Save', 'Don\'t Save')) { try { await this.save(); } catch (e) { AV.toast(e.message, true); } }
+      if (this._live || this._sensRun) { this.hideWin(); return; } // keep the running state; reopening shows it
+      if (this.win) this.win.remove(); if (this._mapBar) this._mapBar.remove(); this._mapBar = null; document.removeEventListener('keydown', this._onKey, true); this.win = null; this.el = null; this.charts = null;
+    }
+    hideWin() { if (this.win) this.win.style.display = 'none'; }
+    showWin() { if (this.win) this.win.style.display = ''; if (this._mapBar) { this._mapBar.remove(); this._mapBar = null; } if (this._mapOff) { this._mapOff(); this._mapOff = null; } }
+    // go to the map for a moment (zoom to an object, pick an object): the dialog is hidden and a bar at the bottom
+    // brings it back; onPick(obj) is called with the first object selected on the map (and the dialog comes back)
+    toMap(text, onPick) {
+      this.hideWin(); this.app.activateView && this.app.activateView('map'); if (this._mapBar) this._mapBar.remove();
+      this._mapBar = h('div', { class: 'calmapbar' }, h('img', { src: 'icons/calibration.png', alt: '' }), h('span', null, text), h('button', { class: 'btn primary small', onclick: () => this.showWin() }, onPick ? 'Cancel' : 'Back to Auto Calibration'));
+      document.body.appendChild(this._mapBar);
+      if (onPick) this._mapOff = this.app.on('selection', (sel) => { if (!sel || !sel.length) return; const o = sel[0]; this.showWin(); onPick(o); });
     }
     async listProjects() { const d = this.folder(); if (!await window.host.exists(d)) return []; const L = await window.host.listDir(d); return (L || []).filter(e => /\.avcal$/i.test(e.name || e)).map(e => (e.name || e).replace(/\.avcal$/i, '')); }
     async loadLast() {
@@ -385,8 +406,8 @@
           const tr = h('tr', { class: r.ok ? '' : 'bad' });
           const mon = h('input', { class: 'mon', value: r.mon, onchange: (e) => { this.P.mapping[r.i].mon = e.target.value.trim(); this.touch(); this.render(); } });
           const obj = h('input', { class: 'obj' + (r.ok || !r.obj ? '' : ' err'), value: r.obj, onchange: (e) => { this.P.mapping[r.i].obj = e.target.value.trim(); this.touch(); this.render(); } });
-          const pick = h('button', { class: 'btn small', title: 'Use the object selected on the map', onclick: () => { const s = [...this.app.selection][0]; if (!s) { AV.toast('Select a conduit, node or rain gage on the map first.', true); return; } this.P.mapping[r.i].obj = s.id; this.touch(); this.render(); } }, '⌖');
-          const zoom = h('button', { class: 'btn small', title: 'Show on the map', disabled: !r.ok, onclick: () => { this.app.select(r.o); this.app.map && this.app.map.zoomToObjects([r.o]); this.app.activateView && this.app.activateView('map'); } }, '◎');
+          const pick = h('button', { class: 'btn small', title: 'Pick the object on the map', onclick: () => { const i = r.i; this.toMap('Click the conduit, node or rain gage of monitor ' + (this.P.mapping[i].mon || '') + ' on the map', (o) => { this.P.mapping[i].obj = o.id; this.touch(); this.render(); AV.toast(this.P.mapping[i].mon + ' → ' + o.id); }); } }, '⌖');
+          const zoom = h('button', { class: 'btn small', title: 'Show on the map', disabled: !r.ok, onclick: () => { this.app.select(r.o); this.app.map && this.app.map.zoomToObjects([r.o]); this.toMap((this.P.mapping[r.i].mon || '') + ' = ' + r.o.id); } }, '◎');
           const del = h('button', { class: 'btn small', title: 'Delete the row', onclick: () => { this.P.mapping.splice(r.i, 1); this.touch(); this.render(); } }, '×');
           tr.append(h('td', null, mon), h('td', null, obj), h('td', null, r.ok ? this.kindName(r.o) : '–'), h('td', { html: r.ok ? chip('good', '✓ linked') : chip('bad', '× ' + (r.reason.startsWith('object') || r.reason.includes('used by') ? 'not matched' : r.reason)) }), h('td', { class: 'nowrap' }, pick, zoom, del));
           tbl.appendChild(tr); }

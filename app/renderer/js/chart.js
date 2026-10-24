@@ -56,7 +56,12 @@
       if (!this.w) return;
       const ctx = this.ctx; ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.w, this.hh);
-      const L = 68, R = 18, T = this.title ? 34 : 16, B = this.compact ? 22 : 46 + Math.ceil(this.series.length / 3) * 16;
+      const L = 68, R = 18, T = this.title ? 34 : 16;
+      // legend entries flow left to right and wrap to the next row when the chart is narrow
+      ctx.font = '12px Segoe UI'; const legPos = []; { const avail = Math.max(120, this.w - L - R); let x = 0, row = 0;
+        this.series.forEach((s) => { const w = 28 + ctx.measureText(s.name).width + 18; if (x > 0 && x + w > avail) { x = 0; row++; } legPos.push([x, row, w]); x += w; }); }
+      const nRows = legPos.length ? legPos[legPos.length - 1][1] + 1 : 0;
+      const B = this.compact ? 22 : 46 + nRows * 16;
       this.plot = { L, R, T, B, W: this.w - L - R, H: this.hh - T - B };
       const e = this.extent(); this.e = e;
       ctx.font = '12px Segoe UI, Arial'; ctx.fillStyle = '#263238';
@@ -104,10 +109,9 @@
       ctx.restore();
       // legend
       ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '12px Segoe UI';
-      const colW = Math.max(160, P.W / 3);
       this._leg = [];
       if (!this.compact) this.series.forEach((s, i) => {
-        const x = P.L + (i % 3) * colW, y = P.T + P.H + 40 + Math.floor(i / 3) * 16;
+        const x = P.L + legPos[i][0], y = P.T + P.H + 40 + legPos[i][1] * 16; const colW = legPos[i][2];
         ctx.globalAlpha = s.hidden ? 0.35 : 1;
         if (s.bars) { ctx.fillStyle = s.color; ctx.fillRect(x, y - 5, 22, 10); } else { ctx.strokeStyle = s.color; ctx.lineWidth = Math.min(4, (s.width || 1.8) + 0.7); ctx.setLineDash(s.dash || []); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 22, y); ctx.stroke(); ctx.setLineDash([]); if (s.marker && s.marker !== 'none') { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(x + 11, y, 3, 0, 7); ctx.fill(); } }
         ctx.fillStyle = '#263238'; ctx.fillText(s.name, x + 28, y); ctx.globalAlpha = 1;

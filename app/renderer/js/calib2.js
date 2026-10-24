@@ -585,10 +585,12 @@
       h('label', null, 'Event ', h('select', { onchange: (e) => { this.sel.rev = e.target.value; this.drawResChart(); } }, all.map(e => h('option', { value: e.id, selected: e.id === ev.id }, e.id + ' (' + e.use.toLowerCase() + ')')))));
     const w = this.eventWindow(ev); const cut = (s) => { if (!s) return null; const a = lb(s.t, w[0]), b = lb(s.t, w[1]); return { x: Array.from(s.t.slice(a, b)), y: Array.from(s.v.slice(a, b)) }; };
     const obs = cut(this.series(vk)); const cur = cut(this.resSeries.get('cur|' + ev.id + '|' + vk)); const op = cut(this.resSeries.get(k + '|' + ev.id + '|' + vk));
-    const S = []; if (obs) S.push(Object.assign({ name: 'Observed', color: '#263238', width: 0.01, marker: 'circle' }, obs.x.length > 400 ? thin(obs, 400) : obs)); if (cur) S.push(Object.assign({ name: 'Current model', color: '#9aa5b1', dash: [6, 4], width: 2 }, cur)); if (op) S.push(Object.assign({ name: 'Option ' + (k === 'E' ? 'Edited' : k), color: '#1565c0', width: 2.2 }, op));
+    const S = []; if (obs) S.push(Object.assign({ name: 'Observed', color: '#263238', width: 0.01, marker: 'circle' }, obs.x.length > 400 ? thin(obs, 400) : obs)); if (op) S.push(Object.assign({ name: 'Option ' + (k === 'E' ? 'Edited' : k), color: '#1565c0', width: 2.2 }, op)); if (cur) S.push(Object.assign({ name: 'Current model', color: '#78909c', dash: [6, 4], width: 2 }, cur)); // current drawn last (dashed, on top)
     const M = this.P.monitors[vk]; this._resChart.setSeries(S, { xFix: w, xFmt: fmtShort, yLabel: M.var + ' (' + this.modelUnit(M.var) + ')', xLabel: 'Date / time', title: '' });
     // stats line
     const s = this.scored().find(x => x.key === vk); const st = this._resStats; st.innerHTML = '';
+    if (cur && op && cur.y.length === op.y.length) { let mx = 0, d = 0; for (let i = 0; i < op.y.length; i++) { mx = Math.max(mx, Math.abs(cur.y[i])); d = Math.max(d, Math.abs(op.y[i] - cur.y[i])); }
+      if (mx > 0 && d <= 0.005 * mx) st.appendChild(h('div', { class: 'muted', style: { marginBottom: '4px' } }, 'Option ' + (k === 'E' ? 'Edited' : k) + ' and the current model give the same ' + M.var.toLowerCase() + ' here (largest difference ' + AV.fmt(d, 4) + ' ' + this.modelUnit(M.var) + '): the parameters changed in this option do not reach ' + mon.o.id + ', so the two lines lie on top of each other.')); }
     if (s && op) { const run = this.runFromSeries(k, ev.id); const Mx = this.metrics(s, ev, run); if (Mx) { const cks = this.checksFor(s, ev, Mx, this.critRows()); st.append(...cks.map(c => h('span', { class: 'calstat ' + (c.s === 1 ? 'good' : c.s > 0 ? 'mid' : 'bad') }, c.txt + (c.s === 1 ? ' ✓' : ' ✕'))));
       const one = this.scoreRuns({ [ev.id]: run }, [ev]); const p = one.per[mon.mid]; if (p) st.append(h('span', { class: 'muted' }, ' · score ' + p.s.toFixed(0) + ' in this event')); } }
   };
@@ -601,7 +603,7 @@
     let struct = null; for (const s of vars) for (const key of ['peak', 'vol', 'depthU', 'depthS', 'depthL']) { const signs = []; let mag = [];
       for (const k of ['cur', 'A', 'B', 'C']) for (const ev of all) { const run = this.runFromSeries(k, ev.id); const M = this.metrics(s, ev, run); if (!M) continue; const c = this.checksFor(s, ev, M, rows).find(x => x.key === key); if (!c) continue; signs.push(c.s < 1 ? Math.sign(c.d) : 0); mag.push(c.d); }
       if (signs.length >= 4 && signs.every(x => x === signs[0] && x !== 0)) { struct = { s, key, lo: Math.min(...mag), hi: Math.max(...mag), sign: signs[0] }; break; } }
-    const zoom = () => { this.app.select(mon.o); this.app.map && this.app.map.zoomToObjects([mon.o]); this.app.activateView('map'); };
+    const zoom = () => { this.app.select(mon.o); this.app.map && this.app.map.zoomToObjects([mon.o]); this.toMap(mid + ' = ' + mon.o.id); };
     const excl = () => { this.P.weights[mid] = 0; this.touch(); this.go(3); AV.toast(mid + ' is no longer scored (weight 0). Start the calibration again.', false, 6000); };
     if (struct) { const u = this.si ? 'm' : 'ft'; const isDepth = struct.key.startsWith('depth'); const lim = (v) => isDepth && !this.critRows().find(r => r.key === struct.key && r.unit === '%') ? Math.abs(v).toFixed(2) + ' ' + u : Math.abs(v).toFixed(0) + ' %';
       const what = isDepth ? 'the modelled depth is ' + lim(struct.lo) + '–' + lim(struct.hi) + (struct.sign > 0 ? ' too high' : ' too low') : 'the modelled ' + (struct.key === 'vol' ? 'volume' : 'peak') + ' is ' + lim(struct.lo) + '–' + lim(struct.hi) + (struct.sign > 0 ? ' too large' : ' too small');
