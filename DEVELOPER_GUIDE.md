@@ -546,3 +546,14 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 
 - 用户要求去掉 Split Partition 里的 "Apply and Merge Pxx + Pyy" 按钮和合并建议（`smallestPair` 会挑到刚拆出的两块，等于撤销拆分）。现在只有 Cancel / Apply；分区数 > 本机核时只显示中性说明。`smallestPair` 仍用于 Merge Partitions… 的默认选择；`apply(pair)` 的参数保留但 Split 只传 null。
 
+## 32. 2.10.4：分区 OPT（自动寻优）
+
+- 入口：结果区 est. speed-up 小卡片（`.pchip.pspeed`）里的 **OPT** 按钮 → `partpanel.js optDlg()`。
+- 候选数 `optCands(pr, cur)`：物理核 −1 / 物理核 / +1、(核+线程)/2、线程数、`cpuPlan.plan` 的数、当前分区数，限制在 2…`maxParts()`。
+- 先按面板设置 `partAnalyse` 一次，再对每个候选 `partCompute`（n ≤ 物理核时用两类速度权重，与 go() 相同），`cpuPlan.assign` 得 speed-up。
+  打分 `score = tot / (tot / speedup + 2 × 切点数) × (1 − 0.01 n)`（切点按每步 2 个节点当量的交换工作，偏保守）。表里显示的 Est. speed-up 与卡片相同（不含交换），排序/“fastest”按 score。
+  实际分区数相同的候选去重。各候选的分区结果都保留，`Use N Partitions` 直接采用（同时设 V.S.n、V.A、V.P.cpu，清 undo）。
+- 瓶颈说明：最大分区不再变小（最后一个候选的最大分区 ≥ 最优的 90 %）时，对它做 `partCompute(only, n=2)`，若拆不开就用 `blockers` 说明是哪组必须在一起（积水区 / 来回流 / 泵堰孔口），并在地图闪烁（复用 Split 的 V.hl）。这段单独 try，失败不影响结果。
+- CSS：`.pchip.pspeed`、`.popt`、`.poptbar`（注意已有 `.pbar` 是表里的节点条，不能重名）、`.pbest`。
+- 后续（未做）：用耦合计算的实测子模型用时校正每个区域的工作量。
+

@@ -74,7 +74,8 @@
       const asg = prof ? AV.cpuPlan.assign(st.map(s => s.nodes), prof) : null;
       body.appendChild(sec(2, 'Result'));
       body.appendChild(h('div', { class: 'pchips' }, [[P.count, 'partitions'], [P.cuts.length, 'cut points'], [mnN + '–' + mxN, 'nodes per partition'], [[...P.why.values()].filter(v => v.startsWith('oscillating')).length, 'oscillating pipes'], [P.hard ? P.hard.size : 0, 'never cut (pumps …)'], [V.A.ponds.length, 'ponding areas']].map(([v, l]) => h('div', { class: 'pchip' }, h('b', null, String(v)), h('span', null, l))),
-        asg ? h('div', { class: 'pchip', title: 'Against one sub-model on one fastest core: total nodes / the slowest partition (its nodes / the speed of its core). Exchange costs not included.' }, h('b', { style: { color: asg.speedup >= 0.75 * asg.ideal ? 'var(--ok)' : 'var(--warn)' } }, '×' + asg.speedup.toFixed(1)), h('span', null, 'est. speed-up')) : null));
+        asg ? h('div', { class: 'pchip pspeed', title: 'Against one sub-model on one fastest core: total nodes / the slowest partition (its nodes / the speed of its core). Exchange costs not included.' }, h('div', null, h('b', { style: { color: asg.speedup >= 0.75 * asg.ideal ? 'var(--ok)' : 'var(--warn)' } }, '×' + asg.speedup.toFixed(1)), h('span', null, 'est. speed-up')),
+          h('button', { class: 'btn small primary popt', title: 'Optimise: try several numbers of partitions with the settings above and use the fastest for this computer', disabled: busy, onclick: () => optDlg() }, 'OPT')) : null));
       const tb = h('table', { class: 'ptbl' }, h('tr', null, ['', 'Partition', 'Nodes', ''].concat(asg ? ['Core', 'Load'] : []).concat(['Links', 'Subc.', 'In', 'Out', 'Outfalls']).map(x => h('th', null, x))),
         st.map(s => h('tr', { class: 'p' + (V.sel === s.i ? ' sel' : ''), onclick: () => { V.sel = V.sel === s.i ? null : s.i; V.hl = null; render(); redrawMap(); }, ondblclick: () => zoomTo(s.i) },
           h('td', null, h('span', { class: 'sw', style: { background: COL(s.i) } })), h('td', null, PID(s.i)), h('td', { class: 'num' }, String(s.nodes)),
@@ -215,6 +216,63 @@
     const smallestPair = (P, without) => { let best = null; const st = P.stats; for (const c of P.cuts) { const a = c.upPart, b = c.downPart; if (a === b || a === without || b === without) continue; const sz = st[a].nodes + st[b].nodes; if (!best || sz < best.sz) best = { a: Math.min(a, b), b: Math.max(a, b), sz }; } return best; };
     const physCores = () => { const p = AV.cpuProfileOK(app); return p ? p.cores.length : C; };
     // ---- Split Partition: the selected partition only, with the settings of the main partition (editable here)
+    // ---- OPT (2.10.4): try several numbers of partitions with the current settings, pick the fastest for this computer
+    // score = est. speed-up (nodes / core speed, cpuplan.assign) with the exchange costs: 1 % per sub-model and
+    // 2 node-equivalents of work per cut point in every step (conservative); the partitions found are kept, so "Use" is instant
+    function optCands(pr, cur) {
+      const c = pr.cores.length, t = pr.logical, mx = maxParts(); const pl = AV.cpuPlan.plan(pr, mx);
+      const set = new Set([c - 1, c, c + 1, Math.round((c + t) / 2), t, pl ? pl.n : c, cur]);
+      return [...set].filter(n => n >= 2 && n <= mx).sort((a, b) => a - b);
+    }
+    function optDlg() {
+      const pr = AV.cpuProfileOK(app); if (!pr || busy) return; const cur = V.P ? V.P.count : V.S.n; const cands = optCands(pr, cur);
+      const tot = app.model.nodes.size; const res = []; let stop = false, bestI = -1, sel = -1, A = null;
+      const bar = h('i'); const prog = h('div', { class: 'hint' }, 'Analysing the base results…'); const why = h('div', { class: 'hint', style: { marginTop: '6px', lineHeight: 1.5 } });
+      const tb = h('table', { class: 'ptbl' }); const head = () => h('tr', null, ['Partitions', 'Cut points', 'Largest', 'Max load', 'Est. speed-up'].map((x, i) => h('th', { class: i ? 'num' : '' }, x)));
+      const draw = () => { tb.innerHTML = ''; tb.appendChild(head()); res.forEach((r, i) => tb.appendChild(h('tr', { class: 'p' + (i === sel ? ' sel' : ''), style: { cursor: 'pointer' }, onclick: () => { if (bestI < 0) return; sel = i; draw(); setB(); } },
+        h('td', null, String(r.n), i === bestI ? h('span', { class: 'pbest' }, 'fastest') : null, r.n === cur ? h('span', { class: 'hint' }, ' (current)') : null),
+        h('td', { class: 'num' }, r.cuts.toLocaleString()), h('td', { class: 'num' }, r.big.toLocaleString()),
+        h('td', { class: 'num', style: { color: r.load > 1 + V.S.tol / 100 ? 'var(--warn)' : 'var(--ok)' } }, Math.round(r.load * 100) + ' %'),
+        h('td', { class: 'num' }, h('b', null, '×' + r.sp.toFixed(1)))))); };
+      const body = h('div', { class: 'partp', style: { width: '540px' } },
+        h('div', { class: 'hint' }, pr.model + ' · ' + AV.cpuPlan.describe(pr) + '. Every number below is partitioned with the settings of the panel; the fastest is selected (cut points count as exchange work). You can click another row.'),
+        h('div', { class: 'poptbar' }, bar), prog, tb, why);
+      const dlg = AV.modal({ title: 'Optimise Partitions for this Computer', width: 580, body, buttons: [{ label: 'Cancel', onClick: () => { stop = true; V.hl = null; redrawMap(); return true; } }] });
+      const setB = () => dlg.setButtons([{ label: 'Cancel', onClick: () => { V.hl = null; redrawMap(); return true; } }, { label: 'Use ' + res[sel].n + ' Partitions', primary: true, onClick: () => { use(res[sel]); return true; } }]);
+      const use = (r) => { V.hl = null; V.S.n = r.n; app.prefs.partition = V.S; app.savePrefs(); V.A = A; V.P = r.P; V.P.cpu = { model: pr.model, sig: pr.sig, cores: AV.cpuPlan.describe(pr), date: pr.date };
+        V.sel = null; V.undo = []; app.status('Model partition: ' + V.P.count + ' partitions, ' + V.P.cuts.length + ' cut points (OPT).'); render(); redrawMap(); };
+      (async () => {
+        busy = true; const t0 = performance.now(); const bz = AV.busy.start('Optimising the partitions');
+        try {
+          await new Promise(r => setTimeout(r, 30)); A = await AV.partAnalyse(app, V.S);
+          for (let k = 0; k < cands.length && !stop; k++) { const n = cands[k]; prog.textContent = 'Trying ' + n + ' partitions… (' + (k + 1) + ' of ' + cands.length + ')'; await new Promise(r => setTimeout(r, 20));
+            const w = n <= pr.cores.length ? AV.cpuPlan.twoClass(AV.cpuPlan.slotsFor(pr, n).map(x => x.speed)) : null;
+            const P = AV.partCompute(app, A, Object.assign({}, V.S, { n }), { w }); const sz = P.stats.map(s => s.nodes); const a = AV.cpuPlan.assign(sz, pr);
+            const worst = tot / a.speedup; const score = tot / (worst + 2 * P.cuts.length) * (1 - 0.01 * P.count);
+            res.push({ n: P.count, want: n, P, cuts: P.cuts.length, big: AV.amax(sz), load: AV.amax(a.parts.map(x => x.load)), sp: a.speedup, score });
+            bar.style.width = ((k + 1) / cands.length * 100) + '%'; draw(); }
+          if (stop) return;
+          // the same partition count can come out twice (a model that cannot be split further): keep the first
+          const seen = new Set(); for (let i = res.length - 1; i >= 0; i--) { if (seen.has(res[i].n)) res.splice(i, 1); else seen.add(res[i].n); } res.sort((a, b) => a.n - b.n);
+          bestI = res.reduce((b, r, i) => r.score > res[b].score ? i : b, 0); sel = bestI; draw(); setB();
+          prog.textContent = 'Done – ' + res.length + ' numbers tried in ' + ((performance.now() - t0) / 1000).toFixed(0) + ' s.';
+          // what keeps more partitions from running faster: the largest partition stops shrinking
+          const last = res[res.length - 1], best = res[bestI];
+          if (last !== best && last.big >= 0.9 * best.big) try {
+            const big = last.P.stats.reduce((a, s) => s.nodes > a.nodes ? s : a); const only = new Set([...last.P.owner].filter(([, q]) => q === big.i).map(([id]) => id));
+            let Q = null; try { Q = AV.partCompute(app, A, Object.assign({}, V.S, { n: 2 }), { only }); } catch (e) { Q = null; }
+            const bl = Q && Q.count < 2 && Q.blockers && Q.blockers[0];
+            const pl = (k, wd) => k.toLocaleString() + ' ' + wd + (k === 1 ? '' : 's');
+            const first = res.find(r => r.big >= 0.9 * last.big) || last; let txt = 'From ' + first.n + ' partitions on, the largest partition stays at about ' + last.big.toLocaleString() + ' nodes';
+            if (bl) { const r = []; if (bl.ponds) r.push(bl.ponds === 1 ? 'a ponding area (' + pl(bl.pondNodes, 'manhole') + ')' : pl(bl.ponds, 'ponding area')); if (bl.osc) r.push(pl(bl.osc, 'pipe') + ' with oscillating flow'); if (bl.hard) r.push(pl(bl.hard, 'pump / weir / orifice link'));
+              txt += ': a group of ' + bl.size.toLocaleString() + ' nodes is kept whole' + (r.length ? ' (' + r.join(', ') + ')' : '') + ', so more partitions do not run faster here. It blinks on the map; see Settings ▸ Advanced to allow cuts there.';
+              V.hl = new Set(bl.nodes); redrawMap(); const iv = setInterval(() => { if (!V.hl || !V.hl.size || !app.partView) { clearInterval(iv); return; } app.map.redrawOverlay(); }, 450);
+            } else txt += ', so more partitions do not run faster here.';
+            why.textContent = txt; } catch (e) { console.warn('OPT why', e); }
+        } catch (e) { console.error(e); prog.textContent = 'Optimise failed: ' + e.message; }
+        finally { bz.done(); busy = false; }
+      })();
+    }
     function splitDlg(p0) {
       const P = V.P; if (p0 === null || p0 === undefined) return; const st = P.stats[p0]; const pr = AV.cpuProfileOK(app);
       const S2 = Object.assign({}, V.S); const tgt = pr ? (() => { const sl = AV.cpuPlan.slotsFor(pr, P.count).map(x => x.speed); const tw = AV.cpuPlan.twoClass(sl); return app.model.nodes.size / (P.count * (1 - tw.frac) + P.count * tw.frac * tw.r); })() : app.model.nodes.size / P.count;
