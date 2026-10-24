@@ -179,7 +179,7 @@
         UNDER_RELAXATION: g('UNDER_RELAXATION', '0.5'), NONCONV_REPORT_COUNT: g('NONCONV_REPORT_COUNT', '100'), detail: !!this.detailReport,
       };
       const D = this.app.defaults; for (const k in D) v['def_' + k] = D[k];
-      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false; if (!/^(MODEL|CONVERT)$/i.test(v.f2d_UNITS)) v.f2d_UNITS = 'MODEL'; v.f2d_MESH_TYPE = /^UNSTR/i.test(v.f2d_MESH_TYPE) ? 'UNSTRUCTURED' : 'SQUARE'; v.f2d_EXCL_TYPE = /^(RAISED|POROUS)$/i.test(v.f2d_EXCL_TYPE) ? v.f2d_EXCL_TYPE.toUpperCase() : 'VOID';
+      const F2 = AV.f2d(this.model); for (const k of AV.F2D_KEYS) v['f2d_' + k] = F2[k]; v.f2d_ENABLED = AV.f2dEnabled(this.model); v.f2d_TAGALL = false; if (!/^(MODEL|CONVERT)$/i.test(v.f2d_UNITS)) v.f2d_UNITS = 'MODEL'; v.f2d_MESH_TYPE = /^UNSTR/i.test(v.f2d_MESH_TYPE) ? 'UNSTRUCTURED' : 'SQUARE'; v.f2d_EXCL_TYPE = /^(RAISED|POROUS)$/i.test(v.f2d_EXCL_TYPE) ? v.f2d_EXCL_TYPE.toUpperCase() : 'VOID'; v.f2d_BLDG_MESH = /^(ALL|NONE)$/i.test(v.f2d_BLDG_MESH) ? v.f2d_BLDG_MESH.toUpperCase() : 'LARGE';
       const YN = ['NO', 'YES'];
       const tabs = {
         General: [
@@ -226,20 +226,19 @@
           { k: 'f2d_DEM', l: 'Digital Elevation Model', t: 'file', ext: ['tif', 'tiff', 'asc'], note: 'GeoTIFF or ASCII grid in the map coordinate system; cell elevations are read at the cell centres.' },
           { k: 'f2d_WATERFRONT', l: 'Water Front (line)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Lines where surface water leaves the model (river bank, coast); attribute "elev" = outlet elevation.' },
           { k: 'f2d_CUTOFF', l: 'Cut-off Lines', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Walls / embankments: no surface flow across them.' },
-          { k: 'f2d_EXCLUSION', l: 'Exclusion Polygons', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional. Buildings and other areas. Attribute "type" per polygon: VOID (no cells, water flows around), RAISED (cells raised by "height") or POROUS (cells keep "porosity" × their area and flow width). Polygons without these attributes use the values below.' },
-          { k: 'f2d_EXCL_TYPE', l: 'Exclusion Type (default)', t: 'choice', o: ['VOID', 'RAISED', 'POROUS'] },
-          { k: 'f2d_EXCL_HEIGHT', l: 'Raised Height (default)', t: 'text', note: 'In the DEM elevation units; blank = 0.3 m / 1 ft.' }, { k: 'f2d_EXCL_POROSITY', l: 'Porosity (default, 0–1)', t: 'text', note: 'Blank = 0.5.' },
+          { t: 'excl' },
           { k: 'f2d_MESH_ZONES', l: 'Mesh Zones (polygon)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional, unstructured mesh only. Attribute "size" = cell size inside the polygon: finer along streets and streams, coarser in open land.' },
           { k: 'f2d_BREAK_LINES', l: 'Break Lines (line)', t: 'file', ext: ['shp', 'geojson', 'json', 'kml'], note: 'Optional, unstructured mesh only. Cell edges follow these lines (road centre lines, kerbs, ridges); water can cross them. Optional attribute "size" = cell size along the line.' },
           { t: 'h', l: 'Mesh and run' },
           { k: 'f2d_MESH_TYPE', l: 'Mesh Type', t: 'choice', o: ['SQUARE', 'UNSTRUCTURED'], note: 'SQUARE: square grid as Avaris DS. UNSTRUCTURED: triangles that follow the boundary, buildings, cut-off and break lines, with finer cells in mesh zones. Also chosen in Create Meshes.' },
+          { k: 'f2d_BLDG_MESH', l: 'Buildings (unstructured mesh)', t: 'choice', o: ['LARGE', 'ALL', 'NONE'], note: 'LARGE (default): buildings larger than one cell shape the mesh, smaller ones reduce the area and flow width of their cells. ALL: every building shapes the mesh (fine cells around each building, much shorter time steps, slow runs). NONE: no building shapes the mesh; all of them reduce the area and flow width of the cells they cover (fastest).' },
           { k: 'f2d_CELL_SIZE', l: 'Cell Size (blank = boundary "length")', t: 'text', note: 'In map units, the same number for both mesh types: square cells of this side, or triangles with about the same area (edge about 1.5 × the size), so both give about the same number of cells. Cells of 1/2 to 1/3 of the typical street width resolve streets; mesh zones make them finer only where needed.' }, { k: 'f2d_ROUGHNESS', l: 'Surface Roughness (blank = boundary "roughness")', t: 'text' },
           { k: 'f2d_UNITS', l: 'Mesh Units', t: 'choice', o: ['MODEL', 'CONVERT'], note: 'MODEL (as Avaris DS): cell size and DEM / water-front elevations are used as they are, read in the model units. CONVERT: they are converted from the map units to the model units when the mesh is built (e.g. map and DEM in metres, model in US units: 100 m cells become 328 ft, DEM elevations in m become ft). Rebuild the mesh after changing. To run in other flow units, change the Flow Units in the status bar.' },
           { k: 'f2d_ROUTING_STEP', l: '2D Routing Step (sec, blank = model)', t: 'text' }, { k: 'f2d_FLOOD_DEPTH', l: 'Flood Depth Threshold', t: 'text', note: 'Cells deeper than this count as flooded for Time Ponded / Time to Recede.' },
           { t: 'note', l: 'After changing the layers or the cell size, use Create Meshes (Simulation ribbon, or right-click the 2D Meshes layer). The 1D-2D run writes <model>.finp / .frpt / .fout; the model file itself is not changed.' }],
       };
       if (only2D) { for (const k of Object.keys(tabs)) if (k !== '2D Flood') delete tabs[k]; } else if (!AV.has2D(this.app)) delete tabs['2D Flood'];
-      const body = h('div', { style: { width: only2D ? '600px' : '560px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
+      const body = h('div', { style: { width: tabs['2D Flood'] ? '660px' : '560px', overflowX: 'hidden' } }); const tb = h('div', { class: 'tabs2' }); body.appendChild(tb);
       const inputs = {}; const pages = []; let filesUI = null; tb.style.flexWrap = 'wrap';
       const t0 = Math.max(0, Object.keys(tabs).indexOf(startTab));
       Object.keys(tabs).forEach((name, ti) => {
@@ -248,6 +247,7 @@
           if (f.t === 'h') { form.appendChild(h('h4', null, f.l)); continue; }
           if (f.t === 'note') { form.appendChild(h('div', { class: 'note' }, f.l)); continue; }
           if (f.t === 'files') { filesUI = AV.filesTab(this.app); form.appendChild(filesUI.el); continue; }
+          if (f.t === 'excl') { const X = AV.exclTable(this.app); form.appendChild(X.el); Object.assign(inputs, X.inputs); continue; }
           let inp;
           if (f.t === 'choice') { inp = h('select', null, f.o.map(x => h('option', { value: x }, x))); inp.value = String(v[f.k]).toUpperCase(); }
           else if (f.t === 'check') inp = h('input', { type: 'checkbox', checked: !!v[f.k] });
@@ -287,13 +287,15 @@
       if (Object.keys(r).some(k => k.startsWith('f2d_'))) { const n2 = {}; for (const k of Object.keys(r)) if (k.startsWith('f2d_')) { n2[k.slice(4)] = r[k]; delete r[k]; }
         n2.ENABLED = n2.ENABLED ? 'YES' : 'NO';
         for (const k of ['ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS', 'EXCL_HEIGHT']) if (n2[k] !== '' && !(parseFloat(n2[k]) >= 0)) { AV.alert('2D Flood: "' + k.replace('_', ' ').toLowerCase() + '" must be a number.'); return; }
-        if (n2.EXCL_POROSITY !== '' && n2.EXCL_POROSITY !== undefined && !(parseFloat(n2.EXCL_POROSITY) > 0 && parseFloat(n2.EXCL_POROSITY) <= 1)) { AV.alert('2D Flood: the porosity must be a number above 0 and up to 1.'); return; }
+        { const L = [{ height: n2.EXCL_HEIGHT, porosity: n2.EXCL_POROSITY }].concat(n2.EXCL_MORE ? JSON.parse(n2.EXCL_MORE) : []);
+          for (let i = 0; i < L.length; i++) { const x = L[i]; if (x.height !== '' && x.height !== undefined && !(parseFloat(x.height) >= 0)) { AV.alert('2D Flood: the height of exclusion layer ' + (i + 1) + ' must be a number of 0 or more.'); return; }
+            if (x.porosity !== '' && x.porosity !== undefined && !(parseFloat(x.porosity) > 0 && parseFloat(x.porosity) <= 1)) { AV.alert('2D Flood: the porosity of exclusion layer ' + (i + 1) + ' must be a number above 0 and up to 1.'); return; } } }
         const m = this.model; const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = {}; for (const k of AV.F2D_KEYS) if (n2[k] !== '' && n2[k] !== undefined) nw2[k] = String(n2[k]);
         if (JSON.stringify(AV.f2d(m)) !== JSON.stringify(AV.f2d({ osem2d: nw2 }))) {
           const ch = AV.F2D_KEYS.filter(k => AV.f2d(m)[k] !== AV.f2d({ osem2d: nw2 })[k]).map(k => ({ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: '2D ' + k, old: AV.f2d(m)[k], nw: AV.f2d({ osem2d: nw2 })[k] }));
           this.app.exec({ label: '2D flood settings', do: () => { m.osem2d = Object.assign({}, nw2); }, undo: () => { m.osem2d = old2 ? Object.assign({}, old2) : undefined; }, changes: ch });
           this.app.panels.refreshLayers();
-          const geo = ['BOUNDARY', 'DEM', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'CELL_SIZE', 'ROUGHNESS', 'MESH_TYPE', 'MESH_ZONES', 'BREAK_LINES', 'EXCL_TYPE', 'EXCL_HEIGHT', 'EXCL_POROSITY'].some(k => ch.some(c => c.key === '2D ' + k));
+          const geo = ['BOUNDARY', 'DEM', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'CELL_SIZE', 'ROUGHNESS', 'MESH_TYPE', 'MESH_ZONES', 'BREAK_LINES', 'EXCL_TYPE', 'EXCL_HEIGHT', 'EXCL_POROSITY', 'EXCL_MORE', 'BLDG_MESH'].some(k => ch.some(c => c.key === '2D ' + k));
           if (AV.f2dEnabled(m) && geo && nw2.BOUNDARY && nw2.DEM) setTimeout(async () => { if (await AV.confirm((this.app.mesh2d ? 'The 2D input layers changed. Rebuild the mesh now?' : 'Create the 2D mesh now?'), 'Create Meshes', 'Create Meshes', 'Later')) AV.createMeshes(this.app); }, 50);
         } }
       if (only2D) return;
@@ -335,7 +337,7 @@
       if (this.results) await this.clearResults(true);
       const bar = h('div'); const pct = h('div', { style: { marginTop: '6px', color: 'var(--muted)' } }, 'Starting engine...');
       const t0 = Date.now();
-      this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { style: { marginBottom: '8px' } }, 'Avaris engine: ' + (m.options.FLOW_ROUTING || 'KINWAVE') + ' routing, ' + m.nodes.size + ' nodes, ' + m.links.size + ' links'), h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine('main'); return false; } }], enterSubmits: false });
+      this.runDlg = AV.modal({ title: 'Running Simulation - ' + base, width: 440, body: h('div', null, h('div', { style: { marginBottom: '8px' } }, 'Avaris engine: ' + (m.options.FLOW_ROUTING || 'KINWAVE') + ' routing, ' + m.nodes.size + ' nodes, ' + m.links.size + ' links' + (AV.f2dEnabled(m) && AV.has2D(app) && app.mesh2d && app.mesh2d.cells.length ? ' + 2D: ' + app.mesh2d.cells.length.toLocaleString() + ' cells, ' + app.mesh2d.links.length.toLocaleString() + ' surface links' : '')), h('div', { class: 'progress' }, bar), pct), buttons: [{ label: 'Stop', danger: true, onClick: () => { window.host.cancelEngine('main'); return false; } }], enterSubmits: false });
       this.progEls = { bar, pct, t0 };
       app.status('Running simulation...');
       const encoding = app.filePath ? await window.host.encoding(app.filePath) : 'utf8';

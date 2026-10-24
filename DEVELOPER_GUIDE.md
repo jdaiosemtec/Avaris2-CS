@@ -489,3 +489,9 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 不要把大数组展开传参（`Math.min(...a)`、`push(...a)`）：超过约 10 万个元素就会 "Maximum call stack size exceeded"。用 `AV.amin / AV.amax / AV.pushAll`（util.js），主进程 cplmerge.js 有自己的 `pushAll`。
 - umesh.js：面积 < 1/4 单元面积的建筑不作为约束，按质心找所在单元，累计遮挡面积，单元 `por` = 1 − 遮挡/面积（下限 0.1，`bt` = 3）；约束边恢复时短于 0.3 h 或中点附近已有点的不再细分。
 - gdb.js：GeoJSONSeq 输出固定是 WGS 84 经纬度，`prjWKT` 设为 GEO（2.9.2 误设为图层坐标系，位置错）。`AV.loadDataFile(app, path, { box })` 对 2 万要素以上的 GDB 图层只读框内（Create Meshes 读排除多边形时用 2D 边界框）。
+
+## 23. 2.9.4：外部图层编辑、多个排除图层
+
+- `extedit.js`（`AV.extEdit`）：`app.editLayer` 为正在编辑的外部图层（同时只能一个）；选择存在 `L.sel`（与属性表共用）。map.js 选择工具在编辑图层时先测节点，再测图层要素（`E.hit`：最小的包含多边形，或 6 px 内的线 / 点），空白处拖框 `drag.ext`；Edit Geometry 时 `E.vertexHit` / `moveVertex` / `insertVertex` / `removeVertex`，叠加层画顶点。panels.showProps 无网络选择时调 `E.props`；app.deleteSelection、pickAddType('EXT')、onSelectionChanged、checkSave 有钩子；features.onDraw 对编辑图层走 `E.addFeature`。所有修改 `app.exec` 可撤销；`L.dirty` / `L.geomDirty`。保存：shp 只改属性时只写 .dbf；改了几何按 `L.srcWKT` 反投影写回（`finishVector` 记录 `srcWKT`、`reprojected`）；其他格式另存 shp（地图坐标系 + .prj）。
+- 排除图层：`AV.exclusionLayers(m)` = [EXCLUSION/EXCL_* 一行] + `EXCL_MORE`（JSON）。Options 里 `AV.exclTable` 生成表格，返回伪 input（value getter）给对话框读取。Create Meshes 按顺序读取，每层自己的默认类型。
+- `BLDG_MESH`（umesh.js `opt.buildings`）：LARGE 面积 < 1 个单元的建筑按遮挡面积处理，轮廓加密下限 h/2；ALL 为原来的做法（下限 h/4）；NONE 全部按遮挡面积。跨多个单元的建筑按 h/4 采样点分摊面积。

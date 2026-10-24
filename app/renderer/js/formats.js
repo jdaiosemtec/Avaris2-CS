@@ -308,9 +308,9 @@
   };
   function finishVector(app, L) {
     if (!L.features.length) throw new Error('The layer has no features that could be read.');
-    let tf = transformer(app, L.prjWKT);
+    let tf = transformer(app, L.prjWKT); L.srcWKT = L.prjWKT || null;
     if (tf) { try { const b = L.bbox || bbOf(L.features.flatMap(f => f.type === 'point' ? f.coords : f.coords.flat())); const c = [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]].map(tf); if (!c.flat().every(isFinite) || keepRaw(app, b, bbOf(c))) { tf = null; L.crsNote = RAW_NOTE; } } catch (er) { tf = null; L.crsNote = RAW_NOTE; } }
-    if (tf) { reproject(L, tf); L.crsNote = 'Reprojected into the map coordinate system.'; }
+    if (tf) { reproject(L, tf); L.reprojected = true; L.crsNote = 'Reprojected into the map coordinate system.'; }
     else if (L.prjWKT && !app.crs) { L.crsNote = 'Map coordinate system not set: drawn in the layer\'s own coordinates.'; if (!app.model.nodes.size) app.setCRS(L.prjWKT); }
     const pal = ['#e65100', '#6a1b9a', '#00838f', '#ad1457', '#2e7d32', '#4e342e'];
     Object.assign(L, { stroke: pal[app.map.extLayers.length % pal.length], fill: '#90a4ae', fillOpacity: 0.25, width: 1.2, ptSize: 3, order: 'above' });

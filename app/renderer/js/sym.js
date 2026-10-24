@@ -206,14 +206,17 @@
     if (map.extLayers.length) {
       row(0, [tw('ext'), h('b', null, 'Layers'), h('span', { class: 'lcnt' }, String(map.extLayers.length))], { cls: 'lgrp' });
       if (open.ext) map.extLayers.forEach((L, i) => {
-        row(1, [sp(), chk(L.visible, v => L.visible = v), symBtn(null, L), h('span', { class: 'lname', title: L.path }, L.name), h('span', { class: 'lcnt' }, L.raster ? (L.w + '×' + L.h) : String(L.features.length))], {
+        row(1, [sp(), chk(L.visible, v => L.visible = v), symBtn(null, L), h('span', { class: 'lname', title: L.path }, L.editing ? h('span', { class: 'ledit', title: 'Editing' + (L.dirty ? ' – unsaved edits' : '') }, '✎ ') : null, L.name + (L.editing && L.dirty ? ' *' : '')), h('span', { class: 'lcnt' }, L.raster ? (L.w + '×' + L.h) : String(L.features.length))], {
+          add: L.editing ? 'EXT' : undefined,
           dbl: () => map.zoomToBox({ x1: L.bbox[0], y1: L.bbox[1], x2: L.bbox[2], y2: L.bbox[3] }),
           menu: () => [{ label: 'Zoom to Layer', fn: () => map.zoomToBox({ x1: L.bbox[0], y1: L.bbox[1], x2: L.bbox[2], y2: L.bbox[3] }) }, ZS(null), !L.raster ? { label: 'Attribute Table', fn: () => AV.openTable(app, AV.extTableId(L)) } : null, { label: 'Symbology...', fn: () => app.symPane.open({ ext: L }) },
-            L.editable ? { label: 'Draw Features', fn: () => app.feat.startDraw(L) } : null, !L.raster ? { label: 'Export as Shapefile...', fn: () => app.feat.exportLayer(L) } : null,
+            !L.raster ? '-' : null, !L.raster && !L.editing ? { label: 'Start Editing', fn: () => AV.extEdit.start(app, L) } : null, L.editing ? { label: 'Save Edits', disabled: !L.dirty, fn: () => AV.extEdit.save(app, L) } : null, L.editing ? { label: 'Stop Editing', fn: () => AV.extEdit.stop(app) } : null,
+            L.editable && !L.editing ? { label: 'Draw Features', fn: () => app.feat.startDraw(L) } : null, !L.raster ? '-' : null, !L.raster ? { label: 'Export as Shapefile...', fn: () => app.feat.exportLayer(L) } : null,
+            !L.raster && L.kind === 'polygon' && L.path && AV.has2D(app) ? { label: 'Use as Exclusion Layer...', fn: () => AV.useAsExclusion(app, L) } : null,
             !L.raster && L.features.length ? { label: 'Import into Network...', fn: () => app.tools.importNetwork(L.path) } : null,
             '-', { label: 'Move Up', fn: () => { if (i > 0) { map.extLayers.splice(i, 1); map.extLayers.splice(i - 1, 0, L); this.refreshLayers(); map.redraw(); } } },
             { label: 'Move Down', fn: () => { if (i < map.extLayers.length - 1) { map.extLayers.splice(i, 1); map.extLayers.splice(i + 1, 0, L); this.refreshLayers(); map.redraw(); } } },
-            { label: 'Remove', fn: () => { map.extLayers.splice(i, 1); this.refreshLayers(); map.redraw(); } }].filter(Boolean),
+            { label: 'Remove', fn: async () => { if (L.editing && !await AV.extEdit.stop(app)) return; const j = map.extLayers.indexOf(L); if (j >= 0) map.extLayers.splice(j, 1); this.refreshLayers(); map.redraw(); } }].filter(Boolean),
         });
       });
     }

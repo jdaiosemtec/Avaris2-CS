@@ -10,14 +10,16 @@
 'use strict';
 (function (AV) {
   const h = AV.h;
-  const KEYS = ['ENABLED', 'BOUNDARY', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'DEM', 'ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS', 'UNITS', 'MESH_TYPE', 'MESH_ZONES', 'BREAK_LINES', 'EXCL_TYPE', 'EXCL_HEIGHT', 'EXCL_POROSITY'];
+  const KEYS = ['ENABLED', 'BOUNDARY', 'WATERFRONT', 'CUTOFF', 'EXCLUSION', 'DEM', 'ROUTING_STEP', 'FLOOD_DEPTH', 'CELL_SIZE', 'ROUGHNESS', 'UNITS', 'MESH_TYPE', 'MESH_ZONES', 'BREAK_LINES', 'EXCL_TYPE', 'EXCL_HEIGHT', 'EXCL_POROSITY', 'EXCL_MORE', 'BLDG_MESH'];
   // MESH_TYPE: SQUARE (Avaris DS grid) or UNSTRUCTURED (triangles, umesh.js), chosen in Create Meshes.
   // MESH_ZONES / BREAK_LINES: optional layers for the unstructured mesh: polygons with "size" = finer / coarser cells
   //   inside; lines = break lines (cell edges follow them; optional "size" = cell size along the line).
   // EXCL_TYPE / EXCL_HEIGHT / EXCL_POROSITY: how exclusion polygons (buildings) are modelled when the polygon has no
   //   "type" / "height" / "porosity" attribute: VOID (no cells, water flows around), RAISED (cells raised by the
   //   height), POROUS (cells keep porosity x their area and porosity x the width of their links).
-  const DEF = { ENABLED: 'NO', BOUNDARY: '', WATERFRONT: '', CUTOFF: '', EXCLUSION: '', DEM: '', ROUTING_STEP: '', FLOOD_DEPTH: '0', CELL_SIZE: '', ROUGHNESS: '', UNITS: 'MODEL', MESH_TYPE: 'SQUARE', MESH_ZONES: '', BREAK_LINES: '', EXCL_TYPE: 'VOID', EXCL_HEIGHT: '', EXCL_POROSITY: '' };
+  const DEF = { ENABLED: 'NO', BOUNDARY: '', WATERFRONT: '', CUTOFF: '', EXCLUSION: '', DEM: '', ROUTING_STEP: '', FLOOD_DEPTH: '0', CELL_SIZE: '', ROUGHNESS: '', UNITS: 'MODEL', MESH_TYPE: 'SQUARE', MESH_ZONES: '', BREAK_LINES: '', EXCL_TYPE: 'VOID', EXCL_HEIGHT: '', EXCL_POROSITY: '', EXCL_MORE: '', BLDG_MESH: 'LARGE' };
+  // EXCL_MORE: further exclusion layers, JSON [{ path, type, height, porosity }] (the first layer is EXCLUSION /
+  //   EXCL_TYPE / EXCL_HEIGHT / EXCL_POROSITY, as before). BLDG_MESH (unstructured mesh): LARGE / ALL / NONE, see umesh.js
   const MAXD2D = 30; // depth of the 2D surface "channels" and cells (as in Avaris DS)
   AV.F2D_KEYS = KEYS;
   AV.f2d = (m) => Object.assign({}, DEF, (m && m.osem2d) || {});
@@ -167,6 +169,54 @@
   // "porosity"; polygons without them take the defaults of Options → 2D Flood
   const strProp = (props, names) => { if (!props) return ''; for (const k of Object.keys(props)) if (names.includes(k.toLowerCase())) { const v = String(props[k] ?? '').trim(); if (v) return v; } return ''; };
   AV.exclusionType = (v, def) => { const t = String(v || '').trim().toUpperCase(); if (/^(0|VOID|NONE|BUILDING|空|不进水)$/.test(t)) return 'VOID'; if (/^(1|RAISED|RAISE|STUBBY|抬高)$/.test(t)) return 'RAISED'; if (/^(2|POROUS|POROSITY|多孔)$/.test(t)) return 'POROUS'; return def; };
+  // exclusion layers of the model: [{ path, type, height, porosity }] (first = EXCLUSION / EXCL_*, then EXCL_MORE)
+  AV.exclusionLayers = function (m) { const f = AV.f2d(m); const out = [{ path: f.EXCLUSION || '', type: f.EXCL_TYPE || 'VOID', height: f.EXCL_HEIGHT || '', porosity: f.EXCL_POROSITY || '' }];
+    if (f.EXCL_MORE) { try { for (const x of JSON.parse(f.EXCL_MORE)) if (x && x.path) out.push({ path: String(x.path), type: x.type || 'VOID', height: x.height === undefined ? '' : String(x.height), porosity: x.porosity === undefined ? '' : String(x.porosity) }); } catch (e) { /* bad JSON: ignored */ } }
+    return out; };
+  // Options → 2D Flood: table of exclusion layers (one row by default; + Add Layer / + From Map Layers add more).
+  // Returns { el, inputs } where inputs mimic the dialog's text inputs for EXCLUSION, EXCL_TYPE, EXCL_HEIGHT,
+  // EXCL_POROSITY (first row) and EXCL_MORE (the other rows as JSON).
+  AV.exclTable = function (app) {
+    const rows = AV.exclusionLayers(app.model).map(x => Object.assign({}, x, { type: AV.exclusionType(x.type, 'VOID') }));
+    const el = h('div', { class: 'excltab', style: { gridColumn: '1 / -1' } }); const tbl = h('table', { class: 'grid exclgrid' });
+    const loaded = (p) => { const abs = resolve(app, quoteless(p)); const L = app.map.extLayers.find(x => x.features && x.path && (x.path === abs || x.path === p)); return L ? L.features.length : null; };
+    const render = () => { tbl.innerHTML = '';
+      tbl.appendChild(h('tr', null, ['#', 'Layer', 'Type', 'Height', 'Porosity', 'Polygons', ''].map(t => h('th', null, t))));
+      rows.forEach((r, i) => {
+        const pin = h('input', { type: 'text', value: r.path, placeholder: '(none)', style: { width: '170px' }, title: r.path, oninput: () => { r.path = pin.value.trim(); } });
+        const ty = h('select', { onchange: () => { r.type = ty.value; render(); } }, ['VOID', 'RAISED', 'POROUS'].map(t => h('option', { value: t, selected: r.type === t }, t)));
+        const hi = h('input', { type: 'text', value: r.height, style: { width: '52px' }, disabled: r.type !== 'RAISED', placeholder: r.type === 'RAISED' ? (AV.f2dRun(app.model).si ? '0.3' : '1') : '', oninput: () => { r.height = hi.value.trim(); } });
+        const po = h('input', { type: 'text', value: r.porosity, style: { width: '52px' }, disabled: r.type !== 'POROUS', placeholder: r.type === 'POROUS' ? '0.5' : '', oninput: () => { r.porosity = po.value.trim(); } });
+        const n = r.path ? loaded(r.path) : null;
+        const mv = (d) => { const j = i + d; if (j < 0 || j >= rows.length) return; [rows[i], rows[j]] = [rows[j], rows[i]]; render(); };
+        tbl.appendChild(h('tr', null, h('td', null, String(i + 1)),
+          h('td', { class: 'nowrap' }, pin, ' ', h('button', { class: 'btn small', title: 'Browse', onclick: async () => { const p = await window.host.openDialog({ title: 'Exclusion layer', filters: [{ name: 'Polygons', extensions: ['shp', 'geojson', 'json', 'kml'] }] }); if (p) { r.path = AV.f2dRelative(app, p); render(); } } }, '...')),
+          h('td', null, ty), h('td', null, hi), h('td', null, po), h('td', { class: 'note' }, n === null ? '' : n.toLocaleString()),
+          h('td', { class: 'nowrap' }, h('button', { class: 'btn small', title: 'Up (a place covered by several layers takes the upper one)', disabled: i === 0, onclick: () => mv(-1) }, '↑'), h('button', { class: 'btn small', title: 'Down', disabled: i === rows.length - 1, onclick: () => mv(1) }, '↓'),
+            h('button', { class: 'btn small', title: rows.length > 1 ? 'Remove this layer' : 'Clear', onclick: () => { if (rows.length > 1) rows.splice(i, 1); else Object.assign(rows[0], { path: '', type: 'VOID', height: '', porosity: '' }); render(); } }, '×'))));
+      }); };
+    const addRow = (p) => { if (rows.length === 1 && !rows[0].path) rows[0].path = p; else rows.push({ path: p, type: 'VOID', height: '', porosity: '' }); render(); };
+    const fromMap = (e) => { const Ls = app.map.extLayers.filter(L => L.features && L.kind === 'polygon' && L.path);
+      if (!Ls.length) { AV.toast('No polygon layers on the map: add the building layer with Add Data first.', true); return; } const r = e.target.getBoundingClientRect();
+      app.contextMenu(r.left, r.bottom, Ls.map(L => ({ label: L.name + '  (' + L.features.length.toLocaleString() + ')', fn: () => addRow(AV.f2dRelative(app, L.path)) }))); };
+    render();
+    el.append(h('div', { class: 'exclh' }, h('b', null, 'Exclusion Layers'), h('span', { class: 'note' }, '  buildings and other structures')), tbl,
+      h('div', { style: { margin: '4px 0 2px', display: 'flex', gap: '6px' } }, h('button', { class: 'btn small', onclick: async () => { const p = await window.host.openDialog({ title: 'Exclusion layer', filters: [{ name: 'Polygons', extensions: ['shp', 'geojson', 'json', 'kml'] }] }); if (p) addRow(AV.f2dRelative(app, p)); } }, '+ Add Layer...'), h('button', { class: 'btn small', onclick: fromMap }, '+ From Map Layers ▾')),
+      h('div', { class: 'note' }, 'Type / Height / Porosity apply to the polygons of that layer without their own "type" / "height" / "porosity" attributes. VOID: no cells, water flows around; RAISED: ground raised by the height (DEM units); POROUS: area and flow width × porosity. Where layers overlap, the upper layer counts.'));
+    const T = (fn) => ({ type: 'text', get value() { return String(fn()); } });
+    return { el, inputs: { f2d_EXCLUSION: T(() => rows[0].path), f2d_EXCL_TYPE: T(() => rows[0].type), f2d_EXCL_HEIGHT: T(() => rows[0].type === 'RAISED' ? rows[0].height : ''), f2d_EXCL_POROSITY: T(() => rows[0].type === 'POROUS' ? rows[0].porosity : ''),
+      f2d_EXCL_MORE: T(() => { const more = rows.slice(1).filter(r => r.path).map(r => ({ path: r.path, type: r.type, height: r.type === 'RAISED' ? r.height : '', porosity: r.type === 'POROUS' ? r.porosity : '' })); return more.length ? JSON.stringify(more) : ''; }) } };
+  };
+
+  // Layer View ▸ Use as Exclusion Layer: add the layer to the exclusion layers and open the 2D settings
+  AV.useAsExclusion = function (app, L) {
+    const m = app.model, f = AV.f2d(m); const p = AV.f2dRelative(app, L.path); const list = AV.exclusionLayers(m);
+    if (list.some(x => x.path && (x.path === p || AV.f2dResolve(app, x.path) === L.path))) { AV.toast(L.name + ' is already an exclusion layer.'); app.sim.optionsDialog('2D Flood'); return; }
+    const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = Object.assign({}, m.osem2d || {});
+    if (!f.EXCLUSION) nw2.EXCLUSION = p; else { const more = list.slice(1).map(x => ({ path: x.path, type: x.type, height: x.height, porosity: x.porosity })); more.push({ path: p, type: 'VOID', height: '', porosity: '' }); nw2.EXCL_MORE = JSON.stringify(more); }
+    app.exec({ label: 'Exclusion layer ' + L.name, do: () => { m.osem2d = Object.assign({}, nw2); }, undo: () => { m.osem2d = old2 ? Object.assign({}, old2) : undefined; }, changes: [{ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: '2D EXCLUSION', old: '', nw: p }] });
+    AV.toast(L.name + ' added as exclusion layer ' + (f.EXCLUSION ? list.length + 1 : 1) + ' (VOID): set its type in the table.', false, 6000); app.sim.optionsDialog('2D Flood');
+  };
   // mesh type chosen when the mesh is created (SQUARE / UNSTRUCTURED); resolves to null when cancelled
   AV.chooseMeshType = function (app) {
     const f = AV.f2d(app.model); let cur = /^UNSTR/i.test(f.MESH_TYPE) ? 'UNSTRUCTURED' : 'SQUARE';
@@ -196,6 +246,7 @@
       if (t !== (/^UNSTR/i.test(f.MESH_TYPE) ? 'UNSTRUCTURED' : 'SQUARE')) { const old2 = m.osem2d ? Object.assign({}, m.osem2d) : null; const nw2 = Object.assign({}, m.osem2d || {}, { MESH_TYPE: t });
         app.exec({ label: '2D mesh type', do: () => { m.osem2d = Object.assign({}, nw2); }, undo: () => { m.osem2d = old2 ? Object.assign({}, old2) : undefined; }, changes: [{ o: { kind: 'OPTIONS', id: 'Options', type: '' }, key: '2D MESH_TYPE', old: f.MESH_TYPE, nw: t }] }); f = AV.f2d(m); } }
     const tri = /^UNSTR/i.test(f.MESH_TYPE);
+    if (!quiet && AV.extEdit && !await AV.extEdit.checkSaved(app, [f.BOUNDARY, f.CUTOFF, f.WATERFRONT, f.MESH_ZONES, f.BREAK_LINES].concat(AV.exclusionLayers(m).map(x => x.path)))) return;
     const dlg = quiet ? { body: {}, close() {} } : AV.modal({ title: 'Create Meshes', width: 420, body: h('div', null, 'Reading boundary, DEM and lines...'), noFooter: true });
     const say = async (t) => { dlg.body.textContent = t; await new Promise(r => setTimeout(r, 20)); };
     try {
@@ -219,11 +270,14 @@
       const lines = async (key, what) => { if (!f[key]) return []; const L = await readVector(app, f[key], what); return L.features.filter(x => x.type === 'line' || x.type === 'polygon'); };
       const cut = (await lines('CUTOFF', 'Cut-off')).flatMap(x => x.coords);
       const coast = (await lines('WATERFRONT', 'Water front')).flatMap(x => x.coords.map(pts => ({ pts, elev: numProp(x.props, ['elev', 'elevation', 'stage', 'z']) })));
-      const defT = AV.exclusionType(f.EXCL_TYPE, 'VOID'), defH = parseFloat(f.EXCL_HEIGHT) >= 0 && f.EXCL_HEIGHT !== '' ? parseFloat(f.EXCL_HEIGHT) : (AV.f2dRun(m).si ? 0.3 : 1.0), defP = parseFloat(f.EXCL_POROSITY) > 0 ? Math.min(1, parseFloat(f.EXCL_POROSITY)) : 0.5;
       let bb = [Infinity, Infinity, -Infinity, -Infinity]; for (const b of boundary) for (const r of b.rings) for (const q of r) { if (q[0] < bb[0]) bb[0] = q[0]; if (q[1] < bb[1]) bb[1] = q[1]; if (q[0] > bb[2]) bb[2] = q[0]; if (q[1] > bb[3]) bb[3] = q[1]; }
-      const exL = f.EXCLUSION ? await readVector(app, f.EXCLUSION, 'Exclusion', bb) : null;
-      const exclusion = exL ? exL.features.filter(x => x.type === 'polygon').map(x => { const hh = numProp(x.props, ['height', 'bheight', 'h', 'raise']), pp = numProp(x.props, ['porosity', 'por']);
-        return { rings: x.coords, type: AV.exclusionType(strProp(x.props, ['type', 'btype', 'mode', 'exclusion']), defT), height: isFinite(hh) && hh >= 0 ? hh : defH, porosity: pp > 0 && pp <= 1 ? pp : defP }; }) : [];
+      // exclusion layers in their order (a place covered by several layers takes the first one); every layer has its
+      // own type / height / porosity for polygons without these attributes
+      const exclusion = []; let nExclLayers = 0;
+      for (const X of AV.exclusionLayers(m)) { if (!X.path) continue; await say('Reading exclusion layer ' + (nExclLayers + 1) + '...'); const exL = await readVector(app, X.path, 'Exclusion', bb); nExclLayers++;
+        const defT = AV.exclusionType(X.type, 'VOID'), defH = parseFloat(X.height) >= 0 && X.height !== '' ? parseFloat(X.height) : (AV.f2dRun(m).si ? 0.3 : 1.0), defP = parseFloat(X.porosity) > 0 ? Math.min(1, parseFloat(X.porosity)) : 0.5;
+        for (const x of exL.features) { if (x.type !== 'polygon') continue; const hh = numProp(x.props, ['height', 'bheight', 'h', 'raise']), pp = numProp(x.props, ['porosity', 'por']);
+          exclusion.push({ rings: x.coords, type: AV.exclusionType(strProp(x.props, ['type', 'btype', 'mode', 'exclusion']), defT), height: isFinite(hh) && hh >= 0 ? hh : defH, porosity: pp > 0 && pp <= 1 ? pp : defP }); } }
       const zones = [];
       if (tri) for (const [key, what] of [['MESH_ZONES', 'Mesh zones'], ['BREAK_LINES', 'Break lines']]) if (f[key]) for (const x of (await readVector(app, f[key], what)).features) { const sz = numProp(x.props, ['size', 'length', 'cellsize']);
         if (x.type === 'polygon') zones.push({ kind: 'polygon', coords: x.coords, size: sz }); else if (x.type === 'line') for (const pts of x.coords) zones.push({ kind: 'line', coords: pts, size: sz }); }
@@ -231,10 +285,10 @@
       const N = [...m.nodes.values()].filter(n => n.type !== 'OUTFALL'); const tagged = N.filter(n => /^link2d$/i.test(String(n.tag || '').trim()));
       const nodes = (tagged.length ? tagged : N).map(n => ({ id: n.id, x: n.x, y: n.y }));
       await say('Building the mesh...');
-      const mesh = tri ? AV.buildUMesh({ boundary, exclusion, cutoff: cut, coast, sample, nodes, lenFactor, zones, progress: (t) => { dlg.body.textContent = t; } })
+      const mesh = tri ? AV.buildUMesh({ boundary, exclusion, cutoff: cut, coast, sample, nodes, lenFactor, zones, buildings: f.BLDG_MESH, progress: (t) => { dlg.body.textContent = t; } })
         : AV.buildMesh2D({ boundary, exclusion, cutoff: cut, coast, sample, nodes, lenFactor });
       if (!mesh.cells.length) throw new Error('No cells were created: check that the boundary overlaps the DEM and that the cell size is smaller than the boundary.');
-      mesh.source = { boundary: f.BOUNDARY, dem: f.DEM, cutoff: f.CUTOFF, waterfront: f.WATERFRONT, exclusion: f.EXCLUSION, zones: tri ? f.MESH_ZONES : undefined, breakLines: tri ? f.BREAK_LINES : undefined, cellSize: boundary.map(b => b.size), roughness: boundary.map(b => b.n) };
+      mesh.source = { boundary: f.BOUNDARY, dem: f.DEM, cutoff: f.CUTOFF, waterfront: f.WATERFRONT, exclusion: f.EXCLUSION, exclusionLayers: AV.exclusionLayers(m), zones: tri ? f.MESH_ZONES : undefined, breakLines: tri ? f.BREAK_LINES : undefined, cellSize: boundary.map(b => b.size), roughness: boundary.map(b => b.n) };
       const mp = AV.meshPath(app); if (mp) await window.host.writeText(mp, JSON.stringify(mesh));
       AV.prepMesh(mesh); app.mesh2d = mesh; app.meshResults = null; app._meshHeat = null; app._meshRange = null; dlg.close();
       app.panels.refreshLayers(); app.map.redraw();

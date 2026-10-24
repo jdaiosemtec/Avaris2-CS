@@ -673,6 +673,7 @@
         const [sx, sy] = pos(e);
         if (e.button === 1 || (e.button === 0 && (this.mode === 'pan' || this.spaceDown))) { drag = { type: 'pan', sx, sy, cx: this.cx, cy: this.cy }; c.style.cursor = 'grabbing'; return; }
         if (e.button === 2) { this._ctxSkip = false;
+          if (this.app.editEnabled && AV.extEdit) { const xv = AV.extEdit.vertexHit(this, sx, sy); if (xv) { AV.extEdit.removeVertex(this.app, xv); this._ctxSkip = true; return; } }
           if (this.app.editEnabled) { const vh = this.vertexHit(sx, sy); if (vh) { this.app.feat.removeVertex(vh.link, vh.i); this._ctxSkip = true; return; } }
           if (this.temp && (this.temp.kind === 'link' || this.temp.kind === 'poly' || this.temp.kind === 'measure' || this.temp.kind === 'ssplit')) { if (this.temp.kind === 'ssplit') this.app.setTool('select'); else this.cancelTemp(); this._ctxSkip = true; return; }
           return;
@@ -681,6 +682,14 @@
         const [wx, wy] = this.toWorld(sx, sy);
         this.lastClickWorld = [wx, wy];
         const mode = this.mode;
+        // a layer being edited (Layer View ▸ Start Editing): its features take the clicks of the select tool (nodes stay on top)
+        const EL = mode === 'select' && AV.extEdit ? AV.extEdit.layer(this.app) : null;
+        if (EL && !e.shiftKey) {
+          if (this.app.editEnabled) { const xv = AV.extEdit.vertexHit(this, sx, sy); if (xv) { if (e.detail >= 2) return; drag = { type: 'extvertex', xv, L: EL, old: JSON.parse(JSON.stringify(xv.f.coords)), moved: false, sx, sy }; return; }
+            if (e.detail >= 2 && AV.extEdit.insertVertex(this, wx, wy)) return; }
+          if (!this.hitTest(sx, sy, ['NODE'])) { const f = AV.extEdit.hit(this, EL, wx, wy); if (f) { AV.extEdit.select(this.app, EL, [f], e.ctrlKey); return; }
+            drag = { type: 'box', sx, sy, add: e.ctrlKey, ext: EL }; return; }
+        }
         if (mode === 'select' && this.app.editEnabled) {
           const vh = this.vertexHit(sx, sy);
           if (vh) {
@@ -743,6 +752,10 @@
         if (drag) {
           if (drag.type === 'pan') { this.cx = drag.cx - (sx - drag.sx) / this.scale; this.cy = drag.cy + (sy - drag.sy) / this.scale; this.interacting = true; this._schedule(); }
           else if (drag.type === 'box' || drag.type === 'zoombox') { this.temp = { kind: 'box', x0: drag.sx, y0: drag.sy, x1: sx, y1: sy }; this.redrawOverlay(); }
+          else if (drag.type === 'extvertex') {
+            if (!drag.moved && Math.hypot(sx - drag.sx, sy - drag.sy) < 3) return;
+            drag.moved = true; const [wx, wy] = this.toWorld(sx, sy); AV.extEdit.moveVertex(drag.xv.f, drag.xv.p, drag.xv.i, wx, wy); this.redraw();
+          }
           else if (drag.type === 'vertex') {
             if (!drag.moved && Math.hypot(sx - drag.sx, sy - drag.sy) < 3) return;
             drag.moved = true; const [wx, wy] = this.toWorld(sx, sy); drag.link.verts[drag.i] = [wx, wy]; this.liveEdit();
@@ -773,6 +786,15 @@
         const [sx, sy] = pos(e);
         this.dragObj = null;
         if (drag.type === 'pan') { c.style.cursor = this.mode === 'pan' ? 'grab' : this.mode === 'select' ? 'default' : 'crosshair'; this.interacting = false; this._schedule(); }
+        else if (drag.type === 'box' && drag.ext) {
+          this.temp = null; const L = drag.ext;
+          if (Math.hypot(sx - drag.sx, sy - drag.sy) < 4) { if (!drag.add) { this.app.clearSelection(); AV.extEdit.select(this.app, L, [], false); } }
+          else { const a = this.toWorld(Math.min(sx, drag.sx), Math.max(sy, drag.sy)), b = this.toWorld(Math.max(sx, drag.sx), Math.min(sy, drag.sy)); const fs = AV.extEdit.inBox(L, a[0], a[1], b[0], b[1]);
+            const S = AV.extEdit.sel(L); if (!drag.add) S.clear(); for (const f of fs) S.add(f); AV.extEdit.select(this.app, L, [], true); }
+          this.redrawOverlay();
+        } else if (drag.type === 'extvertex' && drag.moved) {
+          AV.extEdit.geomEdit(this.app, drag.L, drag.xv.f, 'Move vertex', drag.old);
+        }
         else if (drag.type === 'box') {
           this.temp = null;
           if (Math.hypot(sx - drag.sx, sy - drag.sy) < 4) { if (!drag.add) this.app.clearSelection();

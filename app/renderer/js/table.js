@@ -191,6 +191,7 @@
       { label: 'Statistics', fn: () => this.stats(c) }];
       if (!c.ro && !c.res && !c.id && !c.ends) items.push({ label: 'Field Calculator...', fn: () => this.calculator(c) });
       if ((c.num || c.res) && !this.ext()) items.push({ label: 'Color Map by This Field', fn: () => this.themeBy(c) });
+      if (this.ext() && c.ext && AV.extEdit) items.push('-', { label: 'Delete Field', fn: async () => { if (await AV.confirm('Delete the field ' + c.k + ' of all features of ' + this.rows.layer.name + '? (Ctrl+Z undoes it; the file changes only with Save Edits)', 'Delete Field', 'Delete')) AV.extEdit.deleteField(this.app, this.rows.layer, c.k); } });
       this.app.contextMenu(e.clientX, e.clientY, items);
     }
     themeBy(c) {

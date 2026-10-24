@@ -72,10 +72,13 @@
     // mesh (that would need very small cells around each of them): they reduce the area and flow width of the cell
     // that contains them instead (VOID / RAISED: blocked area; POROUS: area x (1 - porosity))
     const ringArea = (r) => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return Math.abs(a / 2); };
-    const excl = [], small = [];
+    // opt.buildings: LARGE (default) only buildings larger than one cell shape the mesh; ALL every building does (fine
+    // cells around small buildings, short time steps); NONE no building does (all of them as cell porosity)
+    const mode = String(opt.buildings || 'LARGE').toUpperCase(); const excl = [], small = [];
     for (const e0 of opt.exclusion || []) { const e = Array.isArray(e0) ? { rings: e0, type: 'VOID' } : e0; const b = bboxOf(e.rings); if (b[2] < all[0] || b[0] > all[2] || b[3] < all[1] || b[1] > all[3]) continue;
       const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2; const bi = bIdx.at(cx, cy); const hb = bi >= 0 ? Bnd[bi].h : hmin; const A = ringArea(e.rings[0] || []);
-      if (A < 0.25 * hb * hb * Math.sqrt(3) / 4) { if (bi >= 0) small.push({ x: cx, y: cy, a: A, type: e.type, porosity: e.porosity }); } else excl.push(e); }
+      const thr = mode === 'ALL' ? 0 : mode === 'NONE' ? Infinity : hb * hb * Math.sqrt(3) / 4; // LARGE: smaller than one cell
+      if (A < thr) { if (bi >= 0) small.push({ x: cx, y: cy, a: A, rings: e.rings, b, type: e.type, porosity: e.porosity }); } else excl.push(e); }
     const voids = excl.filter(e => e.type === 'VOID'), others = excl.filter(e => e.type !== 'VOID'); const vIdx = polyIndex(voids, Math.max(hmax, Math.max(W0, H0) / 256)); const oIdx = polyIndex(others, Math.max(hmax, Math.max(W0, H0) / 256));
     const domain = (x, y) => { const b = bIdx.at(x, y); if (b < 0) return -1; if (voids.length && vIdx.at(x, y) >= 0) return -2; return b; };
     // ---- 1. size field on a background grid
@@ -94,7 +97,7 @@
     for (const e of excl) for (const r of e.rings) { let per = 0; for (let k = 1; k < r.length; k++) per += Math.hypot(r[k][0] - r[k - 1][0], r[k][1] - r[k - 1][1]); if (!(per > 0)) continue;
       for (let k = 1; k < r.length; k++) { const a = r[k - 1], b = r[k]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); const n = Math.max(1, Math.ceil(L / (g / 2)));
         for (let t = 0; t <= n; t++) { const x = a[0] + (b[0] - a[0]) * t / n, y = a[1] + (b[1] - a[1]) * t / n; const i = Math.round((x - all[0]) / g), j = Math.round((y - all[1]) / g); if (i < 0 || j < 0 || i >= gx || j >= gy) continue;
-          const o = j * gx + i; const hb = HF[o]; HF[o] = Math.min(hb, Math.max(hb / 4, per / 4)); } } }
+          const o = j * gx + i; const hb = HF[o]; HF[o] = Math.min(hb, Math.max(mode === 'ALL' ? hb / 4 : hb / 2, per / 4)); } } }
     // gradation: two chamfer sweeps (8 neighbours)
     const gd = GRADE * g, gd2 = GRADE * g * Math.SQRT2;
     for (let it = 0; it < 2; it++) {
@@ -216,7 +219,12 @@
     const cellAt = (x, y) => { const a = cix.get(Math.floor(x / cB) * 1e7 + Math.floor(y / cB)); if (!a) return null; for (const k of a) { const c = cells[k]; if (pip(x, y, c.v.map(i => [X[i], Y[i]]))) return c; } return null; };
     // small buildings: blocked area of their cell
     let nSmall = 0; const blocked = new Float64Array(cells.length);
-    for (const b of small) { const c = cellAt(b.x, b.y); if (!c) continue; nSmall++; blocked[c.k] += b.type === 'POROUS' ? b.a * (1 - (b.porosity > 0 && b.porosity <= 1 ? b.porosity : 0.5)) : b.a; }
+    for (const b of small) { const f = b.type === 'POROUS' ? 1 - (b.porosity > 0 && b.porosity <= 1 ? b.porosity : 0.5) : 1;
+      const c0 = cellAt(b.x, b.y); const hc = c0 ? Math.sqrt(c0.A) : hmin;
+      if (b.a < 0.5 * hc * hc) { if (!c0) continue; nSmall++; blocked[c0.k] += b.a * f; continue; }
+      // a building over several cells: its area is shared out by sample points inside it
+      const st = hc / 4; let any = false; for (let x = b.b[0] + st / 2; x < b.b[2]; x += st) for (let y = b.b[1] + st / 2; y < b.b[3]; y += st) { if (!inRings(x, y, b.rings)) continue; const c = cellAt(x, y); if (c) { blocked[c.k] += st * st * f; any = true; } }
+      if (any) nSmall++; }
     for (const c of cells) if (blocked[c.k] > 0) { c.por = Math.max(0.1, c.por * (1 - blocked[c.k] / c.A)); if (!c.bt) c.bt = 3; }
 
     // ---- 6. faces between cells -> links

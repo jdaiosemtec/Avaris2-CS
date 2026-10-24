@@ -374,6 +374,7 @@
       AV.$('#modelCount').textContent = m ? `${m.nodes.size} nodes · ${m.links.size} links` : '';
     }
     async checkSave() {
+      if (AV.extEdit && AV.extEdit.layer(this) && !await AV.extEdit.stop(this)) return false;
       if (!this.dirty) return true;
       const r = await window.host.message({ type: 'question', buttons: ['Save', "Don't Save", 'Cancel'], defaultId: 0, cancelId: 2, message: 'Save changes to ' + (this.filePath ? AV.basename(this.filePath) : 'Untitled') + '?' });
       if (r === 2) return false;
@@ -544,7 +545,7 @@
       const tp = AV.$('#tsPane'); if (tp) tp.style.display = this.tsOpen ? '' : 'none';
     }
     toggleLogPane() { this.prefs.logPane = this.prefs.logPane === false; this.savePrefs(); this.updateRightPanes(); this.refreshRibbon(); }
-    onSelectionChanged() { if (this.selection.size && !this._keepMesh && this.meshSelSet && this.meshSelSet.size) { this.meshSelSet.clear(); this.meshSel = -1; } if (this.selection.size && this.rightTab === 'sym') this.showRightTab('props'); this.updateRightPanes(); this.emit('selection', [...this.selection]); this.panels.showProps(); this.map.redrawOverlay(); AV.syncTableSelection(this); const n = this.selection.size; this.status(n ? n + ' object(s) selected' : 'Ready'); this.updateSelStats(); }
+    onSelectionChanged() { if (this.selection.size && AV.extEdit) AV.extEdit.clear(this); if (this.selection.size && !this._keepMesh && this.meshSelSet && this.meshSelSet.size) { this.meshSelSet.clear(); this.meshSel = -1; } if (this.selection.size && this.rightTab === 'sym') this.showRightTab('props'); this.updateRightPanes(); this.emit('selection', [...this.selection]); this.panels.showProps(); this.map.redrawOverlay(); AV.syncTableSelection(this); const n = this.selection.size; this.status(n ? n + ' object(s) selected' : 'Ready'); this.updateSelStats(); }
     // status bar "Selection Statistics": total area of the selected subcatchments and total length of the selected links,
     // in a unit the user picks with the small button next to it
     updateSelStats() {
@@ -576,6 +577,7 @@
     }
     pickAddType(type) {
       if (!this.addMode) return false;
+      if (type === 'EXT') { const L = AV.extEdit && AV.extEdit.layer(this); if (L) this.feat.startDraw(L); return true; } // new features of the layer being edited
       this.addType = type; this.setTool('add-' + type, true);
       const nm = (AV.SYM_NAMES && AV.SYM_NAMES[type]) || (type === 'LABEL' ? 'Map Labels' : type);
       this.map.setHint('Adding ' + nm + ' - click on the map' + (AV.LINK_TYPES.includes(type) ? ' (start node, optional vertices, end node)' : type === 'SUBCATCH' ? ' (outline points, double-click to finish)' : '') + '. Pick another layer to switch, click Add again to stop.');
@@ -684,6 +686,7 @@
       this.exec({ label: 'Move ' + (o.id || 'label'), light: true, do: () => { o.x = nx; o.y = ny; }, undo: () => { o.x = ox; o.y = oy; }, changes: o.kind === 'LABEL' ? null : [{ o, key: 'x', old: ox, nw: nx }, { o, key: 'y', old: oy, nw: ny }] });
     }
     async deleteSelection(objs) {
+      if (!objs && !this.selection.size && AV.extEdit && AV.extEdit.deleteSelected(this)) return; // features of the layer being edited
       const sel = objs || [...this.selection]; if (!sel.length) return;
       const m = this.model;
       const nodes = sel.filter(o => o.kind === 'NODE'); const nodeIds = new Set(nodes.map(n => n.id));

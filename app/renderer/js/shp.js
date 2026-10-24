@@ -145,7 +145,7 @@
       const vals = rows.map(r => r[k]).filter(v => v !== null && v !== undefined && v !== '');
       const numeric = vals.length && vals.every(v => typeof v === 'number' || (typeof v === 'string' && /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(v)));
       if (numeric) { rows.forEach(r => { if (r[k] !== null && r[k] !== undefined && r[k] !== '') r[k] = +r[k]; }); return { name: k.slice(0, 10), type: 'N', len: 19, dc: 6, key: k }; }
-      const len = Math.min(254, Math.max(4, ...vals.map(v => String(v).length)));
+      let len = 4; for (const v of vals) len = Math.max(len, String(v).length); len = Math.min(254, len);
       return { name: k.slice(0, 10), type: 'C', len, key: k };
     });
   };

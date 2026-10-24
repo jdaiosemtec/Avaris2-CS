@@ -132,6 +132,7 @@
       const selKey = sel.map(o => o.kind + ':' + o.id).join('|');
       if (selKey !== this._selKey) { this._selKey = selKey; const H = this.app.hist; if (H && H.filterKey) { H.filterKey = null; H.renderPanel && H.renderPanel(); } }
       AV.$('#propSub').textContent = sel.length > 1 ? sel.length + ' selected' : '';
+      if (!sel.length && AV.extEdit && AV.extEdit.props(this.app, el)) return;
       if (!sel.length) { el.appendChild(h('div', { class: 'empty' }, 'Select an object on the map', h('br'), 'or in an attribute table to view and edit its properties.')); this.modelSummary(el); return; }
       if (sel.length > 1) return this.multiProps(el, sel);
       const o = sel[0];
