@@ -14,6 +14,7 @@
 //       ERROR <message>
 //-----------------------------------------------------------------------------
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "swmm5.h"
@@ -23,6 +24,8 @@ extern int    AvarisSkipDetail;  // omit time series tables from report
 int osem_applyExtensions(const char* inpFile);
 int couple_main(int argc, char* argv[]);
 double wallTime(void);
+int cpu_bind(const char* list);
+int cpu_printInfo(void);
 
 int main(int argc, char *argv[])
 {
@@ -34,6 +37,8 @@ int main(int argc, char *argv[])
 
     if (argc >= 3 && (strcmp(argv[1], "-couple") == 0 || strcmp(argv[1], "-cplworker") == 0))
         return couple_main(argc, argv);
+    if (argc >= 2 && strcmp(argv[1], "-cpuinfo") == 0) return cpu_printInfo();
+    if (getenv("AVARIS_CPUS")) cpu_bind(getenv("AVARIS_CPUS"));   // Detect benchmark: one run per core
     if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0))
     {
         int v = swmm_getVersion();

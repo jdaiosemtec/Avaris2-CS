@@ -65,6 +65,7 @@ extern int  (*CplAfterNodes)(int converged);
 double swmm_proposeStep(void);
 int    swmm_stepFixed(double routingStep, double *elapsedTime);
 int    osem_applyExtensions(const char* inpFile);
+int    cpu_bind(const char* list);
 extern int AvarisSkipDetail;
 
 #define MAXPATH 1024
@@ -73,6 +74,7 @@ extern int AvarisSkipDetail;
 typedef struct {
     int  k, level;
     char inp[MAXPATH], rpt[MAXPATH], out[MAXPATH];
+    char cpus[256];                   // BIND: logical processors of this sub-model ("" = not bound)
 } TPartCfg;
 
 typedef struct {
@@ -101,6 +103,8 @@ typedef struct {
     volatile int    conv;             // converged in this iteration
     volatile double dtProp[2];          // double buffered by step parity
     volatile double e1, e2, e3, secs;
+    volatile double wait;             // seconds spent waiting for the other sub-models (barriers)
+    volatile int    bound;            // logical processors it is bound to (0 = not bound)
     volatile long   steps;
     volatile double vol[4];           // volume through the cuts (ft3): received +/-, sent +/-
     char            msg[256];
@@ -210,6 +214,11 @@ static int readCfg(const char* file, TCfg* c)
             strncpy(p->rpt, nextField(&s), MAXPATH - 1);
             strncpy(p->out, nextField(&s), MAXPATH - 1);
             c->nPart++;
+        }
+        else if (strcmp(key, "BIND") == 0)
+        {
+            int k = atoi(nextField(&s)); char* v = nextField(&s); int i;
+            for (i = 0; i < c->nPart; i++) if (c->part[i].k == k && v) { strncpy(c->part[i].cpus, v, 255); break; }
         }
         else if (strcmp(key, "CPL") == 0)
         {
@@ -356,6 +365,15 @@ static int barrier(int n)
 //  worker: one sub-model
 //=============================================================================
 
+static int Me;
+// barrier of a worker: the time it waits for the others is added up (2.10.0: computing time = run time - wait)
+static int tbarrier(int n)
+{
+    double t = wallTime(); int r = barrier(n);
+    R[Me].wait += wallTime() - t;
+    return r;
+}
+
 typedef struct {
     int    c;                         // coupling index
     int    jOut, jLink, jNode;        // object indexes in this sub-model
@@ -365,7 +383,7 @@ typedef struct {
 } TLocal;
 
 static TCfg    Cfg;
-static int     Me, NUp, NDn, Aborted;
+static int     NUp, NDn, Aborted;
 static TLocal *Up, *Dn;
 
 static void failWorker(int k, const char* msg)
@@ -418,7 +436,7 @@ static void cplAfterLinks(void)
         w->area = (u->sign > 0 ? Link[jl].surfArea2 : Link[jl].surfArea1) * barrels;
         w->dqdh = Link[jl].dqdh;
     }
-    if (!barrier(Cfg.nPart)) { stopRun(); return; }
+    if (!tbarrier(Cfg.nPart)) { stopRun(); return; }
     for (i = 0; i < NDn; i++) { int j = Dn[i].jNode; Node[j].cplQ = 0.0; Node[j].cplArea = 0.0; Node[j].cplDqdh = 0.0; }
     for (i = 0; i < NDn; i++)
     {
@@ -436,7 +454,7 @@ static int cplAfterNodes(int converged)
     for (i = 0; i < NDn; i++)
         V[Dn[i].c].h = Node[Dn[i].jNode].invertElev + Node[Dn[i].jNode].newDepth;
     R[Me].conv = converged;
-    if (!barrier(Cfg.nPart)) { stopRun(); return TRUE; }
+    if (!tbarrier(Cfg.nPart)) { stopRun(); return TRUE; }
     for (i = 0; i < Cfg.nPart; i++) if (!R[i].conv) all = FALSE;
     for (i = 0; i < NUp; i++) Node[Up[i].jOut].cplHead = V[Up[i].c].h;
     return all;
@@ -464,9 +482,10 @@ static int runWorker(const char* cfgFile, int k)
     openEvents(Cfg.shm, 0);
 #endif
 
+    if (Cfg.part[k].cpus[0]) R[k].bound = cpu_bind(Cfg.part[k].cpus);
     AvarisSkipDetail = 1;
     err = swmm_open(Cfg.part[k].inp, Cfg.part[k].rpt, Cfg.part[k].out);
-    if (err) { failWorker(k, NULL); barrier(Cfg.nPart); return err; }
+    if (err) { failWorker(k, NULL); tbarrier(Cfg.nPart); return err; }
     osem_applyExtensions(Cfg.part[k].inp);
     if (Cfg.threads > 0) NumThreads = Cfg.threads;
     SkipSteadyState = FALSE;          // every sub-model iterates in every step
@@ -491,7 +510,7 @@ static int runWorker(const char* cfgFile, int k)
             if (u->jOut < 0 || u->jLink < 0 || Node[u->jOut].type != OUTFALL)
             {
                 snprintf(msg, sizeof(msg), "coupling %s / %s not found in sub-model %d", c->outId, c->linkId, k + 1);
-                failWorker(k, msg); barrier(Cfg.nPart); return 1;
+                failWorker(k, msg); tbarrier(Cfg.nPart); return 1;
             }
             u->sign = (Link[u->jLink].node2 == u->jOut) ? 1.0 : -1.0;
             Node[u->jOut].cplBnd = TRUE;
@@ -504,7 +523,7 @@ static int runWorker(const char* cfgFile, int k)
             if (d->jNode < 0)
             {
                 snprintf(msg, sizeof(msg), "coupled node %s not found in sub-model %d", c->nodeId, k + 1);
-                failWorker(k, msg); barrier(Cfg.nPart); return 1;
+                failWorker(k, msg); tbarrier(Cfg.nPart); return 1;
             }
             Node[d->jNode].cplDown = TRUE;
             neutralizeBaseInflow(d->jNode);
@@ -512,7 +531,7 @@ static int runWorker(const char* cfgFile, int k)
     }
 
     err = swmm_start(TRUE);
-    if (err) { failWorker(k, NULL); barrier(Cfg.nPart); return err; }
+    if (err) { failWorker(k, NULL); tbarrier(Cfg.nPart); return err; }
     dw = (RouteModel == DW);
     if (dw) { CplAfterLinks = cplAfterLinks; CplAfterNodes = cplAfterNodes; }
     if (k == 0) H->totalDays = TotalDuration / MSECperDAY;
@@ -530,7 +549,7 @@ static int runWorker(const char* cfgFile, int k)
         TLocal* d = &Dn[i]; int b;
         for (b = 0; b < 3; b++) V[b * Cfg.nCpl + d->c].h = Node[d->jNode].invertElev + Node[d->jNode].newDepth;
     }
-    if (!barrier(Cfg.nPart)) goto finish;
+    if (!tbarrier(Cfg.nPart)) goto finish;
     for (i = 0; i < NUp; i++)
     {
         TLocal* u = &Up[i];
@@ -545,7 +564,7 @@ static int runWorker(const char* cfgFile, int k)
         TCplVal *cur = V + (1 + (n & 1)) * Cfg.nCpl, *nxt = V + (1 + ((n + 1) & 1)) * Cfg.nCpl;
         R[k].dtProp[n & 1] = swmm_proposeStep();
         if (ErrorCode) { failWorker(k, NULL); break; }
-        if (!barrier(Cfg.nPart)) break;
+        if (!tbarrier(Cfg.nPart)) break;
         dt = 1.0e30;
         for (i = 0; i < Cfg.nPart; i++) if (R[i].dtProp[n & 1] < dt) dt = R[i].dtProp[n & 1];
         if (dt <= 0.0) break;
@@ -758,7 +777,8 @@ static int runCoordinator(const char* cfgFile)
 
     for (i = 0; i < cfg.nPart; i++)
     {
-        printf("PART %d %d %ld %.2f %.3f %.3f\n", i + 1, R[i].err, R[i].steps, R[i].secs, R[i].e1, R[i].e2);
+        printf("PART %d %d %ld %.2f %.3f %.3f %.2f %s\n", i + 1, R[i].err, R[i].steps, R[i].secs, R[i].e1, R[i].e2, R[i].wait,
+               R[i].bound > 0 ? cfg.part[i].cpus : "-");
         if (R[i].err && !err) err = R[i].err;
         if (R[i].err && R[i].msg[0]) printf("ERROR sub-model %d: %s\n", i + 1, R[i].msg);
         if (fabs(R[i].e1) > fabs(e1)) e1 = R[i].e1;

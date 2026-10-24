@@ -907,6 +907,10 @@ table.flprm { width: 100%; border-collapse: collapse; font-size: 12px; } table.f
 .partp .hint { color: var(--muted); font-size: 11.5px; }
 .partp details summary { cursor: pointer; color: var(--accent); margin-top: 6px; }
 .pchips { display: flex; gap: 6px; flex-wrap: wrap; }
+.pmach { background: #f1f8e9; border: 1px solid #c5e1a5; border-radius: 4px; padding: 5px 8px; margin-top: 6px; line-height: 1.55; font-size: 11.5px; }
+.pmach b { color: #33691e; } .pmach.warn { background: #fff8e1; border-color: #ffe082; color: #6d4c00; }
+.pcore { font-size: 11px; padding: 0 5px; border-radius: 8px; border: 1px solid; white-space: nowrap; }
+.pcore.P { color: #0d47a1; border-color: #90caf9; background: #e3f2fd; } .pcore.E { color: #6a1b9a; border-color: #ce93d8; background: #f3e5f5; }
 .pchip { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; min-width: 74px; }
 .pchip b { display: block; font-size: 15px; } .pchip span { color: var(--muted); font-size: 11px; }
 .ptwrap { max-height: 250px; overflow: auto; border: 1px solid var(--border); margin-top: 8px; }

@@ -517,3 +517,13 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 
 - `mesh2d.js buildMesh2D`：每个网格记 `voidSet`（中心落在 VOID 建筑里被删的方格）。耦合时 `cellAt` 找不到方格、且井所在方格在 `voidSet` 里 → 在周围 8 格里取离井最近的保留方格，井到方格中心的连线不能穿过 Cutoff Line。这种耦合带 `nb: 1`；`stats.coupledNeighbour` / `neighbourNodes`（前 200 个）。DEM 无数据被跳过的方格不处理。
 - 方形网格输出 `gen: AV.SQMESH_GEN`（= 2）。`sim.js run`：方形网格 gen < 2 且 `stats.skippedExcl > 0` 时提示重建（同 2.9.7 的三角网格提示）。
+
+## 28. 2.10.0：按本机 CPU 均衡分区、自动绑核、二次拆分 / 合并
+
+- **引擎**（`engine/src/cpuaff.c`）：`avaris_engine -cpuinfo` 每个物理核一行 `CORE <序号> <类别> <逻辑处理器列表>`，最后 `CPUS <逻辑数>`。Windows 用 `GetLogicalProcessorInformationEx` 的 `EfficiencyClass`（大 = 快），Linux 读 sysfs（`/sys/devices/cpu_core|cpu_atom/cpus`、`thread_siblings_list`、`cpu_capacity`）。`cpu_bind("3,7")` 绑定进程（Windows 同时关掉 EcoQoS 降频）；环境变量 `AVARIS_CPUS` 绑定单独运行（Detect 测速用）。
+- **couple.c**：run.cpl 新行 `BIND <k> <列表>`，worker 启动时绑定；`tbarrier` 统计每个子模型在同步点的等待时间；`PART` 行多两列：等待秒数、绑定的处理器（`-` = 未绑定）。
+- **`renderer/js/cpuplan.js`**（渲染进程 `AV.cpuPlan`，主进程 `require`）：`parseInfo`、`plan`（core / thread 两种方案，取 Σ速度 × (1 − 1%·n) 最大者）、`slotsFor`、`twoClass`（快 / 慢两类目标大小 r、frac）、`assign`（按大小排序绑定、Load、预计加速）、`binding`、`slotLabel`、`benchModel`（约 1,600 根管的测试模型）。
+- **main.js**：`cpu:topology`、`cpu:detect`（每个物理核一个、再每个线程一个同时运行测试模型，按类别取中位时间，最快类 = 1）；`engine:runCoupled` 用 `job.bind = { sizes, profile }` 和当前拓扑写 BIND（profile 的 sig 不等于本机时只按核类别排序；子模型 × 线程数 > 逻辑处理器数时不绑定）。
+- **partition.js `partCompute(app, A, S, opt)`**：`opt.w = { r, frac }` 时关闭分支的目标交替为 T 和 r·T（小区占 frac），质量用"最大 size/speed"；`opt.only` 只在这些节点内分区（Split），不重切，失败时 `P.blockers`（必须在一起的组：积水区 ≥2 个井、振荡管、泵堰等）。`partChecks` 有 profile 时按 Load 检查。`partOverlay` 画 `V.hl`（闪烁）。
+- **partpanel.js**：Detect（自动设分区数 = plan.n，存 `app.prefs.cpuProfile`；`AV.cpuProfileOK` 只认本机）；结果表 Core / Load 列和预计加速；Split Partition 对话框（参数同主分区、预览直接改 V.P、Cancel 恢复、超核数建议合并最小相邻两区）；Merge Partitions；Undo（`V.undo` 保存 owner）。`AV.modal` 新增 `setButtons`。
+- **sim.js / database.js**：运行前 `job.bind`；Run Status 增加子模型计算 / 等待时间表（`cplPartsTable`），运行信息 json 的 `coupled.parts` 也保存。

@@ -434,6 +434,9 @@
       // hot start of the whole model: its text (1D, and 1D-2D) tells the main process the order of the saved objects
       if ((m.raw.FILES || []).some(l => /^\s*USE\s+HOTSTART\b/i.test(l))) { const t1 = m.toINP({ reportAll: true }); job.masterTexts = [t1]; job.masterDir = app.filePath ? AV.dirname(app.filePath) : '';
         if (AV.f2dEnabled(m) && AV.has2D(app) && app.mesh2d && app.mesh2d.cells.length) { try { job.masterTexts.push(AV.mesh2DToINP(m.toINP({ reportAll: true, runSI: AV.f2dRun(m).si }), app.mesh2d, m)); } catch (e) { /* 1D text only */ } } }
+      // 2.10.0: binding of the sub-models to the cores by their size (nodes + 2D cells)
+      const sizes = ci.parts.map((x, k) => { const d = (ci.def.partitions || []).find(q => q.id === x.id) || (ci.def.partitions || [])[k] || {}; return (d.nodes || 1) + (f2 && f2.cells ? f2.cells[k] || 0 : 0); });
+      job.bind = { sizes, profile: (AV.cpuProfileOK && AV.cpuProfileOK(app)) || null };
       const res = await window.host.runCoupled(job);
       this.runDlg.close(); this.runDlg = null;
       const secs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -444,7 +447,8 @@
       const ok = res.code === 0 && !res.errors.length;
       { const ts0 = this.parseTimeStepSummary(rptText); await AV.writeRunMeta(AV.dirname(res.out), base, { name: base, desc: rn.desc, date: new Date().toISOString(), model: AV.basename(app.filePath), type: f2 ? '1D-2D coupled' : '1D coupled', flowUnits: m.flowUnits,
         code: ok ? 0 : (res.code || 1), seconds: +secs, engineSeconds: res.seconds, massBal: res.massBal, warnings: warnings.length, notConv: ts0['% of Steps Not Converging'] !== undefined ? +ts0['% of Steps Not Converging'] : undefined,
-        coupled: { subModels: ci.parts.length, cutPoints: ci.def.couplings.length, cut2D: f2 ? f2.cuts2D : 0, threads, partsFolder: res.coupled && res.coupled.dir } }); }
+        coupled: { subModels: ci.parts.length, cutPoints: ci.def.couplings.length, cut2D: f2 ? f2.cuts2D : 0, threads, partsFolder: res.coupled && res.coupled.dir,
+          parts: res.coupled && res.coupled.parts ? res.coupled.parts.map((p, k) => ({ id: ci.parts[k] ? ci.parts[k].id : 'P' + p.k, size: sizes[k], seconds: p.seconds, wait: p.wait, cpus: p.cpus })) : null } }); }
       if (app.db) app.db.render();
       if (!ok) {
         app.status('Simulation failed.');
@@ -461,9 +465,20 @@
       app.status('Coupled simulation complete in ' + secs + ' s.');
       const r = await AV.modal({ title: 'Run Status', width: 480, body: h('div', null, h('div', { style: { color: good ? 'var(--ok)' : 'var(--warn)', fontWeight: 600, marginBottom: '10px' } }, good ? 'Run was successful.' : 'Run completed - continuity errors are high, check the report.'), kv,
         h('div', { class: 'note', style: { marginTop: '8px' } }, 'The results of the sub-models were merged into one run of the master model. To check them against the whole model, run the whole model too and open Scenario Comparison.'),
+        this.cplPartsTable(res, ci, sizes),
         warnings.length ? h('div', { style: { marginTop: '10px', maxHeight: '140px', overflow: 'auto', fontSize: '11.5px', color: 'var(--warn)' } }, warnings.slice(0, 20).map(w => h('div', null, w))) : null),
         buttons: [{ label: 'View Report', value: 'rpt' }, { label: 'OK', primary: true, value: 'ok' }] }).done;
       if (r === 'rpt') this.showReport();
+    }
+    // computing and waiting time of every sub-model (2.10.0): the one that waits least is the one the others wait for
+    cplPartsTable(res, ci, sizes) {
+      const P = (res.coupled && res.coupled.parts) || []; if (!P.length || P.every(p => p.wait === null || p.wait === undefined)) return null;
+      const rows = P.map((p, k) => ({ id: ci.parts[k] ? ci.parts[k].id : 'P' + p.k, size: sizes[k], run: p.seconds, wait: p.wait || 0, comp: Math.max(0, p.seconds - (p.wait || 0)), cpus: p.cpus }));
+      const slow = rows.reduce((a, r) => r.comp > a.comp ? r : a, rows[0]); const tot = rows.reduce((a, r) => a + r.comp, 0); const eff = tot / (rows.length * Math.max(...rows.map(r => r.run)));
+      return h('details', { style: { marginTop: '8px' } }, h('summary', { style: { cursor: 'pointer', color: 'var(--accent)' } }, 'Sub-models: ' + slow.id + ' computes longest (' + slow.comp.toFixed(0) + ' s) · use of the cores ' + Math.round(eff * 100) + ' %' + (res.coupled.binding ? '' : ' · not bound to cores')),
+        h('div', { class: 'ptwrap', style: { maxHeight: '220px', marginTop: '4px' } }, h('table', { class: 'ptbl' }, h('tr', null, ['Sub-model', 'Nodes + 2D cells', 'Computing s', 'Waiting s', 'Core'].map(x => h('th', null, x))),
+          rows.map(r => h('tr', { class: r === slow ? 'wn' : '' }, h('td', null, r.id), h('td', { class: 'num' }, r.size.toLocaleString()), h('td', { class: 'num' }, r.comp.toFixed(1)), h('td', { class: 'num' }, r.wait.toFixed(1)), h('td', null, r.cpus ? 'CPU ' + r.cpus : '–'))))),
+        h('div', { class: 'hint' }, 'Waiting = time a sub-model waited for the others in every step. The sub-model with the longest computing time sets the speed of the run: make it smaller (Tools ▸ Partition Model ▸ Split Partition).'));
     }
     onProgress(p, id) {
       if (id && id !== 'main') { if (this.scenProgress) this.scenProgress(id, p); return; }

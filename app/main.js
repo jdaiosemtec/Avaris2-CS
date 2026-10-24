@@ -422,9 +422,18 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
   const L = ['AVCPL\t1', 'SHM\t' + path.join(pdir, 'run.shm'), 'MODE\t0', 'THREADS\t' + Math.max(1, job.threads || 1)];
   parts.forEach((p, k) => L.push(['PART', k, p.level, p.inp, p.rpt, p.out].join('\t')));
   for (const c of job.couplings) L.push(['CPL', c.up, c.outfall, c.link, c.down, c.node].join('\t'));
+  // 2.10.0: every sub-model bound to its own core(s), the largest on the fastest (profile of Detect when it was
+  // measured on this processor, else by core class); none when there are more sub-models than threads
+  let binding = null;
+  if (job.bind && job.bind.sizes && job.bind.sizes.length === parts.length) {
+    const topo = await cpuTopology();
+    if (topo) { const model = ((os.cpus()[0] || {}).model || '').trim(); const prof = job.bind.profile && job.bind.profile.sig === CPUP.sig(model, topo) ? job.bind.profile : null;
+      binding = CPUP.binding(job.bind.sizes, topo, prof, Math.max(1, job.threads || 1));
+      if (binding) binding.forEach((cpus, k) => L.push(['BIND', k, cpus.join(',')].join('\t'))); }
+  }
   fs.writeFileSync(cfg, L.join('\n') + '\n', 'utf8');
   return new Promise((resolve) => {
-    let buf = ''; const result = { code: -1, errors: [], rpt, out, inp: cfg, massBal: null, seconds: 0, canceled: false, coupled: { parts: [], dir: pdir, vol: [0, 0] } };
+    let buf = ''; const result = { code: -1, errors: [], rpt, out, inp: cfg, massBal: null, seconds: 0, canceled: false, coupled: { parts: [], dir: pdir, vol: [0, 0], binding } };
     // everything the engine reports is kept in run.log next to the sub-model results (for support)
     const logF = path.join(pdir, 'run.log'); const logL = []; const flushLog = () => { try { fs.writeFileSync(logF, logL.join('\n') + '\n'); } catch (err) { } };
     logL.push(new Date().toISOString() + ' coupled run: ' + parts.length + ' sub-models, ' + job.couplings.length + ' cut points, engine ' + enginePath());
@@ -435,7 +444,7 @@ ipcMain.handle('engine:runCoupled', async (e, job) => {
       if (!line.startsWith('PROGRESS ')) logL.push(line);
       if (line.startsWith('PROGRESS ')) { if (win) win.webContents.send('engine:progress', parseFloat(line.slice(9)), job.id || 'main'); }
       else if (line.startsWith('ERROR ')) result.errors.push(line.slice(6));
-      else if (line.startsWith('PART ')) { const t = line.split(/\s+/); result.coupled.parts.push({ k: +t[1], err: +t[2], steps: +t[3], seconds: +t[4] }); }
+      else if (line.startsWith('PART ')) { const t = line.split(/\s+/); result.coupled.parts.push({ k: +t[1], err: +t[2], steps: +t[3], seconds: +t[4], wait: t[7] !== undefined ? +t[7] : null, cpus: t[8] && t[8] !== '-' ? t[8] : null }); }
       else if (line.startsWith('CPLVOL ')) { const t = line.split(/\s+/); result.coupled.vol = [+t[1], +t[2]]; }
       else if (line.startsWith('DONE ')) { const t = line.split(/\s+/); result.code = parseInt(t[1]); result.massBal = { runoff: parseFloat(t[2]), flow: parseFloat(t[3]), quality: parseFloat(t[4]) }; result.seconds = parseFloat(t[5]); }
     };
@@ -468,6 +477,32 @@ ipcMain.handle('sys:cpu', async () => {
   const logical = os.cpus().length; let physical = null;
   if (process.platform === 'win32') physical = await new Promise((resolve) => { try { const p = spawn('powershell.exe', ['-NoProfile', '-Command', '(Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum'], { windowsHide: true }); let s = ''; const t = setTimeout(() => { try { p.kill(); } catch (e) { } resolve(null); }, 6000); p.stdout.on('data', d => s += d); p.on('close', () => { clearTimeout(t); const n = parseInt(s.trim()); resolve(n > 0 ? n : null); }); p.on('error', () => { clearTimeout(t); resolve(null); }); } catch (e) { resolve(null); } });
   return { logical, physical, model: (os.cpus()[0] || {}).model || '', memGB: Math.round(os.totalmem() / 1073741824) };
+});
+// ---- processor profile (2.10.0): topology from the engine (-cpuinfo) and Detect (benchmark one sub-model per core)
+const CPUP = require('./renderer/js/cpuplan.js');
+function cpuTopology() { return new Promise((resolve) => { try { const p = spawn(enginePath(), ['-cpuinfo'], { windowsHide: true }); let s = ''; const t = setTimeout(() => { try { p.kill(); } catch (e) { } resolve(null); }, 8000);
+  p.stdout.on('data', d => { s += d; }); p.on('close', () => { clearTimeout(t); const r = CPUP.parseInfo(s); resolve(r.cores.length ? r : null); }); p.on('error', () => { clearTimeout(t); resolve(null); }); } catch (e) { resolve(null); } }); }
+ipcMain.handle('cpu:topology', async () => { const t = await cpuTopology(); return t ? Object.assign(t, { model: ((os.cpus()[0] || {}).model || '').trim() }) : null; });
+ipcMain.handle('cpu:detect', async (e) => {
+  const info = await cpuTopology(); if (!info) throw new Error('the processor topology could not be read');
+  const model = ((os.cpus()[0] || {}).model || '').trim(); const dir = path.join(app.getPath('temp'), 'avaris-cpu-bench'); fs.mkdirSync(dir, { recursive: true });
+  const inp = path.join(dir, 'bench.inp'); fs.writeFileSync(inp, CPUP.benchModel());
+  const say = (t) => { try { e.sender.send('cpu:progress', t); } catch (err) { } };
+  // all slots of a phase at the same time, each bound to its logical processor; returns seconds per slot
+  const phase = (cpus) => Promise.all(cpus.map((c, k) => new Promise((resolve) => { const t0 = Date.now();
+    const p = spawn(enginePath(), [inp, path.join(dir, 'b' + k + '.rpt'), path.join(dir, 'b' + k + '.out'), '-nodetail'], { windowsHide: true, env: Object.assign({}, process.env, { AVARIS_CPUS: String(c), OMP_NUM_THREADS: '1' }) });
+    const to = setTimeout(() => { try { p.kill(); } catch (err) { } }, 300000);
+    p.on('close', (code) => { clearTimeout(to); resolve(code === 0 ? (Date.now() - t0) / 1000 : NaN); }); p.on('error', () => { clearTimeout(to); resolve(NaN); }); })));
+  const med = (a) => { const v = a.filter(x => x > 0).sort((x, y) => x - y); return v.length ? v[Math.floor(v.length / 2)] : NaN; };
+  const byCls = (list, times) => { const m = {}; list.forEach((x, k) => { (m[x.cls] = m[x.cls] || []).push(times[k]); }); const o = {}; for (const c in m) o[c] = med(m[c]); return o; };
+  say('Benchmark: one sub-model on every core …');
+  const slA = info.cores.map(c => ({ cls: c.cls, cpu: c.cpus[0] })); const tA = await phase(slA.map(x => x.cpu)); const A = byCls(slA, tA);
+  let B = null;
+  if (info.logical > info.cores.length) { say('Benchmark: one sub-model on every thread …'); const slB = []; for (const c of info.cores) for (const x of c.cpus) slB.push({ cls: c.cls, cpu: x }); const tB = await phase(slB.map(x => x.cpu)); B = byCls(slB, tB); }
+  const best = Math.min(...Object.values(A).filter(x => x > 0)); if (!(best > 0)) throw new Error('the benchmark did not run');
+  const sp = (o) => { const r = {}; for (const c in o) r[c] = o[c] > 0 ? +(best / o[c]).toFixed(3) : 0; return r; };
+  try { for (const f of fs.readdirSync(dir)) fs.unlinkSync(path.join(dir, f)); } catch (err) { }
+  return { model, logical: info.logical, cores: info.cores, A: sp(A), B: B ? sp(B) : null, secA: A, secB: B, date: new Date().toISOString(), sig: CPUP.sig(model, info) };
 });
 // simulation results of a model live in <model>_Results; only files there may be deleted / renamed from the Database panel
 const inResults = (p) => /(_Results|_Calibration[\\/]runs)[\\/][^\\/]+$/i.test(p);

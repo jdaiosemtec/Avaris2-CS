@@ -32,7 +32,11 @@
       const work = app.model.nodes.size + app.model.links.size + (ci.has2D && AV.has2D(app) && app.mesh2d ? 2 * app.mesh2d.cells.length : 0); const np = ci.parts.length; const tips = [];
       if (cores && np > cores) tips.push(np + ' sub-models but ' + cores + ' processor cores: the sub-models wait for each other in every iteration, so the run is slower than it could be. Partition into at most ' + cores + ' sub-models (Tools ▸ Partition Model).');
       if (work / np < 200) tips.push('Each sub-model has very little work (about ' + Math.round(work / np).toLocaleString() + ' objects): the exchange in every iteration may cost more than it saves. Use fewer sub-models.');
-      perf = tips.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'Speed: ' + tips.join(' ')) : h('div', { class: 'note' }, 'Speed: ' + np + ' sub-models on ' + (cores || '?') + ' processor cores.');
+      // 2.10.0: the sub-models are bound to the cores automatically (largest on the fastest)
+      const prof = AV.cpuProfileOK && AV.cpuProfileOK(app); let bindTxt = ' The sub-models are bound to the processor cores automatically, the largest on the fastest core.';
+      if (prof) { const asg = AV.cpuPlan.assign((ci.def.partitions || []).map(x => x.nodes || 1), prof); bindTxt += ' ' + (prof.model || '') + ' (' + AV.cpuPlan.describe(prof) + '): estimated speed-up ×' + asg.speedup.toFixed(1) + ' against one core.'; }
+      else bindTxt += ' Tools ▸ Partition Model ▸ Detect measures this computer and balances the partitions for its cores.';
+      perf = tips.length ? h('div', { class: 'note', style: { color: 'var(--warn)' } }, 'Speed: ' + tips.join(' ') + bindTxt) : h('div', { class: 'note' }, 'Speed: ' + np + ' sub-models on ' + (cores || '?') + ' processor cores.' + bindTxt);
       const hps = AV.hasHPS(app); const ok = hps && !ci.stale && !ci.missing.length; if (ok && app._lastCoupled) { rCpl.checked = true; rWhole.checked = false; } if (!ok) rCpl.disabled = true;
       modeEl = h('div', { class: 'runmode' },
         h('label', null, rWhole, ' Whole model'),

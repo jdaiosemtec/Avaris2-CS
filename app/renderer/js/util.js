@@ -60,13 +60,15 @@ window.AV = window.AV || {};
     back.appendChild(box);
     let resolveFn; const done = new Promise(r => resolveFn = r);
     const close = (v) => { back.remove(); document.removeEventListener('keydown', onKey, true); resolveFn(v); if (opts.onClose) opts.onClose(v); };
-    for (const b of (opts.buttons || [{ label: 'OK', primary: true }])) {
-      foot.appendChild(h('button', {
-        class: 'btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : ''), onclick: async () => {
-          if (b.onClick) { const r = await b.onClick(); if (r === false) return; close(r === undefined ? b.value : r); } else close(b.value);
-        }
-      }, b.label));
-    }
+    const setButtons = (list) => { foot.innerHTML = '';
+      for (const b of list) {
+        foot.appendChild(h('button', {
+          class: 'btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : ''), onclick: async () => {
+            if (b.onClick) { const r = await b.onClick(); if (r === false) return; close(r === undefined ? b.value : r); } else close(b.value);
+          }
+        }, b.label));
+      } };
+    setButtons(opts.buttons || [{ label: 'OK', primary: true }]);
     if (opts.noFooter) foot.remove();
     const onKey = (e) => {
       const all = document.querySelectorAll('.modal-back'); if (all.length && all[all.length - 1] !== back) return; // only the top dialog reacts
@@ -86,7 +88,7 @@ window.AV = window.AV || {};
     });
     document.body.appendChild(back);
     setTimeout(() => { const f = body.querySelector('input,select,textarea'); if (f && opts.autofocus !== false) f.focus(); }, 30);
-    return { el: box, body, close, done };
+    return { el: box, body, close, done, setButtons };
   };
   AV.alert = (msg, title) => AV.modal({ title: title || 'Avaris2 CS', body: h('div', { style: { whiteSpace: 'pre-wrap', maxWidth: '560px', lineHeight: 1.5 } }, msg), buttons: [{ label: 'OK', primary: true, value: true }] }).done;
   AV.confirm = (msg, title, yes = 'OK', no = 'Cancel') => AV.modal({ title: title || 'Confirm', body: h('div', { style: { whiteSpace: 'pre-wrap', maxWidth: '520px', lineHeight: 1.5 } }, msg), buttons: [{ label: no, value: false }, { label: yes, primary: true, value: true }] }).done.then(v => !!v);

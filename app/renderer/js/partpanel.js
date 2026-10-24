@@ -7,13 +7,17 @@
   const defPath = (app) => app.filePath ? app.filePath.replace(/\.inp$/i, '.partition.json') : null;
   const prefsOf = (app) => Object.assign({ n: 12, revMin: 60, revPct: 5, revMax: 95, revRel: 2, keepPonds: true, pondMin: 30, pondDist: 0, pondDepth: 0, tol: 25, ctrl: 60, pattern: '{model}_P{nn}.inp', folder: '', boundary: true }, app.prefs.partition || {});
   let cores = null;
+  // processor profile (2.10.0, Detect): kept in the preferences; valid only on the processor it was measured on
+  AV.cpuTopoNow = null;
+  AV.cpuProfileOK = (app) => { const p = app.prefs && app.prefs.cpuProfile; if (!p || !p.cores || !p.A) return null; if (AV.cpuTopoNow && AV.cpuTopoNow.sig !== p.sig) return null; return p; };
+  const loadTopo = async () => { if (AV.cpuTopoNow) return; try { const t = await window.host.cpuTopology(); if (t) AV.cpuTopoNow = Object.assign(t, { sig: AV.cpuPlan.sig(t.model, t) }); } catch (e) { } };
   const getCores = async () => { if (cores) return cores; try { const c = await window.host.cpuInfo(); cores = c.physical || c.logical || 4; } catch (e) { cores = 4; } return cores; };
 
   AV.openPartition = async function (app, tab) {
     if (!AV.hasHPS(app)) { AV.needHPS(app, 'Model Partition'); return; }
     if (!app.model || !app.model.nodes.size) { AV.toast('Open a model first.', true); return; }
     if (!app.filePath) { AV.toast('Save the model first: the sub-models are written next to it.', true); return; }
-    const C = await getCores();
+    const C = await getCores(); await loadTopo();
     const V = app.partView || (app.partView = { P: null, A: null, sel: null, showCut: true, showNo: true, tab: 'part', S: prefsOf(app) });
     if (tab) V.tab = tab;
     const P0 = AV.floatPanel({ id: 'partition', title: 'Model Partition', minimize: true, w: 530, h: Math.min(780, window.innerHeight - 150), body: h('div', { class: 'flp' }),
@@ -30,11 +34,21 @@
       const body = h('div', { class: 'fllist partp', style: { padding: '8px 12px 14px' } }); root.appendChild(body);
       if (V.tab === 'regen') { regenView(body); return; }
       const sec = (n, t) => h('div', { class: 'psec' }, h('span', { class: 'pn' }, String(n)), t);
-      const R = app.results; const mx = C;
+      const R = app.results; const mx = C; const prof = AV.cpuProfileOK(app); const prof0 = app.prefs.cpuProfile;
       body.appendChild(sec(1, 'Settings'));
       body.appendChild(h('div', { class: 'form' },
-        h('label', null, 'Number of partitions'), h('span', null, num('n', 64, { min: 2, max: 400 }), h('span', { class: 'hint' }, '  this computer: ' + C + ' cores → at most ' + mx + ' for the coupled run')),
+        h('label', null, 'Number of partitions'), h('span', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, num('n', 64, { min: 2, max: 400 }),
+          B(V.detecting ? 'Detecting…' : 'Detect', () => detect(), false, V.detecting || busy),
+          h('span', { class: 'hint' }, V.detecting ? V.detecting : prof ? '' : 'measures this computer and sets the best number and sizes of the partitions')),
         h('label', null, 'Base results'), h('span', { class: R ? '' : 'hint' }, R ? AV.basename(R.meta.file || '') + ' (' + R.meta.nPeriods + ' steps)' : 'none – run a simulation or open results (Database) first')));
+      if (prof) { const pl = AV.cpuPlan.plan(prof, maxParts()); const sl = AV.cpuPlan.slotsFor(prof, V.S.n).map(x => x.speed); const tw = AV.cpuPlan.twoClass(sl); const tot = app.model.nodes.size;
+        const T = tot / (V.S.n * (1 - tw.frac) + V.S.n * tw.frac * tw.r); const cls = [...new Set(prof.cores.map(c => c.cls))].sort((a, b) => b - a);
+        const spd = cls.map(c => (cls.length < 2 ? 'core' : c === cls[0] ? 'performance core' : 'efficiency core') + ' ' + (prof.A[c] || 0).toFixed(2)).join(' · ') + (prof.B ? ' · with both threads busy ' + cls.map(c => (prof.B[c] || 0).toFixed(2)).join(' / ') : '');
+        body.appendChild(h('div', { class: 'pmach' }, h('b', null, prof.model || 'This computer'), ' · ' + AV.cpuPlan.describe(prof) + ' · detected ' + (prof.date ? new Date(prof.date).toLocaleString() : ''), h('br'),
+          'Relative speed: ' + spd, h('br'),
+          h('b', null, 'Set for this computer: ' + pl.n + ' partitions'), tw.r < 0.95 ? ' – about ' + Math.round(T).toLocaleString() + ' nodes on each fast core and ' + Math.round(T * tw.r).toLocaleString() + ' on each slower one' : ' – the same size on every core', '; the cores are bound automatically at every run.',
+          V.S.n !== pl.n ? h('div', { class: 'hint', style: { color: 'var(--warn)' } }, 'Number of partitions changed to ' + V.S.n + ' by hand (best for this computer: ' + pl.n + ').') : null)); }
+      else if (prof0 && prof0.cores) body.appendChild(h('div', { class: 'pmach warn' }, 'The processor profile was measured on ' + (prof0.model || 'another processor') + ' – this computer is different (' + (AV.cpuTopoNow ? AV.cpuTopoNow.model : '?') + '). Click Detect to measure this computer; until then the partitions are balanced by number of nodes.'));
       const unit = app.model.isSI ? 'm' : 'ft'; const opt = (label, ctl, hint) => [h('div', { class: 'al' }, label), h('div', { class: 'ac' }, ctl), hint ? h('div', { class: 'ah' }, hint) : null];
       const keep = h('input', { type: 'checkbox', checked: V.S.keepPonds !== false, onchange: (e) => { V.S.keepPonds = e.target.checked; app.prefs.partition = V.S; app.savePrefs(); } });
       body.appendChild(h('details', { open: !!V.adv, ontoggle: (e) => { V.adv = e.target.open; } }, h('summary', null, 'Advanced'), h('div', { class: 'padv' },
@@ -51,21 +65,30 @@
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '10px 0 2px' } }, B(V.P ? 'Partition Again' : 'Partition', () => go(status), true, busy), V.P && V.sel !== null ? B('Show All', () => { V.sel = null; render(); redrawMap(); }) : null, status));
       if (!V.P) { body.appendChild(h('div', { class: 'note', style: { marginTop: '8px' } }, 'Every partition drains in one direction (flow directions of the base results); pipes with oscillating flow, pumps, weirs … and ponding areas are not cut; the cut points are placed so that the partitions have about the same size with as few cuts as possible.')); return; }
       const P = V.P, st = P.stats; const mxN = Math.max(...st.map(s => s.nodes)), mnN = Math.min(...st.map(s => s.nodes));
+      const asg = prof ? AV.cpuPlan.assign(st.map(s => s.nodes), prof) : null;
       body.appendChild(sec(2, 'Result'));
-      body.appendChild(h('div', { class: 'pchips' }, [[P.count, 'partitions'], [P.cuts.length, 'cut points'], [mnN + '–' + mxN, 'nodes per partition'], [[...P.why.values()].filter(v => v.startsWith('oscillating')).length, 'oscillating pipes'], [P.hard ? P.hard.size : 0, 'never cut (pumps …)'], [V.A.ponds.length, 'ponding areas']].map(([v, l]) => h('div', { class: 'pchip' }, h('b', null, String(v)), h('span', null, l)))));
-      const tb = h('table', { class: 'ptbl' }, h('tr', null, ['', 'Partition', 'Nodes', '', 'Links', 'Subc.', 'In', 'Out', 'Outfalls'].map(x => h('th', null, x))),
-        st.map(s => h('tr', { class: 'p' + (V.sel === s.i ? ' sel' : ''), onclick: () => { V.sel = V.sel === s.i ? null : s.i; render(); redrawMap(); }, ondblclick: () => zoomTo(s.i) },
+      body.appendChild(h('div', { class: 'pchips' }, [[P.count, 'partitions'], [P.cuts.length, 'cut points'], [mnN + '–' + mxN, 'nodes per partition'], [[...P.why.values()].filter(v => v.startsWith('oscillating')).length, 'oscillating pipes'], [P.hard ? P.hard.size : 0, 'never cut (pumps …)'], [V.A.ponds.length, 'ponding areas']].map(([v, l]) => h('div', { class: 'pchip' }, h('b', null, String(v)), h('span', null, l))),
+        asg ? h('div', { class: 'pchip', title: 'Against one sub-model on one fastest core: total nodes / the slowest partition (its nodes / the speed of its core). Exchange costs not included.' }, h('b', { style: { color: asg.speedup >= 0.75 * asg.ideal ? 'var(--ok)' : 'var(--warn)' } }, '×' + asg.speedup.toFixed(1)), h('span', null, 'est. speed-up')) : null));
+      const tb = h('table', { class: 'ptbl' }, h('tr', null, ['', 'Partition', 'Nodes', ''].concat(asg ? ['Core', 'Load'] : []).concat(['Links', 'Subc.', 'In', 'Out', 'Outfalls']).map(x => h('th', null, x))),
+        st.map(s => h('tr', { class: 'p' + (V.sel === s.i ? ' sel' : ''), onclick: () => { V.sel = V.sel === s.i ? null : s.i; V.hl = null; render(); redrawMap(); }, ondblclick: () => zoomTo(s.i) },
           h('td', null, h('span', { class: 'sw', style: { background: COL(s.i) } })), h('td', null, PID(s.i)), h('td', { class: 'num' }, String(s.nodes)),
-          h('td', null, h('span', { class: 'pbar' }, h('i', { style: { width: (100 * s.nodes / mxN) + '%', background: COL(s.i) } }))), h('td', { class: 'num' }, String(s.links)), h('td', { class: 'num' }, String(s.subs)),
+          h('td', null, h('span', { class: 'pbar' }, h('i', { style: { width: (100 * s.nodes / mxN) + '%', background: COL(s.i) } }))),
+          asg ? h('td', null, h('span', { class: 'pcore ' + (asg.parts[s.i].cls === Math.max(...prof.cores.map(c => c.cls)) ? 'P' : 'E') }, AV.cpuPlan.slotLabel(prof, asg.parts[s.i]))) : null,
+          asg ? h('td', { class: 'num', style: { color: asg.parts[s.i].load * 100 > 100 + +V.S.tol ? 'var(--danger)' : 'var(--ok)', fontWeight: asg.parts[s.i].load * 100 > 100 + +V.S.tol ? 600 : 400 } }, Math.round(asg.parts[s.i].load * 100) + ' %') : null,
+          h('td', { class: 'num' }, String(s.links)), h('td', { class: 'num' }, String(s.subs)),
           h('td', { class: 'num' }, String(s.cin)), h('td', { class: 'num' }, String(s.cout)), h('td', { class: 'ellip', title: s.outfalls.join(', ') }, s.outfalls.length ? s.outfalls.slice(0, 3).join(', ') + (s.outfalls.length > 3 ? ' …' : '') : '→ coupled'))));
       body.appendChild(h('div', { class: 'ptwrap' }, tb));
-      body.appendChild(h('div', { class: 'hint' }, 'In / Out = couplings from upstream / to downstream partitions. Click a row to highlight, double-click to zoom.'));
+      body.appendChild(h('div', { class: 'hint' }, (asg ? 'Core = the core the sub-model is bound to at the run (largest partition on the fastest core); Load = its work on that core against the best balance for this computer. ' : '') + 'In / Out = couplings from upstream / to downstream partitions. Click a row to highlight, double-click to zoom.'));
       body.appendChild(sec(3, 'Adjust'));
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
         B(V.picking === 'remove' ? 'Finish' : 'Move Cut…', () => V.picking === 'remove' ? endPick() : startPick('remove'), V.picking === 'remove'),
         B(V.picking === 'add' ? 'Finish' : 'Add Cut…', () => V.picking === 'add' ? endPick() : startPick('add'), V.picking === 'add'),
+        B('Split Partition…', () => splitDlg(V.sel), false, V.sel === null || busy),
+        B('Merge Partitions…', () => mergeDlg(), false, P.count < 2 || busy),
+        V.undo && V.undo.length ? B('Undo', () => undo()) : null,
+        V.sel === null ? h('span', { class: 'hint' }, 'select a partition to split it') : null,
         P.manual ? h('span', { class: 'hint' }, P.manual + ' manual change(s)') : null));
-      body.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, 'The number of partitions never changes here – only the boundary between two adjacent partitions moves. Move Cut: click a cut point (⊗); the feasible conduits nearby blink – click one as the new cut point. Add Cut: click a conduit; its upstream branch joins the neighbouring partition (refused if that would create a new partition; warning for oscillating flow and ponding areas; pumps, weirs … cannot be cut).'));
+      body.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, 'Split Partition: only the selected partition is partitioned again (same settings as above); the other partitions and their cut points do not change, the new partitions get the next numbers. Merge Partitions: two adjacent partitions become one. Move Cut / Add Cut never change the number of partitions – only the boundary between two adjacent partitions moves. Move Cut: click a cut point (⊗); the feasible conduits nearby blink – click one as the new cut point. Add Cut: click a conduit; its upstream branch joins the neighbouring partition (refused if that would create a new partition; warning for oscillating flow and ponding areas; pumps, weirs … cannot be cut).'));
       body.appendChild(sec(4, 'Checks'));
       const chk = AV.partChecks(app, P, V.A, V.S, C); V.errors = chk.filter(c => c.t === 'er').length;
       body.appendChild(h('div', { class: 'pchecks' }, chk.map(c => h('div', { class: c.t }, (c.t === 'ok' ? '✓ ' : c.t === 'er' ? '✗ ' : '⚠ ') + c.s))));
@@ -89,7 +112,8 @@
       if (busy) return; stopMove(); busy = true; status.textContent = 'Analysing the base results…'; render(); const bz = AV.busy.start('Partitioning the model');
       try { await new Promise(r => setTimeout(r, 30)); const t0 = performance.now();
         V.A = await AV.partAnalyse(app, V.S); status.textContent = 'Partitioning…'; await new Promise(r => setTimeout(r, 20));
-        V.P = AV.partCompute(app, V.A, V.S); V.sel = null; V.time = ((performance.now() - t0) / 1000).toFixed(1);
+        const pr = AV.cpuProfileOK(app); const w = pr ? AV.cpuPlan.twoClass(AV.cpuPlan.slotsFor(pr, V.S.n).map(x => x.speed)) : null;
+        V.P = AV.partCompute(app, V.A, V.S, { w }); if (pr) V.P.cpu = { model: pr.model, sig: pr.sig, cores: AV.cpuPlan.describe(pr), date: pr.date }; V.sel = null; V.undo = []; V.hl = null; V.time = ((performance.now() - t0) / 1000).toFixed(1);
         app.status('Model partition: ' + V.P.count + ' partitions, ' + V.P.cuts.length + ' cut points (' + V.time + ' s).');
       } catch (e) { console.error(e); AV.alert('Partition failed: ' + e.message); }
       bz.done(); busy = false; render(); redrawMap();
@@ -136,7 +160,7 @@
     function movePick(l) {
       const P = V.P;
       if (V.move) { const k = V.move.cand.get(l.id);
-        if (k) { const old = V.move.c.link.id; for (const id of k.nodes) P.owner.set(id, k.to); stopMove();
+        if (k) { const old = V.move.c.link.id; pushUndo(); for (const id of k.nodes) P.owner.set(id, k.to); stopMove();
           changed(P, 'Cut moved from ' + old + ' to ' + l.id + ': ' + k.nodes.length + ' node(s) moved from ' + PID(k.from) + ' to ' + PID(k.to) + ' (still ' + P.count + ' partitions).'); setHint(HINT.remove); return; }
         if (l === V.move.c.link) { stopMove(); setHint(HINT.remove); app.status('Cut ' + l.id + ' kept.'); return; } }
       const c = P.cuts.find(x => x.link === l);
@@ -164,8 +188,102 @@
       const bad = newCuts(G, br, q).filter(x => x !== l && g.hard.has(x.id));
       if (bad.length) { AV.alert('Cutting ' + l.id + ' is not possible: moving its upstream branch to ' + PID(q) + ' would also cut ' + bad.map(x => x.id).slice(0, 5).join(', ') + ' (' + g.why.get(bad[0].id) + '), which cannot be cut.', 'Add Cut'); return; }
       if (iss.length && !await AV.confirm('Cutting ' + l.id + ' is not recommended:\n\n• ' + iss.join('\n• ') + '\n\nCut it anyway?', 'Add Cut', 'Cut Anyway')) return;
-      for (const id of br) P.owner.set(id, q);
+      pushUndo(); for (const id of br) P.owner.set(id, q);
       changed(P, 'Cut added at ' + l.id + ': ' + br.length + ' node(s) moved from ' + PID(pa) + ' to ' + PID(q) + ' (still ' + P.count + ' partitions).');
+    }
+    // ---- Detect (2.10.0): measure this computer, set the best number of partitions; the sizes follow the core speeds
+    const maxParts = () => Math.max(2, Math.floor(app.model.nodes.size / 500));
+    async function detect() {
+      if (V.detecting) return; V.detecting = 'Reading the processor…'; render(); const off = window.host.onCpuProgress ? window.host.onCpuProgress((t) => { V.detecting = t; render(); }) : null;
+      try { const r = await window.host.cpuDetect(); app.prefs.cpuProfile = r; AV.cpuTopoNow = { sig: r.sig, model: r.model };
+        const pl = AV.cpuPlan.plan(r, maxParts()); V.S.n = pl.n; app.prefs.partition = V.S; app.savePrefs();
+        app.status('Detect: ' + r.model + ' – ' + AV.cpuPlan.describe(r) + '; ' + pl.n + ' partitions' + (V.P ? ' (Partition Again to apply)' : '') + '.');
+      } catch (e) { console.error(e); AV.alert('Detect failed: ' + e.message, 'Model Partition'); }
+      if (off) off(); V.detecting = null; render(); }
+    // ---- undo of the manual changes (Move / Add Cut, Split, Merge)
+    const pushUndo = () => { (V.undo = V.undo || []).push({ owner: new Map(V.P.owner), manual: V.P.manual || 0 }); if (V.undo.length > 30) V.undo.shift(); };
+    function undo() { const u = V.undo && V.undo.pop(); if (!u) return; V.P.owner = u.owner; V.P.manual = u.manual; V.hl = null; V.sel = null; AV.partRecut(app, V.P, V.A); render(); redrawMap(); app.status('Undone (' + V.P.count + ' partitions).'); }
+    // partitions sharing a cut point with p
+    const neighbours = (P, p) => { const s = new Map(); for (const c of P.cuts) { const o = c.upPart === p ? c.downPart : c.downPart === p ? c.upPart : -1; if (o >= 0 && o !== p) s.set(o, (s.get(o) || 0) + 1); } return s; };
+    const smallestPair = (P, without) => { let best = null; const st = P.stats; for (const c of P.cuts) { const a = c.upPart, b = c.downPart; if (a === b || a === without || b === without) continue; const sz = st[a].nodes + st[b].nodes; if (!best || sz < best.sz) best = { a: Math.min(a, b), b: Math.max(a, b), sz }; } return best; };
+    const physCores = () => { const p = AV.cpuProfileOK(app); return p ? p.cores.length : C; };
+    // ---- Split Partition: the selected partition only, with the settings of the main partition (editable here)
+    function splitDlg(p0) {
+      const P = V.P; if (p0 === null || p0 === undefined) return; const st = P.stats[p0]; const pr = AV.cpuProfileOK(app);
+      const S2 = Object.assign({}, V.S); const tgt = pr ? (() => { const sl = AV.cpuPlan.slotsFor(pr, P.count).map(x => x.speed); const tw = AV.cpuPlan.twoClass(sl); return app.model.nodes.size / (P.count * (1 - tw.frac) + P.count * tw.frac * tw.r); })() : app.model.nodes.size / P.count;
+      S2.n = Math.max(2, Math.round(st.nodes / tgt));
+      const n2 = (k, w, a) => h('input', Object.assign({ type: 'number', value: S2[k], style: { width: (w || 50) + 'px' }, onchange: (e) => { S2[k] = +e.target.value; } }, a || {}));
+      const keep = h('input', { type: 'checkbox', checked: S2.keepPonds !== false, onchange: (e) => { S2.keepPonds = e.target.checked; } });
+      const prevBox = h('div'); let pending = null;
+      const restore = () => { if (pending) { P.owner = pending.before; AV.partRecut(app, P, V.A); pending = null; V.hl = null; render(); redrawMap(); } };
+      const optRow = (l, c) => [h('div', { class: 'al' }, l), h('div', { class: 'ac' }, c)];
+      const body = h('div', { class: 'partp', style: { width: '560px' } },
+        h('div', { class: 'hint' }, PID(p0) + ': ' + st.nodes.toLocaleString() + ' nodes, ' + st.cin + ' cut points in, ' + st.cout + ' out. The other partitions and their cut points do not change; ' + PID(p0) + ' keeps its number and the new partitions get the next numbers (P' + pad2(P.count) + ' …). Manual cut changes inside ' + PID(p0) + ' are replaced.'),
+        h('div', { class: 'psec' }, h('span', { class: 'pn' }, '1'), 'Settings (as the main partition, for this split only)'),
+        h('div', { class: 'padv' }, ...optRow('Split into', [n2('n', 50, { min: 2, max: 64 }), 'partitions', h('span', { class: 'hint' }, 'suggested ' + S2.n + ' (about ' + Math.round(st.nodes / S2.n).toLocaleString() + ' nodes each)')]),
+          ...optRow('Flow counts', ['above', n2('revRel', 44, { step: 0.5, min: 0 }), '% of the peak, for ≥', n2('revMin', 48, { min: 0 }), 'min']),
+          ...optRow('Oscillating flow', ['reverse ≥', n2('revPct', 44, { min: 0 }), '% of that time → not cut']),
+          ...optRow('Flows backwards', ['reverse ≥', n2('revMax', 44, { min: 0 }), '% → may be cut']),
+          ...optRow('Keep ponding areas whole', [keep, 'manholes of one area stay together'])),
+        h('div', { style: { margin: '10px 0 2px', display: 'flex', gap: '8px' } }, h('button', { class: 'btn small primary', onclick: () => preview() }, 'Preview')), prevBox);
+      let dlg = null;
+      async function preview() {
+        restore(); prevBox.innerHTML = ''; const n = Math.max(2, Math.round(S2.n));
+        const only = new Set([...P.owner].filter(([, q]) => q === p0).map(([id]) => id));
+        let Q; try { Q = AV.partCompute(app, V.A, Object.assign({}, S2, { n }), { only }); } catch (e) { AV.alert('Split failed: ' + e.message, 'Split Partition'); return; }
+        if (Q.count < n) { failed(n, Q); return; }
+        show(Q, n);
+      }
+      function failed(n, Q) {
+        const nOnly = P.stats[p0].nodes; const B2 = Q.blockers || []; V.hl = new Set(B2.flatMap(b => b.nodes)); redrawMap(); if (V.hl.size) { const iv = setInterval(() => { if (!V.hl || !V.hl.size || !app.partView) { clearInterval(iv); return; } app.map.redrawOverlay(); }, 450); }
+        const pl = (k, w) => k.toLocaleString() + ' ' + w + (k === 1 ? '' : 's');
+        const why = B2.map(b => { const r = []; if (b.ponds) r.push(b.ponds === 1 ? 'a ponding area (' + pl(b.pondNodes, 'manhole') + ')' : pl(b.ponds, 'ponding area') + ' (largest ' + pl(b.pondNodes, 'manhole') + ')'); if (b.osc) r.push(pl(b.osc, 'pipe') + ' with oscillating flow'); if (b.hard) r.push(pl(b.hard, 'pump / weir / orifice link').replace('links', 'links'));
+          return '• ' + b.size.toLocaleString() + ' nodes must stay together' + (r.length ? ' – ' + r.join(', ') : '') + ' – more than one part of about ' + Math.round(nOnly / n).toLocaleString() + ' nodes'; });
+        const can = Q.count >= 2 ? Q.count : 0;
+        AV.modal({ title: 'Split Partition – not possible as set', width: 560, body: h('div', { style: { lineHeight: 1.6 } },
+          h('div', null, PID(p0) + ' cannot be split into ' + n + ' partitions with these settings.'),
+          why.length ? h('div', null, ...why.map(t => h('div', null, t))) : h('div', null, 'The branches of ' + PID(p0) + ' do not divide into ' + n + ' parts of about the same size that each drain in one direction.'),
+          why.length ? h('div', { class: 'hint' }, 'Highlighted on the map (blinking).') : null,
+          h('div', { class: 'note', style: { marginTop: '6px' } }, can ? 'At most ' + can + ' partitions are possible with these settings.' : 'No split is possible with these settings.')),
+          buttons: [{ label: 'Cancel', value: 'c' }, { label: 'Change Settings', value: 's' }].concat(can ? [{ label: 'Split into ' + can, primary: true, value: 'k' }] : []) }).done.then(r => {
+            if (r === 'k') { S2.n = can; show(Q, can); return; }
+            if (r !== 's') { V.hl = null; redrawMap(); if (dlg) dlg.close(); } });
+      }
+      function show(Q, n) {
+        const before = new Map(P.owner); const base = P.count; let next = base;
+        const map = new Map(); for (const [id, q] of Q.owner) { if (!map.has(q)) map.set(q, map.size === 0 ? p0 : next++); }
+        for (const [id, q] of Q.owner) P.owner.set(id, map.get(q));
+        AV.partRecut(app, P, V.A); pending = { before }; V.hl = null; render(); redrawMap();
+        const st2 = P.stats; const newIds = [...new Set(map.values())]; const cutsNew = P.cuts.filter(c => newIds.includes(c.upPart) && newIds.includes(c.downPart));
+        const badCuts = cutsNew.filter(c => P.why.has(c.link.id)); const asB = pr ? AV.cpuPlan.assign([...before.values()].reduce((a, q) => { a[q] = (a[q] || 0) + 1; return a; }, []), pr) : null; const asA = pr ? AV.cpuPlan.assign(st2.map(s => s.nodes), pr) : null;
+        const over = P.count > physCores(); const pair = over ? smallestPair(P, -1) : null;
+        prevBox.innerHTML = '';
+        prevBox.appendChild(h('div', { class: 'psec' }, h('span', { class: 'pn' }, '2'), 'Preview (shown on the map)'));
+        prevBox.appendChild(h('table', { class: 'ptbl' }, h('tr', null, ['Partition', 'Nodes', 'Cut points in', 'out'].map(x => h('th', null, x))), newIds.map(q => h('tr', null, h('td', null, h('span', { class: 'sw', style: { background: COL(q) } }), ' ' + PID(q)), h('td', { class: 'num' }, st2[q].nodes.toLocaleString()), h('td', { class: 'num' }, String(st2[q].cin)), h('td', { class: 'num' }, String(st2[q].cout))))));
+        prevBox.appendChild(h('div', { class: 'hint', style: { marginTop: '4px' } }, cutsNew.length + ' new cut points' + (badCuts.length ? ' (' + badCuts.length + ' on pipes with oscillating flow)' : ', all one-way in the base run') + ' · total ' + P.count + ' partitions' + (asA ? ' · est. speed-up ×' + asB.speedup.toFixed(1) + ' → ×' + asA.speedup.toFixed(1) : '')));
+        if (over && pair) prevBox.appendChild(h('div', { class: 'note', style: { color: 'var(--warn)', marginTop: '6px' } }, P.count + ' partitions on ' + physCores() + ' processor cores. Suggested: merge the two smallest adjacent partitions ' + PID(pair.a) + ' (' + st2[pair.a].nodes.toLocaleString() + ') + ' + PID(pair.b) + ' (' + st2[pair.b].nodes.toLocaleString() + ').'));
+        dlg.setButtons([{ label: 'Cancel', onClick: () => { restore(); return true; } }].concat(over && pair ? [{ label: 'Apply', onClick: () => { apply(null); return true; } }, { label: 'Apply and Merge ' + PID(pair.a) + ' + ' + PID(pair.b), primary: true, onClick: () => { apply(pair); return true; } }] : [{ label: 'Apply', primary: true, onClick: () => { apply(null); return true; } }]));
+      }
+      function apply(pair) {
+        const before = pending.before; pending = null; (V.undo = V.undo || []).push({ owner: before, manual: P.manual || 0 });
+        let msg = PID(p0) + ' split into ' + (P.count - (Math.max(...before.values()) + 1) + 1) + ' partitions';
+        if (pair) { for (const [id, q] of P.owner) if (q === pair.b) P.owner.set(id, pair.a); msg += '; ' + PID(pair.b) + ' merged into ' + PID(pair.a); }
+        V.sel = null; changed(P, msg + ' (' + (Math.max(...P.owner.values()) + 1) + ' partitions).');
+      }
+      dlg = AV.modal({ title: 'Split Partition ' + PID(p0), width: 600, body, buttons: [{ label: 'Cancel', onClick: () => { restore(); return true; } }] });
+      if (dlg.done) dlg.done.then(() => { if (pending) restore(); });
+    }
+    // ---- Merge Partitions: two adjacent partitions become one
+    function mergeDlg() {
+      const P = V.P; const pair = smallestPair(P, -1); const a = h('select'), b = h('select');
+      for (let i = 0; i < P.count; i++) a.appendChild(h('option', { value: i }, PID(i) + ' (' + P.stats[i].nodes.toLocaleString() + ')'));
+      const info = h('div', { class: 'note', style: { marginTop: '6px' } });
+      const fillB = () => { const nb = neighbours(P, +a.value); b.innerHTML = ''; [...nb.keys()].sort((x, y) => P.stats[x].nodes - P.stats[y].nodes).forEach(q => b.appendChild(h('option', { value: q }, PID(q) + ' (' + P.stats[q].nodes.toLocaleString() + ')'))); upd(); };
+      const upd = () => { const x = +a.value, y = +b.value; if (!b.options.length) { info.textContent = PID(x) + ' shares no cut point with another partition.'; return; } const nb = neighbours(P, x); info.textContent = PID(x) + ' + ' + PID(y) + ' → ' + (P.stats[x].nodes + P.stats[y].nodes).toLocaleString() + ' nodes · ' + (P.count - 1) + ' partitions · ' + (nb.get(y) || 0) + ' cut points removed. The partitions after ' + PID(Math.max(x, y)) + ' move up one number.'; };
+      a.onchange = fillB; b.onchange = upd; a.value = pair ? pair.a : (V.sel !== null ? V.sel : 0); fillB(); if (pair && +a.value === pair.a) { b.value = pair.b; upd(); }
+      AV.modal({ title: 'Merge Partitions', width: 520, body: h('div', { class: 'partp', style: { lineHeight: 1.8 } }, 'Merge ', a, ' with the adjacent ', b, h('div', { class: 'hint' }, 'Only partitions that share a cut point can be merged. Suggested: the two smallest adjacent partitions.'), info),
+        buttons: [{ label: 'Cancel', value: null }, { label: 'Merge', primary: true, onClick: () => { if (!b.options.length) return false; const x = +a.value, y = +b.value; const keep = Math.min(x, y), go = Math.max(x, y);
+          pushUndo(); for (const [id, q] of P.owner) if (q === go) P.owner.set(id, keep); V.sel = null; changed(P, PID(go) + ' merged into ' + PID(keep) + '.'); return true; } }] });
     }
     // ---- generate the sub-models and the relationship file
     async function generate(folder, pattern, withBnd, demPath) {

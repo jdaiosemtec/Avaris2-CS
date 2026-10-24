@@ -93,10 +93,15 @@
     const pondOf = new Map(); A.ponds.forEach((g, k) => { for (const id of g) if (m.nodes.has(id)) pondOf.set(id, k); });
     return { why, hard, rev, pondOf, isBack, info };
   };
-  AV.partCompute = function (app, A, S) {
+  // opt (2.10.0): w = { r, frac } partition sizes for a processor with fast and slower cores (cpuplan.js twoClass:
+  // a share frac of the partitions is r times the size of the others; they run on the slower cores); only = Set of
+  // node IDs: partition only these (Split Partition) – then the result is not re-cut and carries blockers when the
+  // wanted number cannot be reached
+  AV.partCompute = function (app, A, S, opt) {
+    opt = opt || {}; const W = opt.w && opt.w.r < 0.95 ? opt.w : null;
     const m = app.model; const G0 = AV.partGlue(app, A, S); const { why, isBack, info } = G0;
     // union-find
-    const ids = [...m.nodes.keys()]; const ix = new Map(ids.map((id, i) => [id, i])); const par = new Int32Array(ids.length).map((_, i) => i);
+    const ids = opt.only ? [...m.nodes.keys()].filter(id => opt.only.has(id)) : [...m.nodes.keys()]; const ix = new Map(ids.map((id, i) => [id, i])); const par = new Int32Array(ids.length).map((_, i) => i);
     const sz = new Int32Array(ids.length).fill(1);
     const f = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
     const un = (a, b, cap) => { a = f(a); b = f(b); if (a === b) return true; if (cap && sz[a] + sz[b] > cap) return false; par[a] = b; sz[b] += sz[a]; return true; };
@@ -124,31 +129,41 @@
     const cen = B.map(b => { let x = 0, y = 0; for (const i of b.nodes) { const n = m.nodes.get(ids[i]); x += n.x; y += n.y; } return [x / b.nodes.length, y / b.nodes.length]; });
     const total = ids.length;
     const run = (T) => {
-      const owner = new Int32Array(B.length).fill(-1), open = new Float64Array(B.length); let k = 0;
+      const owner = new Int32Array(B.length).fill(-1), open = new Float64Array(B.length); let k = 0, nSmall = 0;
       const close = (g) => { const id = k++; const st = [g]; while (st.length) { const y = st.pop(); owner[y] = id; for (const c of B[y].ups) if (owner[c] < 0) st.push(c); } };
+      // weighted (W): the next partition is a small one while fewer than the share frac of those closed so far are small
+      const Tc = () => W && nSmall < W.frac * (k + 1) ? T * W.r : T;
+      const closeT = (g, s) => { if (W && s < T * W.r * 1.6) nSmall++; close(g); };
       for (const g of order) { const b = B[g]; let s = b.w; const ch = []; for (const c of b.ups) if (owner[c] < 0) { ch.push(c); s += open[c]; }
-        if (s > T * 1.25 && ch.length) { ch.sort((x, y) => open[y] - open[x]); for (const c of ch) { if (s <= T * 1.25) break; if (open[c] >= T * 0.45) { close(c); s -= open[c]; } } }
-        open[g] = s; if (b.down < 0 || s >= T * 0.85) close(g); }
+        const t = Tc();
+        if (s > t * 1.25 && ch.length) { ch.sort((x, y) => open[y] - open[x]); for (const c of ch) { if (s <= t * 1.25) break; if (open[c] >= t * 0.45) { closeT(c, open[c]); s -= open[c]; } } }
+        open[g] = s; if (b.down < 0 || s >= t * 0.85) closeT(g, s); }
       // partitions joined: a small one goes to its smallest upstream neighbour, else downstream, else the nearest
       const size = new Float64Array(k), cx = new Float64Array(k), cy = new Float64Array(k), pp = new Int32Array(k).map((_, i) => i);
       for (let g = 0; g < B.length; g++) { size[owner[g]] += B[g].w; cx[owner[g]] += cen[g][0] * B[g].w; cy[owner[g]] += cen[g][1] * B[g].w; }
       const pf = (x) => { while (pp[x] !== x) { pp[x] = pp[pp[x]]; x = pp[x]; } return x; };
       const adj = new Map(); const addA = (a, b, up) => { if (a === b) return; let s = adj.get(a); if (!s) adj.set(a, s = []); s.push([b, up]); };
       for (let g = 0; g < B.length; g++) if (B[g].down >= 0) { const a = owner[g], b = owner[B[g].down]; if (a !== b) { addA(b, a, true); addA(a, b, false); } }
-      const small = [...Array(k).keys()].filter(p => size[p] < T * 0.4).sort((a, b) => size[a] - size[b]);
-      for (const p0 of small) { const p = pf(p0); if (size[p] >= T * 0.4) continue; let nb = -1, best = Infinity, down = -1;
+      const Tmin = W ? T * W.r : T;
+      const small = [...Array(k).keys()].filter(p => size[p] < Tmin * 0.4).sort((a, b) => size[a] - size[b]);
+      for (const p0 of small) { const p = pf(p0); if (size[p] >= Tmin * 0.4) continue; let nb = -1, best = Infinity, down = -1;
         for (const [q0, up] of adj.get(p0) || []) { const q = pf(q0); if (q === p) continue; if (up && size[q] < best) { best = size[q]; nb = q; } if (!up) down = q; }
         if (nb < 0) nb = down;
         if (nb < 0) { let bd = Infinity; const x = cx[p] / size[p], y = cy[p] / size[p]; for (let q = 0; q < k; q++) { if (pf(q) !== q || q === p) continue; const d = (cx[q] / size[q] - x) ** 2 + (cy[q] / size[q] - y) ** 2; if (d < bd) { bd = d; nb = q; } } }
         if (nb < 0) continue; pp[p] = nb; size[nb] += size[p]; cx[nb] += cx[p]; cy[nb] += cy[p]; if (adj.has(p0)) for (const e of adj.get(p0)) addA(nb, e[0], e[1]); }
       const roots = [...new Set([...Array(k).keys()].map(pf))].sort((a, b) => a - b); const ren = new Map(roots.map((p, i) => [p, i]));
       const no = new Int32Array(B.length); for (let g = 0; g < B.length; g++) no[g] = ren.get(pf(owner[g]));
-      const sizes = roots.map(p => size[p]); return { blockOwner: no, count: roots.length, spread: Math.max(...sizes) / Math.max(1, Math.min(...sizes)) };
+      const sizes = roots.map(p => size[p]);
+      // weighted: the largest partitions run on the fast cores; quality = the slowest (size / speed)
+      let spread = Math.max(...sizes) / Math.max(1, Math.min(...sizes));
+      if (W) { const sp = [...sizes].sort((a, b) => b - a); const nS = Math.round(W.frac * roots.length); const nB = roots.length - nS; let worst = 0; sp.forEach((x, i) => { worst = Math.max(worst, i < nB ? x : x / W.r); }); spread = worst / (total / (nB + nS * W.r)); }
+      return { blockOwner: no, count: roots.length, spread };
     };
     let lo = 1, hi = total, best = null; const n = Math.max(1, S.n);
     const better = (r) => !best || Math.abs(r.count - n) < Math.abs(best.count - n) || (r.count === n && r.spread < best.spread);
     for (let it = 0; it < 36; it++) { const T = (lo + hi) / 2; const r = run(T); if (better(r)) best = r; if (r.count > n) lo = T; else hi = T; }
-    for (let k = 0; k <= 60; k++) { const r = run(total / n * (0.7 + 0.01 * k)); if (better(r)) best = r; }
+    const T0 = W ? total / (n * (1 - W.frac) + n * W.frac * W.r) : total / n;
+    for (let k = 0; k <= 60; k++) { const r = run(T0 * (0.7 + 0.01 * k)); if (better(r)) best = r; }
     const owner = new Map(); for (let i = 0; i < ids.length; i++) owner.set(ids[i], best.blockOwner[blk[i]]);
     // still too many (whole outfall systems cannot be split further): join the smallest partition to a coupled
     // neighbour (removes cut points) or to the nearest one
@@ -162,6 +177,14 @@
       for (const [id, p] of owner) owner.set(id, p === sm ? (to > sm ? to - 1 : to) : p > sm ? p - 1 : p); cnt--; }
     best.count = cnt;
     const P = { owner, count: best.count, why, hard: G0.hard, pondOf, blocks: B.length, manual: 0, splitRev, splitPond, cap };
+    if (opt.only) {
+      // what keeps the wanted number from being reached: the groups kept whole that are larger than one target part
+      if (cnt < n) { const tgt = total / n; P.blockers = B.map((b, k) => ({ b, k })).filter(x => x.b.w > tgt * 0.85).sort((a, c) => c.b.w - a.b.w).slice(0, 3).map(({ b }) => {
+          const nodes = b.nodes.map(i => ids[i]); const set = new Set(nodes); const pk = new Map(); for (const id of nodes) if (pondOf.has(id)) pk.set(pondOf.get(id), (pk.get(pondOf.get(id)) || 0) + 1);
+          let osc = 0, hardN = 0; for (const l of m.links.values()) if (set.has(l.from) && set.has(l.to)) { if (G0.hard.has(l.id)) hardN++; else if (why.has(l.id)) osc++; }
+          const pv = [...pk.values()].filter(v => v >= 2).sort((a, c) => c - a); // a ponding area keeps manholes together only when it has two or more here
+          return { nodes, size: b.w, pondNodes: pv[0] || 0, ponds: pv.length, osc, hard: hardN }; }); }
+      return P; }
     AV.partRecut(app, P, A); return P;
   };
   // couplings: every link between two partitions; the upstream end follows the base-run flow direction
@@ -198,9 +221,17 @@
     if (S.keepPonds === false) out.push({ t: 'ok', s: 'Ponding areas are not used as a constraint (option off)' }); else out.push(badP.length ? { t: 'wn', s: badP.length + ' cut(s) through ' + pondCut.size + ' ponding area(s) (added by hand)' } : { t: 'ok', s: A.ponds.length ? 'No cut through any of the ' + A.ponds.length + ' ponding areas (' + A.pondSource + ')' : 'No ponding areas in the base results' });
     if (S.keepPonds !== false && A.ponds.length) { const big = Math.max(...A.ponds.map(g => g.length)); if (big > app.model.nodes.size / Math.max(2, st.length)) out.push({ t: 'wn', s: 'The largest ponding area holds ' + big + ' manholes (more than one partition): it is kept in one partition, so the partitions cannot be balanced. Check the base results, raise the 2D ponding depth or untick "Keep ponding areas whole".' }); }
     const empty = st.filter(s => !s.outfalls.length && !s.cout); out.push(empty.length ? { t: 'er', s: empty.map(s => PID(s.i)).join(', ') + ': no outfall and no cut point' } : { t: 'ok', s: 'Every partition drains to an outfall or a cut point' });
+    const prof = AV.cpuProfileOK && AV.cpuProfileOK(app);
+    if (prof) {
+      // 2.10.0: balanced for this computer – every partition runs on its own core; load = (nodes / core speed) / ideal
+      const asg = AV.cpuPlan.assign(st.map(s => s.nodes), prof); const hi = st.filter((s, k) => asg.parts[k].load * 100 > 100 + S.tol).sort((a, b) => asg.parts[b.i].load - asg.parts[a.i].load);
+      out.push(hi.length ? { t: 'wn', s: hi.map(s => PID(s.i) + ' ' + Math.round(asg.parts[s.i].load * 100) + ' %').slice(0, 6).join(', ') + ' load (tolerance ' + S.tol + ' %): the whole run waits for ' + (hi.length > 1 ? 'them' : 'it') + '. Select ' + PID(hi[0].i) + ' and use Split Partition, or Partition Again.' } : { t: 'ok', s: 'Every partition within ' + (100 + +S.tol) + ' % load on its core (estimated speed-up ×' + asg.speedup.toFixed(1) + ')' });
+      const phys = prof.cores.length; out.push(st.length > phys ? { t: 'wn', s: st.length + ' partitions > ' + phys + ' processor cores' + (st.length > prof.logical ? ' and ' + prof.logical + ' threads: some sub-models share a core' : ': some sub-models run on the second thread of a core') + '. Use Merge Partitions, or Partition Again with the number from Detect.' } : { t: 'ok', s: st.length + ' partitions ≤ ' + phys + ' processor cores' });
+    } else {
     const dev = Math.max(...st.map(s => Math.abs(s.nodes - avg) / avg)) * 100;
     out.push(dev > S.tol ? { t: 'wn', s: 'Largest deviation from the average size: ' + dev.toFixed(0) + ' % (tolerance ' + S.tol + ' %) – move branches if needed' } : { t: 'ok', s: 'Partition sizes within ' + dev.toFixed(0) + ' % of the average' });
     const mx = cores; out.push(st.length > mx ? { t: 'wn', s: st.length + ' partitions > ' + cores + ' processor cores: the coupled run is fastest with at most one partition per core' } : { t: 'ok', s: st.length + ' partitions ≤ ' + cores + ' processor cores' });
+    }
     { const per = Math.round(app.model.nodes.size / Math.max(1, st.length)); if (per < 100) out.push({ t: 'wn', s: 'About ' + per.toLocaleString() + ' nodes per partition: very little work per sub-model, use fewer partitions for a faster coupled run' }); }
     if (!A.hasResults) out.push({ t: 'wn', s: 'No base results: flow directions follow the link directions and reverse flow is not checked' });
     return out;
@@ -306,7 +337,7 @@
   AV.partDefinition = function (app, P, A, S, built, cores) {
     const m = app.model; const sig = AV.partSignatures(m); const asg = {}; for (const [id, p] of P.owner) asg[id] = p;
     return { format: 'avaris-partition', version: 1, master: built.name + '.inp', created: new Date().toISOString(), program: 'Avaris2 CS ' + ((app.info && app.info.version) || ''),
-      baseResults: A.resultsName || null, settings: { partitions: P.count, balanceBy: 'nodes', tolerancePct: S.tol, doNotCut: { oscillatingFlow: { minFlowMin: S.revMin, minReversePct: S.revPct, maxReversePct: S.revMax || 95, flowAbovePctOfPeak: +S.revRel >= 0 ? +S.revRel : 2 }, keepPondingAreas: S.keepPonds !== false, ponding: { source: A.pondSource || null, depth2D: A.pondDepth || null, minFloodMin: S.pondMin, distance: A.pondDist || null } } },
+      baseResults: A.resultsName || null, settings: { partitions: P.count, balanceBy: P.cpu ? 'core speed' : 'nodes', processor: P.cpu || null, tolerancePct: S.tol, doNotCut: { oscillatingFlow: { minFlowMin: S.revMin, minReversePct: S.revPct, maxReversePct: S.revMax || 95, flowAbovePctOfPeak: +S.revRel >= 0 ? +S.revRel : 2 }, keepPondingAreas: S.keepPonds !== false, ponding: { source: A.pondSource || null, depth2D: A.pondDepth || null, minFloodMin: S.pondMin, distance: A.pondDist || null } } },
       simulation: { coupling: 'every iteration', couplingNote: 'coupled run: all sub-models take the same routing step; flows and water levels at the cut points are exchanged in every iteration of every step', reportStep: m.options.REPORT_STEP || null, cores, maxPartitions: Math.floor(cores * 1.5) },
       partitions: built.files.map(f => ({ id: PID(f.p), inp: f.file, nodes: f.nodes, links: f.links, subcatchments: f.subs, outfalls: f.outfalls, couplingsIn: f.cin, couplingsOut: f.cout, hotstart: null, hash: fnv(f.text) })),
       couplings: built.couplings, levels: AV.partLevels(P), pattern: S.pattern, folder: S.folderRel || '.', manualChanges: P.manual || 0, assignment: asg, signatures: sig };
@@ -341,6 +372,9 @@
       const X = pts.length % 2 ? pts[k][0] : (pts[k - 1][0] + pts[k][0]) / 2, Y = pts.length % 2 ? pts[k][1] : (pts[k - 1][1] + pts[k][1]) / 2;
       const bad = P.why.has(c.link.id); ctx.beginPath(); ctx.arc(X, Y, 7, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = bad ? '#ff6d00' : '#d32f2f'; ctx.lineWidth = 2; ctx.stroke();
       ctx.beginPath(); ctx.moveTo(X - 3.5, Y - 3.5); ctx.lineTo(X + 3.5, Y + 3.5); ctx.moveTo(X + 3.5, Y - 3.5); ctx.lineTo(X - 3.5, Y + 3.5); ctx.lineWidth = 1.8; ctx.stroke(); }
+    // Split Partition: the groups that keep a partition from being split (blinking red)
+    if (V.hl && V.hl.size) { ctx.save(); const on = Math.floor(Date.now() / 450) % 2 === 0; ctx.fillStyle = on ? 'rgba(229,57,53,.85)' : 'rgba(255,193,7,.9)';
+      for (const id of V.hl) { const n = m.nodes.get(id); if (!n) continue; const [x, y] = map.toScreen(n.x, n.y); ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fill(); } ctx.restore(); }
     ctx.font = '600 12px Segoe UI, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const s of P.stats) { if (!s.nodes) continue; const [X, Y] = map.toScreen(s.cx / s.nodes, s.cy / s.nodes); ctx.lineWidth = 3.5; ctx.strokeStyle = '#fff'; ctx.strokeText(PID(s.i), X, Y); ctx.fillStyle = '#111'; ctx.fillText(PID(s.i), X, Y); }
     ctx.restore();
