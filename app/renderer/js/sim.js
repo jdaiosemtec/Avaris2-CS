@@ -334,6 +334,11 @@
         const a = await AV.modal({ title: 'Run Simulation', body: h('div', { style: { maxWidth: '520px', lineHeight: 1.5 } }, 'The 2D mesh was created with an older version of Avaris2 CS (' + (app.mesh2d.created || '').slice(0, 10) + '). Rebuilding it gives the improved surface links of this version (cells with buildings no longer get short, steep links, which made runs unstable). The run uses the saved mesh until it is rebuilt.'),
           buttons: [{ label: 'Cancel', value: null }, { label: 'Run with Old Mesh', value: 'old' }, { label: 'Rebuild Mesh, then Run', primary: true, value: 'new' }] }).done;
         if (!a) return; if (a === 'new') { await AV.createMeshes(app); if (!app.mesh2d || (app.mesh2d.gen || 1) < AV.UMESH_GEN) return; } }
+      // a square mesh with cells removed by buildings, made before 2.9.11: manholes in those cells were not coupled
+      if (AV.f2dEnabled(m) && AV.has2D(app) && app.mesh2d && app.mesh2d.type !== 'tri' && (app.mesh2d.gen || 1) < AV.SQMESH_GEN && app.mesh2d.stats && app.mesh2d.stats.skippedExcl > 0) {
+        const a = await AV.modal({ title: 'Run Simulation', body: h('div', { style: { maxWidth: '520px', lineHeight: 1.5 } }, 'The square 2D mesh was created with an older version of Avaris2 CS (' + (app.mesh2d.created || '').slice(0, 10) + '). In that version manholes in cells removed by buildings (VOID) were not coupled to the surface, so their overflow stayed ponded on the node. Rebuilding the mesh couples them to the nearest neighbour cell. The run uses the saved mesh until it is rebuilt.'),
+          buttons: [{ label: 'Cancel', value: null }, { label: 'Run with Old Mesh', value: 'old' }, { label: 'Rebuild Mesh, then Run', primary: true, value: 'new' }] }).done;
+        if (!a) return; if (a === 'new') { await AV.createMeshes(app); if (!app.mesh2d || (app.mesh2d.gen || 1) < AV.SQMESH_GEN) return; } }
       const rn = await AV.askRunName(app, null, { coupled: ci }); if (!rn) return;
       if (rn.coupled) return this.runCoupled(rn, ci);
       const dir = app.filePath ? AV.resultsDir(app.filePath) : AV.joinPath(app.info.temp, 'osemcm-runs');

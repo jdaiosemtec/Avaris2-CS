@@ -71,17 +71,17 @@
     opt.boundary.forEach((B, bi) => {
       const s = B.size; const xs = B.rings.flat().map(p => p[0]), ys = B.rings.flat().map(p => p[1]);
       const x0 = AV.amin(xs), y0 = AV.amin(ys), x1 = AV.amax(xs), y1 = AV.amax(ys);
-      const nx = Math.ceil((x1 - x0) / s), ny = Math.ceil((y1 - y0) / s); const idx = new Map();
+      const nx = Math.ceil((x1 - x0) / s), ny = Math.ceil((y1 - y0) / s); const idx = new Map(); const voidSet = new Set();
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
         const cx = x0 + s / 2 + i * s, cy = y0 + s / 2 + j * s;
         if (!inPoly(cx, cy, B.rings)) continue;
-        const ei = exIdx ? exIdx.at(cx, cy) : -1; const E = ei >= 0 ? EX[ei] : null; if (E && E.type === 'VOID') { skippedExcl++; continue; }
+        const ei = exIdx ? exIdx.at(cx, cy) : -1; const E = ei >= 0 ? EX[ei] : null; if (E && E.type === 'VOID') { skippedExcl++; voidSet.add(i + ',' + j); continue; }
         const z = opt.sample(cx, cy); if (z === null || !isFinite(z)) { skippedNoData++; continue; }
         const c = { k: cells.length, id: '', x: cx, y: cy, s, n: B.n, elev: +(z * lf).toFixed(4), bi, i, j, deg: 0, por: 1 };
         if (E && E.type === 'RAISED') { c.elev = +((z + (E.height > 0 ? E.height : 0)) * lf).toFixed(4); c.bt = 1; nRaised++; } else if (E && E.type === 'POROUS') { c.por = E.porosity > 0 && E.porosity <= 1 ? E.porosity : 0.5; c.bt = 2; nPorous++; }
         idx.set(i + ',' + j, c); cells.push(c);
       }
-      grids.push({ x0, y0, s, idx });
+      grids.push({ x0, y0, s, idx, voidSet });
       const cut = opt.cutoff.flatMap(L => L.slice(1).map((p, k) => [L[k], p]));
       for (const c of cells) if (c.bi === bi) for (const [di, dj] of [[1, 0], [0, 1]]) {
         const o = idx.get((c.i + di) + ',' + (c.j + dj)); if (!o) continue;
@@ -104,10 +104,24 @@
           next += step0; }
         ch += L; } }
     // 1D-2D coupling: an orifice at the rim of every 1D node that lies in a cell
-    for (const nd of opt.nodes) { const c = cellAt(nd.x, nd.y); if (!c) continue; couplings.push({ id: '2DX_' + nd.id, node: nd.id, cell: c.id, offset: nd.offset, w: +(c.s * lf).toFixed(4) }); }
-    return { version: 1, created: new Date().toISOString(), lenFactor: lf, cells: cells.map(c => { const o = { id: c.id, x: +c.x.toFixed(4), y: +c.y.toFixed(4), s: c.s, elev: c.elev, n: c.n, deg: c.deg }; if (c.bt) o.bt = c.bt; if (c.por < 1) o.por = c.por; return o; }), links: L2, outfalls, couplings,
-      stats: { cells: cells.length, links: L2.length, outfalls: outfalls.length, couplings: couplings.length, skippedNoData, skippedExcl, raised: nRaised, porous: nPorous } };
+    // (2.9.11) a node whose own cell was removed by a VOID building is coupled to the nearest kept cell of the 8 around it,
+    // not across a cut-off line; before, such manholes (often in streets whose cell centre fell into a house) had no
+    // surface and their overflow stayed ponded on the node. Cells left out for missing DEM data are not handled this way.
+    const cutAll = opt.cutoff.flatMap(L => L.slice(1).map((p, k) => [L[k], p])); let nNeighbour = 0; const neighbourNodes = [];
+    const nearKept = (x, y) => { for (const g of grids) { const i = Math.floor((x - g.x0) / g.s), j = Math.floor((y - g.y0) / g.s); if (!g.voidSet.has(i + ',' + j)) continue;
+      let best = null, bd = Infinity;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { if (!di && !dj) continue; const c = g.idx.get((i + di) + ',' + (j + dj)); if (!c) continue;
+        const d = Math.hypot(c.x - x, c.y - y); if (d >= bd) continue; const a = [x, y], b = [c.x, c.y];
+        if (cutAll.some(([p, q]) => Math.max(p[0], q[0]) >= Math.min(a[0], b[0]) && Math.min(p[0], q[0]) <= Math.max(a[0], b[0]) && Math.max(p[1], q[1]) >= Math.min(a[1], b[1]) && Math.min(p[1], q[1]) <= Math.max(a[1], b[1]) && segX(a, b, p, q))) continue;
+        best = c; bd = d; }
+      if (best) return best; } return null; };
+    for (const nd of opt.nodes) { let c = cellAt(nd.x, nd.y), nb = false; if (!c) { c = nearKept(nd.x, nd.y); nb = !!c; } if (!c) continue;
+      if (nb) { nNeighbour++; neighbourNodes.push(nd.id); }
+      couplings.push(Object.assign({ id: '2DX_' + nd.id, node: nd.id, cell: c.id, offset: nd.offset, w: +(c.s * lf).toFixed(4) }, nb ? { nb: 1 } : {})); }
+    return { version: 1, gen: AV.SQMESH_GEN, created: new Date().toISOString(), lenFactor: lf, cells: cells.map(c => { const o = { id: c.id, x: +c.x.toFixed(4), y: +c.y.toFixed(4), s: c.s, elev: c.elev, n: c.n, deg: c.deg }; if (c.bt) o.bt = c.bt; if (c.por < 1) o.por = c.por; return o; }), links: L2, outfalls, couplings,
+      stats: { cells: cells.length, links: L2.length, outfalls: outfalls.length, couplings: couplings.length, skippedNoData, skippedExcl, raised: nRaised, porous: nPorous, coupledNeighbour: nNeighbour, neighbourNodes: neighbourNodes.slice(0, 200) } };
   };
+  AV.SQMESH_GEN = 2; // 2.9.11: manholes in cells removed by buildings are coupled to a neighbour cell
 
   // ------------------------------------------------------------------ .finp: model + 2D elements
   // extra (coupled parallel run, one sub-model): { all: the whole mesh (cell lookups), bnd: [{ id, elev, x, y }] boundary
@@ -294,7 +308,7 @@
       app.panels.refreshLayers(); app.map.redraw();
       const s = mesh.stats; if (quiet) { app.status('2D mesh rebuilt: ' + s.cells + ' cells.'); return; }
       const rec = AV.meshRecStep(m, mesh); const cur = parseFloat(f.ROUTING_STEP) > 0 ? parseFloat(f.ROUTING_STEP) : parseFloat(m.options.ROUTING_STEP) || 0;
-      await AV.alert('Mesh created (' + (tri ? 'unstructured' : 'square grid') + '):\n\n' + s.cells.toLocaleString() + ' cells' + (tri ? ' (' + s.triangles.toLocaleString() + ' triangles' + (s.quads ? ', ' + s.quads + ' small triangles merged into quadrilaterals' : '') + '; cell size ' : ' (') + boundary.map(b => b.size).join(', ') + ' ' + (mapU === 'NONE' ? 'map units' : mapU.toLowerCase()) + ')\n' + s.links.toLocaleString() + ' surface links\n' + s.couplings + ' manholes coupled to the surface' + (tagged.length ? ' (nodes tagged Link2D)' : '') + '\n' + s.outfalls + ' water-front outfalls' +
+      await AV.alert('Mesh created (' + (tri ? 'unstructured' : 'square grid') + '):\n\n' + s.cells.toLocaleString() + ' cells' + (tri ? ' (' + s.triangles.toLocaleString() + ' triangles' + (s.quads ? ', ' + s.quads + ' small triangles merged into quadrilaterals' : '') + '; cell size ' : ' (') + boundary.map(b => b.size).join(', ') + ' ' + (mapU === 'NONE' ? 'map units' : mapU.toLowerCase()) + ')\n' + s.links.toLocaleString() + ' surface links\n' + s.couplings + ' manholes coupled to the surface' + (tagged.length ? ' (nodes tagged Link2D)' : '') + (s.coupledNeighbour ? ' (' + s.coupledNeighbour + ' of them in cells removed by buildings, coupled to the nearest neighbour cell: ' + s.neighbourNodes.slice(0, 8).join(', ') + (s.coupledNeighbour > 8 ? ' …' : '') + ')' : '') + '\n' + s.outfalls + ' water-front outfalls' +
         (tri ? '\nSmallest triangle angle ' + s.minAngle + '°' + (s.below20 ? ' (' + s.below20 + ' triangles below 20°)' : '') + (zones.length ? '\n' + zones.length + ' mesh zones / break lines' : '') : '') +
         (s.skippedExcl ? '\n' + s.skippedExcl + (tri ? ' triangles' : ' cells') + ' removed by VOID exclusion polygons' : '') + (s.raised ? '\n' + s.raised + ' cells raised (RAISED exclusion polygons)' : '') + (s.porous ? '\n' + s.porous + ' porous cells (POROUS exclusion polygons)' : '') + (s.smallBuildings ? '\n' + s.smallBuildings.toLocaleString() + ' buildings smaller than a quarter of a cell: they reduce the area and flow width of their cells instead of shaping the mesh' : '') +
         (s.skippedNoData ? '\n' + s.skippedNoData + ' cells skipped (no DEM data)' : '') + (rec ? '\n\nShortest surface links about ' + AV.fmt(rec.len, 1) + ' ' + (AV.f2dRun(m).si ? 'm' : 'ft') + ': a 2D routing step of ' + rec.step + ' s or less is recommended (now ' + (cur || '-') + ' s).' : '') +

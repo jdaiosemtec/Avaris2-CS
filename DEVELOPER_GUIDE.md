@@ -512,3 +512,8 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 
 - `hssplit.js absPaths(lines, baseDir, path)`：把 [RAINGAGES] FILE、[TIMESERIES] FILE、[FILES]、[TEMPERATURE] FILE 的相对路径改成以 baseDir 为基准的绝对路径（带空格的加引号）。
 - `main.js fixInp`：子模型文件要拷贝到 `_parts`（修复 / 热启动）或本身就在 `_parts`（1D-2D 的 .finp）时调用，baseDir = `job.srcDirs[k]`（分区文件夹）。
+
+## 27. 2.9.11：方形网格中被建筑删除方格里的检查井
+
+- `mesh2d.js buildMesh2D`：每个网格记 `voidSet`（中心落在 VOID 建筑里被删的方格）。耦合时 `cellAt` 找不到方格、且井所在方格在 `voidSet` 里 → 在周围 8 格里取离井最近的保留方格，井到方格中心的连线不能穿过 Cutoff Line。这种耦合带 `nb: 1`；`stats.coupledNeighbour` / `neighbourNodes`（前 200 个）。DEM 无数据被跳过的方格不处理。
+- 方形网格输出 `gen: AV.SQMESH_GEN`（= 2）。`sim.js run`：方形网格 gen < 2 且 `stats.skippedExcl > 0` 时提示重建（同 2.9.7 的三角网格提示）。
