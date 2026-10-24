@@ -65,15 +65,15 @@
   //      nodes [{id, x, y, rim}] (1D nodes to couple), lenFactor (map units -> model length units)
   AV.buildMesh2D = function (opt) {
     const cells = [], links = [], outfalls = [], couplings = []; const lf = opt.lenFactor || 1; let skippedNoData = 0, skippedExcl = 0, nRaised = 0, nPorous = 0;
-    const grids = []; const EX = (opt.exclusion || []).map(e => Array.isArray(e) ? { rings: e, type: 'VOID' } : e);
+    const grids = []; const EX = (opt.exclusion || []).map(e => Array.isArray(e) ? { rings: e, type: 'VOID' } : e); const exIdx = EX.length ? AV.polyIndex(EX, Math.max(...opt.boundary.map(b => b.size)) * 4) : null;
     opt.boundary.forEach((B, bi) => {
       const s = B.size; const xs = B.rings.flat().map(p => p[0]), ys = B.rings.flat().map(p => p[1]);
-      const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
+      const x0 = AV.amin(xs), y0 = AV.amin(ys), x1 = AV.amax(xs), y1 = AV.amax(ys);
       const nx = Math.ceil((x1 - x0) / s), ny = Math.ceil((y1 - y0) / s); const idx = new Map();
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
         const cx = x0 + s / 2 + i * s, cy = y0 + s / 2 + j * s;
         if (!inPoly(cx, cy, B.rings)) continue;
-        const E = EX.find(e => inPoly(cx, cy, e.rings)); if (E && E.type === 'VOID') { skippedExcl++; continue; }
+        const ei = exIdx ? exIdx.at(cx, cy) : -1; const E = ei >= 0 ? EX[ei] : null; if (E && E.type === 'VOID') { skippedExcl++; continue; }
         const z = opt.sample(cx, cy); if (z === null || !isFinite(z)) { skippedNoData++; continue; }
         const c = { k: cells.length, id: '', x: cx, y: cy, s, n: B.n, elev: +(z * lf).toFixed(4), bi, i, j, deg: 0, por: 1 };
         if (E && E.type === 'RAISED') { c.elev = +((z + (E.height > 0 ? E.height : 0)) * lf).toFixed(4); c.bt = 1; nRaised++; } else if (E && E.type === 'POROUS') { c.por = E.porosity > 0 && E.porosity <= 1 ? E.porosity : 0.5; c.bt = 2; nPorous++; }
@@ -135,12 +135,12 @@
     const rs = parseFloat(f.ROUTING_STEP); const run = AV.f2dRun(m);
     for (const ln of lines) {
       const t = ln.trim();
-      if (t.startsWith('[')) { sec = t.slice(1, t.indexOf(']')).toUpperCase(); out.push(ln); if (add[sec]) { seen.add(sec); out.push(';;Avaris2 2D surface elements'); out.push(...add[sec]); } continue; }
+      if (t.startsWith('[')) { sec = t.slice(1, t.indexOf(']')).toUpperCase(); out.push(ln); if (add[sec]) { seen.add(sec); out.push(';;Avaris2 2D surface elements'); AV.pushAll(out, add[sec]); } continue; }
       if (sec === 'OPTIONS' && /^ROUTING_STEP\b/i.test(t) && rs > 0) { out.push(pad(['ROUTING_STEP', rs])); continue; }
       if ((sec === 'JUNCTIONS' || sec === 'STORAGE') && t && t[0] !== ';') { const k = AV.tokenize(t); const d = deepen.get(k[0]); if (d !== undefined && k.length >= 3 && !(+k[2] >= d)) { k[2] = String(d); out.push(pad(k)); continue; } }
       out.push(ln);
     }
-    for (const s in add) if (!seen.has(s) && add[s].length) { out.push('', '[' + s + ']'); out.push(...add[s]); }
+    for (const s in add) if (!seen.has(s) && add[s].length) { out.push('', '[' + s + ']'); AV.pushAll(out, add[s]); }
     return out.join('\r\n') + '\r\n';
   };
 
@@ -154,10 +154,11 @@
   AV.f2dResolve = resolve;
   AV.meshPath = (app) => app.filePath ? app.filePath.replace(/\.inp$/i, '') + '.mesh2d.json' : null;
   const quoteless = (p) => String(p || '').replace(/^"|"$/g, '');
-  async function readVector(app, path, what) {
+  async function readVector(app, path, what, box) {
     const p = resolve(app, quoteless(path)); if (!p) return null;
-    if (!await window.host.exists(p)) throw new Error(what + ' file not found: ' + p);
-    return await AV.loadDataFile(app, p);
+    const file = AV.GDB && AV.GDB.isGdbLayerPath(p) ? AV.GDB.splitPath(p).gdb : p;
+    if (!await window.host.exists(file)) throw new Error(what + ' file not found: ' + p);
+    return await AV.loadDataFile(app, p, box ? { box } : undefined);
   }
   const numProp = (props, names) => { if (!props) return NaN; for (const k of Object.keys(props)) if (names.includes(k.toLowerCase())) { const v = parseFloat(props[k]); if (isFinite(v)) return v; } return NaN; };
 
@@ -219,7 +220,8 @@
       const cut = (await lines('CUTOFF', 'Cut-off')).flatMap(x => x.coords);
       const coast = (await lines('WATERFRONT', 'Water front')).flatMap(x => x.coords.map(pts => ({ pts, elev: numProp(x.props, ['elev', 'elevation', 'stage', 'z']) })));
       const defT = AV.exclusionType(f.EXCL_TYPE, 'VOID'), defH = parseFloat(f.EXCL_HEIGHT) >= 0 && f.EXCL_HEIGHT !== '' ? parseFloat(f.EXCL_HEIGHT) : (AV.f2dRun(m).si ? 0.3 : 1.0), defP = parseFloat(f.EXCL_POROSITY) > 0 ? Math.min(1, parseFloat(f.EXCL_POROSITY)) : 0.5;
-      const exL = f.EXCLUSION ? await readVector(app, f.EXCLUSION, 'Exclusion') : null;
+      let bb = [Infinity, Infinity, -Infinity, -Infinity]; for (const b of boundary) for (const r of b.rings) for (const q of r) { if (q[0] < bb[0]) bb[0] = q[0]; if (q[1] < bb[1]) bb[1] = q[1]; if (q[0] > bb[2]) bb[2] = q[0]; if (q[1] > bb[3]) bb[3] = q[1]; }
+      const exL = f.EXCLUSION ? await readVector(app, f.EXCLUSION, 'Exclusion', bb) : null;
       const exclusion = exL ? exL.features.filter(x => x.type === 'polygon').map(x => { const hh = numProp(x.props, ['height', 'bheight', 'h', 'raise']), pp = numProp(x.props, ['porosity', 'por']);
         return { rings: x.coords, type: AV.exclusionType(strProp(x.props, ['type', 'btype', 'mode', 'exclusion']), defT), height: isFinite(hh) && hh >= 0 ? hh : defH, porosity: pp > 0 && pp <= 1 ? pp : defP }; }) : [];
       const zones = [];
@@ -240,7 +242,7 @@
       const rec = AV.meshRecStep(m, mesh); const cur = parseFloat(f.ROUTING_STEP) > 0 ? parseFloat(f.ROUTING_STEP) : parseFloat(m.options.ROUTING_STEP) || 0;
       await AV.alert('Mesh created (' + (tri ? 'unstructured' : 'square grid') + '):\n\n' + s.cells.toLocaleString() + ' cells' + (tri ? ' (' + s.triangles.toLocaleString() + ' triangles' + (s.quads ? ', ' + s.quads + ' small triangles merged into quadrilaterals' : '') + '; cell size ' : ' (') + boundary.map(b => b.size).join(', ') + ' ' + (mapU === 'NONE' ? 'map units' : mapU.toLowerCase()) + ')\n' + s.links.toLocaleString() + ' surface links\n' + s.couplings + ' manholes coupled to the surface' + (tagged.length ? ' (nodes tagged Link2D)' : '') + '\n' + s.outfalls + ' water-front outfalls' +
         (tri ? '\nSmallest triangle angle ' + s.minAngle + '°' + (s.below20 ? ' (' + s.below20 + ' triangles below 20°)' : '') + (zones.length ? '\n' + zones.length + ' mesh zones / break lines' : '') : '') +
-        (s.skippedExcl ? '\n' + s.skippedExcl + (tri ? ' triangles' : ' cells') + ' removed by VOID exclusion polygons' : '') + (s.raised ? '\n' + s.raised + ' cells raised (RAISED exclusion polygons)' : '') + (s.porous ? '\n' + s.porous + ' porous cells (POROUS exclusion polygons)' : '') +
+        (s.skippedExcl ? '\n' + s.skippedExcl + (tri ? ' triangles' : ' cells') + ' removed by VOID exclusion polygons' : '') + (s.raised ? '\n' + s.raised + ' cells raised (RAISED exclusion polygons)' : '') + (s.porous ? '\n' + s.porous + ' porous cells (POROUS exclusion polygons)' : '') + (s.smallBuildings ? '\n' + s.smallBuildings.toLocaleString() + ' buildings smaller than a quarter of a cell: they reduce the area and flow width of their cells instead of shaping the mesh' : '') +
         (s.skippedNoData ? '\n' + s.skippedNoData + ' cells skipped (no DEM data)' : '') + (rec ? '\n\nShortest surface links about ' + AV.fmt(rec.len, 1) + ' ' + (AV.f2dRun(m).si ? 'm' : 'ft') + ': a 2D routing step of ' + rec.step + ' s or less is recommended (now ' + (cur || '-') + ' s).' : '') +
         (mp ? '\n\nSaved to ' + mp : '\n\nSave the model to keep the mesh.') + '\n\nRun the simulation to compute the 1D-2D flooding.', 'Create Meshes');
       if (rec && cur > rec.step * 1.25 && await AV.confirm('The 2D routing step (' + cur + ' s) is long for the smallest cells of this mesh; runs may not converge or may lose water. Set the 2D routing step to ' + rec.step + ' s?', 'Create Meshes', 'Set ' + rec.step + ' s', 'Keep ' + cur + ' s')) {
@@ -529,7 +531,7 @@
     const feats = mesh.cells.map((c, k) => { const hs = c.s / 2; const props = { id: c.id, elev: c.elev };
       for (const [f, nm, d] of RF) { const v = app.meshResults ? AV.cellValue(app, k, f) : null; props[nm] = v === null || !isFinite(v) ? (f === 'arrival' || f === 'tmax' ? -1 : 0) : +v.toFixed(d); }
       if (app.meshResults) props.hzclass = props.hazard > 0 ? AV.hazardClass(props.hazard) : '';
-      props.area = +AV.cellArea(c).toFixed(3); props.btype = c.bt === 1 ? 'RAISED' : c.bt === 2 ? 'POROUS' : '';
+      props.area = +AV.cellArea(c).toFixed(3); props.btype = c.bt === 1 ? 'RAISED' : c.bt === 2 ? 'POROUS' : c.bt === 3 ? 'SMALL' : '';
       if (!mesh.verts) return { coords: [[[c.x - hs, c.y - hs], [c.x - hs, c.y + hs], [c.x + hs, c.y + hs], [c.x + hs, c.y - hs], [c.x - hs, c.y - hs]]], props };
       const P = AV.cellPoly(c).slice().reverse(); P.push(P[0].slice()); return { coords: [P], props }; });
     const fields = [{ name: 'id', type: 'C', len: 20 }, { name: 'elev', type: 'N', len: 18, dc: 4 }, { name: 'area', type: 'N', len: 18, dc: 3 }, { name: 'btype', type: 'C', len: 8 }].concat(RF.map(([f, nm, d]) => ({ name: nm, type: 'N', len: 18, dc: d })), app.meshResults ? [{ name: 'hzclass', type: 'C', len: 20 }] : []);
@@ -586,7 +588,7 @@
     const L = AV.meshSI(app) ? 'm' : 'ft'; const f = (v, d) => v === null || v === undefined || !isFinite(v) ? '-' : AV.fmt(v, d);
     el.appendChild(h('div', { class: 'phead' }, h('div', { class: 'pt' }, '2D Cell ' + c.id), h('div', { class: 'ps' }, 'X ' + AV.fmt(c.x, 2) + '   Y ' + AV.fmt(c.y, 2))));
     const rows = [['Ground Elevation (' + L + ')', f(c.elev, 3)], app.mesh2d.verts ? ['Cell Area (map units²)', f(AV.cellArea(c), 1) + (c.v ? (c.v.length === 3 ? '  (triangle)' : '  (' + c.v.length + ' sides)') : '')] : ['Cell Size (map units)', f(c.s)], ['Roughness (n)', f(c.n, 4)], ['Connected Neighbours', String(c.deg)]];
-    if (c.bt) rows.push(['Building', c.bt === 1 ? 'Raised (exclusion polygon)' : 'Porous, porosity ' + f(c.por, 2)]);
+    if (c.bt) rows.push(['Building', c.bt === 1 ? 'Raised (exclusion polygon)' : c.bt === 3 ? 'Small buildings inside: open area ' + f(c.por * 100, 0) + ' %' : 'Porous, porosity ' + f(c.por, 2)]);
     const MR = app.meshResults; const V = AV.meshUnit(app, 'vel'), DV = AV.meshUnit(app, 'dv'); const hr = MR ? AV.cellValue(app, k, 'hazard') : null;
     const res = MR ? [['Max. Depth (' + L + ')', f(AV.cellValue(app, k, 'maxdepth'), 3)], ['Max. Water Surface Elev. (' + L + ')', f(c.elev + (AV.cellValue(app, k, 'maxdepth') || 0), 3)],
       ['Max. Velocity (' + V + ')', f(AV.cellValue(app, k, 'maxvel'), 3)], ['Max. Depth x Velocity (' + DV + ')', f(AV.cellValue(app, k, 'dv'), 3)],

@@ -256,7 +256,7 @@
   const ptab = (rows) => h('table', { class: 'pgrid pdtab' }, h('tr', { class: 'pg1' }, h('td', null, 'Property'), h('td', null, 'Value')), rows.map(([l, el]) => h('tr', null, h('td', { class: 'k' }, l), h('td', { class: 'v' }, el))));
   // replace the rows of one object in a section (others kept in place)
   const replaceRows = (m, sec, id, lines, col) => { const all = m.raw[sec] || []; const out = []; let put = false;
-    for (const l of all) { if (isData(l) && tok(l)[col || 0] === id) { if (!put) { out.push(...lines); put = true; } continue; } out.push(l); } if (!put) out.push(...lines); return out; };
+    for (const l of all) { if (isData(l) && tok(l)[col || 0] === id) { if (!put) { AV.pushAll(out, lines); put = true; } continue; } out.push(l); } if (!put) AV.pushAll(out, lines); return out; };
 
   // ------------------------------------------------------------------ Direct Inflows (one row per constituent)
   AV.inflowsEditor = async function (app, node) {

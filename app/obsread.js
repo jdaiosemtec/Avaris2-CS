@@ -113,7 +113,7 @@ function detect(sample, file, opts) {
   else if (hi0 > 0 && H[hi0 - 1].some(Boolean) && H[hi0 - 1].every(isUnitCell)) unitsRow = H[hi0 - 1];
   const hdr = hi0 >= 0 ? H[hi0] : []; const preamble = H.filter((r, i) => i !== hi0 && r !== unitsRow).map(r => r.join(' ')).join(' ');
   const data = rows.slice(head, head + 200); if (!data.length) throw new Error('No data rows found.');
-  const nc = Math.max(...data.map(r => r.length));
+  let nc = 0; for (const r of data) if (r.length > nc) nc = r.length;
   // time columns: cells that parse as date / time / Excel date
   const timeCols = []; let dateFmt = '';
   for (let c = 0; c < Math.min(nc, 4); c++) { const vals = data.map(r => r[c]).filter(x => x !== '' && x !== undefined);
@@ -160,7 +160,7 @@ async function readObserved(file, opts = {}) {
 async function readRows(label, rowsIt, opts, delim, realFile) {
   const sample = []; const buf = [];
   for (let k = 0; k < 260; k++) { const n = await rowsIt.next(); if (n.done) break; buf.push(n.value); }
-  sample.push(...buf);
+  for (const x of buf) sample.push(x);
   const D = detect(sample, realFile, opts);
   const nT = D.timeCols.length; const isGage = D.layout === 'gage';
   // per-row time parts are kept until the day/month order is known

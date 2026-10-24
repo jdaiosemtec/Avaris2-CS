@@ -34,8 +34,10 @@
       if (r.code !== 0 && /RS/.test(r.stderr || '')) { const i = args.indexOf('RS=NO'); args.splice(i - 1, 2); r = await window.host.gdal('ogr2ogr', args); }
       if (r.code !== 0) fail(r, 'Could not read ' + layer);
       const lines = await window.host.readLines(out); const features = [];
-      for (const l of lines) { try { const f = JSON.parse(l); if (f && f.type === 'Feature') features.push(f); else if (f && f.type === 'FeatureCollection') features.push(...f.features); } catch (e) { /* skip a broken line */ } }
-      const L = AV.SHP.readGeoJSON({ type: 'FeatureCollection', features }); L.prjWKT = wkt || null; return L;
+      for (const l of lines) { try { const f = JSON.parse(l); if (f && f.type === 'Feature') features.push(f); else if (f && f.type === 'FeatureCollection') for (const g of f.features) features.push(g); } catch (e) { /* skip a broken line */ } }
+      // GeoJSONSeq is always written in WGS 84 longitude / latitude (RFC 7946), whatever the CRS of the layer;
+      // a layer without a CRS is written unchanged
+      const L = AV.SHP.readGeoJSON({ type: 'FeatureCollection', features }); L.prjWKT = wkt ? AV.Proj.presetWKT('GEO') : null; return L;
     } finally { window.host.rm(tmp).catch(() => { }); }
   };
   // write feature classes: layers [{name, kind:'point'|'line'|'polygon', feats:[{coords, props}], fields:[{key,name,type:'N'|'C'}]}]

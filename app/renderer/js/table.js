@@ -206,7 +206,7 @@
       const vals = objs.map(o => parseFloat(c.get(o))).filter(isFinite);
       if (!vals.length) { AV.alert('No numeric values in this column.'); return; }
       const n = vals.length, sum = vals.reduce((a, b) => a + b, 0), mean = sum / n, sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / n);
-      AV.alert(`Field: ${c.l}\nRows: ${objs.length === this.rows.objs.length ? 'all' : 'selected'} (${n} numeric)\n\nMinimum: ${AV.fmt(Math.min(...vals))}\nMaximum: ${AV.fmt(Math.max(...vals))}\nMean: ${AV.fmt(mean)}\nSum: ${AV.fmt(sum)}\nStd. deviation: ${AV.fmt(sd)}`, 'Statistics');
+      AV.alert(`Field: ${c.l}\nRows: ${objs.length === this.rows.objs.length ? 'all' : 'selected'} (${n} numeric)\n\nMinimum: ${AV.fmt(AV.amin(vals))}\nMaximum: ${AV.fmt(AV.amax(vals))}\nMean: ${AV.fmt(mean)}\nSum: ${AV.fmt(sum)}\nStd. deviation: ${AV.fmt(sd)}`, 'Statistics');
     }
     async calculator(c) {
       const keys = this.rows.cols.filter(x => x.num).map(x => x.k.replace(/^_/, ''));

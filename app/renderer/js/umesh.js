@@ -63,13 +63,20 @@
     const lf = opt.lenFactor || 1; const t0 = Date.now(); const D = AV.Delaunator || (typeof Delaunator !== 'undefined' ? Delaunator : null);
     if (!D) throw new Error('Delaunator is not loaded.');
     const Bnd = opt.boundary.map((b, bi) => ({ rings: b.rings, h: b.size * SQ, n: b.n, bi }));
-    const excl = (opt.exclusion || []).map(e => Array.isArray(e) ? { rings: e, type: 'VOID' } : e);
-    const voids = excl.filter(e => e.type === 'VOID'), others = excl.filter(e => e.type !== 'VOID');
     const zones = opt.zones || [];
-    let hmin = Math.min(...Bnd.map(b => b.h)), hmax = Math.max(...Bnd.map(b => b.h));
+    let hmin = Infinity, hmax = -Infinity; for (const b of Bnd) { hmin = Math.min(hmin, b.h); hmax = Math.max(hmax, b.h); }
     for (const z of zones) if (z.size > 0) { hmin = Math.min(hmin, z.size * SQ); hmax = Math.max(hmax, z.size * SQ); }
     const all = bboxOf(Bnd.flatMap(b => b.rings)); const W0 = all[2] - all[0], H0 = all[3] - all[1];
-    const bIdx = polyIndex(Bnd, Math.max(hmax * 4, Math.max(W0, H0) / 64)); const vIdx = polyIndex(voids, Math.max(hmax, Math.max(W0, H0) / 256)); const oIdx = polyIndex(others, Math.max(hmax, Math.max(W0, H0) / 256));
+    const bIdx = polyIndex(Bnd, Math.max(hmax * 4, Math.max(W0, H0) / 64));
+    // exclusion polygons: outside the boundary box dropped; buildings smaller than a quarter of a cell do not shape the
+    // mesh (that would need very small cells around each of them): they reduce the area and flow width of the cell
+    // that contains them instead (VOID / RAISED: blocked area; POROUS: area x (1 - porosity))
+    const ringArea = (r) => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return Math.abs(a / 2); };
+    const excl = [], small = [];
+    for (const e0 of opt.exclusion || []) { const e = Array.isArray(e0) ? { rings: e0, type: 'VOID' } : e0; const b = bboxOf(e.rings); if (b[2] < all[0] || b[0] > all[2] || b[3] < all[1] || b[1] > all[3]) continue;
+      const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2; const bi = bIdx.at(cx, cy); const hb = bi >= 0 ? Bnd[bi].h : hmin; const A = ringArea(e.rings[0] || []);
+      if (A < 0.25 * hb * hb * Math.sqrt(3) / 4) { if (bi >= 0) small.push({ x: cx, y: cy, a: A, type: e.type, porosity: e.porosity }); } else excl.push(e); }
+    const voids = excl.filter(e => e.type === 'VOID'), others = excl.filter(e => e.type !== 'VOID'); const vIdx = polyIndex(voids, Math.max(hmax, Math.max(W0, H0) / 256)); const oIdx = polyIndex(others, Math.max(hmax, Math.max(W0, H0) / 256));
     const domain = (x, y) => { const b = bIdx.at(x, y); if (b < 0) return -1; if (voids.length && vIdx.at(x, y) >= 0) return -2; return b; };
     // ---- 1. size field on a background grid
     let g = hmin / 2; if ((W0 / g) * (H0 / g) > 4e6) g = Math.sqrt(W0 * H0 / 4e6);
@@ -151,11 +158,16 @@
     let qi = grow(0); for (let k = 0; k < nFixed; k++) queue.push(k); grow(qi);
 
     // ---- 3. triangulation, constraint recovery, smoothing
-    let tri = null; const ekey = (a, b) => a < b ? a * 4194304 + b : b * 4194304 + a;
+    let tri = null; const ekey = (a, b) => a < b ? a * 16777216 + b : b * 16777216 + a;
     const triangulate = () => { const c = new Float64Array(2 * X.length); for (let k = 0; k < X.length; k++) { c[2 * k] = X[k]; c[2 * k + 1] = Y[k]; } tri = new D(c).triangles; };
     const recover = () => { for (let round = 0; round < 8; round++) { triangulate(); const E = new Set(); for (let t = 0; t < tri.length; t += 3) { E.add(ekey(tri[t], tri[t + 1])); E.add(ekey(tri[t + 1], tri[t + 2])); E.add(ekey(tri[t + 2], tri[t])); }
         const miss = []; for (let k = 0; k < pieces.length; k++) if (!E.has(ekey(pieces[k][0], pieces[k][1]))) miss.push(k); if (!miss.length) return 0; if (round === 7) return miss.length;
-        for (const k of miss) { const [p, q, kind] = pieces[k]; const m = addPt((X[p] + X[q]) / 2, (Y[p] + Y[q]) / 2, true); pieces[k] = [p, m, kind]; pieces.push([m, q, kind]); } } return 0; };
+        // split at the midpoint; pieces that are already short (crossing or touching outlines, e.g. buildings that share
+        // a wall) are given up, so the number of points cannot run away
+        let split = 0;
+        for (const k of miss) { const [p, q, kind] = pieces[k]; const mx = (X[p] + X[q]) / 2, my = (Y[p] + Y[q]) / 2; const hh = hAt(mx, my); if (Math.hypot(X[q] - X[p], Y[q] - Y[p]) < 0.3 * hh || near(mx, my, 0.15 * hh) >= 0) continue;
+          const m = addPt(mx, my, true); pieces[k] = [p, m, kind]; pieces.push([m, q, kind]); split++; }
+        if (!split) return miss.length; } return 0; };
     if (opt.progress) opt.progress('Triangulating ' + X.length.toLocaleString() + ' points…');
     recover();
     // Laplacian smoothing of the free points (3 passes), then triangulate again
@@ -183,7 +195,7 @@
       if (!cand.length) continue; cand.sort((a, b) => b[0] - a[0]); const [, p, q, r, C] = cand[0]; const V = cells0[C].v; const n = V.length;
       let at = -1; for (let i = 0; i < n; i++) if (V[i] === q && V[(i + 1) % n] === p) { at = i; break; } if (at < 0) continue;
       V.splice(at + 1, 0, r); cells0[k].alive = false; t.cell = C; }
-    { const nw = new Int32Array(cells0.length).fill(-1); const out = []; cells0.forEach((c, k) => { if (c.alive) { nw[k] = out.length; out.push(c); } }); for (const t of T) t.cell = nw[t.cell]; cells0.length = 0; cells0.push(...out); }
+    { const nw = new Int32Array(cells0.length).fill(-1); const out = []; cells0.forEach((c, k) => { if (c.alive) { nw[k] = out.length; out.push(c); } }); for (const t of T) t.cell = nw[t.cell]; cells0.length = 0; for (const c of out) cells0.push(c); }
 
     // ---- 5. cells: centroid, area, elevation, building type
     if (opt.progress) opt.progress('Cell elevations…');
@@ -197,15 +209,24 @@
       if (others.length) { const o = oIdx.at(cx, cy); if (o >= 0) { const E = others[o]; if (E.type === 'RAISED') { c.elev += (E.height > 0 ? E.height : 0) * lf; c.bt = 1; nRaised++; } else if (E.type === 'POROUS') { c.por = E.porosity > 0 && E.porosity <= 1 ? E.porosity : 0.5; c.bt = 2; nPorous++; } } }
       c.elev = +c.elev.toFixed(4); cellNew[k] = cells.length; cells.push(c); });
     cells.forEach((c, k) => { c.id = '2D_' + (k + 1); });
+    // cell locator
+    const cB = Math.max(hmax * 1.5, Math.max(W0, H0) / 2048); const cix = new Map();
+    cells.forEach((c, k) => { let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const i of c.v) { x1 = Math.min(x1, X[i]); x2 = Math.max(x2, X[i]); y1 = Math.min(y1, Y[i]); y2 = Math.max(y2, Y[i]); }
+      for (let i = Math.floor(x1 / cB); i <= Math.floor(x2 / cB); i++) for (let j = Math.floor(y1 / cB); j <= Math.floor(y2 / cB); j++) { const key = i * 1e7 + j; let a = cix.get(key); if (!a) cix.set(key, a = []); a.push(k); } });
+    const cellAt = (x, y) => { const a = cix.get(Math.floor(x / cB) * 1e7 + Math.floor(y / cB)); if (!a) return null; for (const k of a) { const c = cells[k]; if (pip(x, y, c.v.map(i => [X[i], Y[i]]))) return c; } return null; };
+    // small buildings: blocked area of their cell
+    let nSmall = 0; const blocked = new Float64Array(cells.length);
+    for (const b of small) { const c = cellAt(b.x, b.y); if (!c) continue; nSmall++; blocked[c.k] += b.type === 'POROUS' ? b.a * (1 - (b.porosity > 0 && b.porosity <= 1 ? b.porosity : 0.5)) : b.a; }
+    for (const c of cells) if (blocked[c.k] > 0) { c.por = Math.max(0.1, c.por * (1 - blocked[c.k] / c.A)); if (!c.bt) c.bt = 3; }
 
     // ---- 6. faces between cells -> links
     const cutIdx = cutSegs.length ? segIndex(cutSegs, Math.max(hmax * 2, Math.max(W0, H0) / 256)) : null;
     const faces = new Map(); // pair key -> { a, b, Ta, Tb, len (edge) }
     const triArea = (px, py, ax, ay, bx, by) => Math.abs((ax - px) * (by - py) - (bx - px) * (ay - py)) / 2;
     for (const [key, o] of ET) { if (!Array.isArray(o)) continue; const ca = cellNew[T[o[0]].cell], cb = cellNew[T[o[1]].cell]; if (ca < 0 || cb < 0 || ca === cb) continue;
-      if (cutPiece.has(key)) continue; const p = Math.floor(key / 4194304), q = key % 4194304; const A = cells[ca], B = cells[cb];
+      if (cutPiece.has(key)) continue; const p = Math.floor(key / 16777216), q = key % 16777216; const A = cells[ca], B = cells[cb];
       if (cutIdx && cutIdx.crosses(A.x, A.y, B.x, B.y)) continue;
-      const a = Math.min(ca, cb), b = Math.max(ca, cb); const ck = a * 4194304 + b; let f = faces.get(ck); if (!f) faces.set(ck, f = { a, b, Ta: 0, Tb: 0, e: 0 });
+      const a = Math.min(ca, cb), b = Math.max(ca, cb); const ck = a * 16777216 + b; let f = faces.get(ck); if (!f) faces.set(ck, f = { a, b, Ta: 0, Tb: 0, e: 0 });
       f.Ta += triArea(cells[a].x, cells[a].y, X[p], Y[p], X[q], Y[q]); f.Tb += triArea(cells[b].x, cells[b].y, X[p], Y[p], X[q], Y[q]); f.e += Math.hypot(X[p] - X[q], Y[p] - Y[q]); }
     const sumT = new Float64Array(cells.length); for (const f of faces.values()) { sumT[f.a] += f.Ta; sumT[f.b] += f.Tb; cells[f.a].deg++; cells[f.b].deg++; }
     const links = []; let k2 = 0;
@@ -214,11 +235,7 @@
       const w = (f.Ta + f.Tb) / L * lf * p; let len = plan / w; len = Math.max(len, 0.25 * L * lf);
       links.push({ id: '2DL_' + (++k2), a: A.id, b: B.id, len: +len.toFixed(4), w: +w.toFixed(4), n: Math.max(A.n, B.n) }); }
 
-    // ---- 7. cell locator, water-front outfalls, 1D couplings
-    const cB = Math.max(hmax * 1.5, Math.max(W0, H0) / 2048); const cix = new Map();
-    cells.forEach((c, k) => { let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const i of c.v) { x1 = Math.min(x1, X[i]); x2 = Math.max(x2, X[i]); y1 = Math.min(y1, Y[i]); y2 = Math.max(y2, Y[i]); }
-      for (let i = Math.floor(x1 / cB); i <= Math.floor(x2 / cB); i++) for (let j = Math.floor(y1 / cB); j <= Math.floor(y2 / cB); j++) { const key = i * 1e7 + j; let a = cix.get(key); if (!a) cix.set(key, a = []); a.push(k); } });
-    const cellAt = (x, y) => { const a = cix.get(Math.floor(x / cB) * 1e7 + Math.floor(y / cB)); if (!a) return null; for (const k of a) { const c = cells[k]; if (pip(x, y, c.v.map(i => [X[i], Y[i]]))) return c; } return null; };
+    // ---- 7. water-front outfalls, 1D couplings
     const outfalls = []; let ko = 0;
     for (const C of opt.coast || []) { let ch = 0, next = null;
       for (let k = 1; k < C.pts.length; k++) { const a = C.pts[k - 1], b = C.pts[k]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (next === null) next = hAt(a[0], a[1]) / SQ;
@@ -238,8 +255,8 @@
     return { version: 2, type: 'tri', created: new Date().toISOString(), lenFactor: lf, verts,
       cells: cells.map(c => { const o = { id: c.id, x: +c.x.toFixed(4), y: +c.y.toFixed(4), s: +Math.sqrt(c.A).toFixed(4), a: +c.A.toFixed(3), v: c.v, elev: c.elev, n: c.n, deg: c.deg }; if (c.bt) o.bt = c.bt; if (c.por < 1) o.por = c.por; return o; }),
       links, outfalls, couplings,
-      stats: { cells: cells.length, links: links.length, outfalls: outfalls.length, couplings: couplings.length, skippedNoData, skippedExcl, raised: nRaised, porous: nPorous, points: X.length, missingConstraints: missing,
+      stats: { cells: cells.length, links: links.length, outfalls: outfalls.length, couplings: couplings.length, skippedNoData, skippedExcl, raised: nRaised, porous: nPorous, smallBuildings: nSmall, points: X.length, missingConstraints: missing,
         triangles: T.length, quads: cells.filter(c => c.v.length > 3).length, minAngle: +minAng.toFixed(1), below20: bad, seconds: (Date.now() - t0) / 1000 } };
   };
-  AV.UMESH_SQ = SQ;
+  AV.UMESH_SQ = SQ; AV.polyIndex = polyIndex;
 })(typeof window !== 'undefined' ? window.AV : module.exports);

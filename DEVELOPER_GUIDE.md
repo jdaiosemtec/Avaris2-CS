@@ -483,3 +483,9 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - `calib.js` `open()`：不再用 `app.addView`，而是 `.calback`（z-index 900，低于 `.modal-back` 2000 和 `.fpanel` 1500）里的 `.calwin`（全窗口减 24 px）；`close()` 运行中只隐藏、有改动时问是否保存；`toMap(text, onPick)` 隐藏弹窗并在地图底部显示 `.calmapbar`，`onPick` 订阅 `app.on('selection')`，取第一个选中对象后恢复弹窗。
 - `chart.js` 图例按文字宽度从左到右排列，宽度不够换行，底部留白按行数计算。
 - `calib2.js` `drawResChart`：Current model 最后画（虚线在上）；方案与当前模型在该监测点的最大差 ≤ 0.5 % 时显示说明。
+
+## 22. 2.9.3
+
+- 不要把大数组展开传参（`Math.min(...a)`、`push(...a)`）：超过约 10 万个元素就会 "Maximum call stack size exceeded"。用 `AV.amin / AV.amax / AV.pushAll`（util.js），主进程 cplmerge.js 有自己的 `pushAll`。
+- umesh.js：面积 < 1/4 单元面积的建筑不作为约束，按质心找所在单元，累计遮挡面积，单元 `por` = 1 − 遮挡/面积（下限 0.1，`bt` = 3）；约束边恢复时短于 0.3 h 或中点附近已有点的不再细分。
+- gdb.js：GeoJSONSeq 输出固定是 WGS 84 经纬度，`prjWKT` 设为 GEO（2.9.2 误设为图层坐标系，位置错）。`AV.loadDataFile(app, path, { box })` 对 2 万要素以上的 GDB 图层只读框内（Create Meshes 读排除多边形时用 2D 边界框）。

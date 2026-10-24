@@ -136,6 +136,10 @@ window.AV = window.AV || {};
   };
 
   // ---------------------------------------------------------- formatting
+  // min / max / push for arrays of any length (spreading a large array into a call overflows the call stack)
+  AV.amin = (a) => { let m = Infinity; for (const v of a) if (v < m) m = v; return m; };
+  AV.amax = (a) => { let m = -Infinity; for (const v of a) if (v > m) m = v; return m; };
+  AV.pushAll = (to, a) => { for (const v of a) to.push(v); return to; };
   AV.fmt = (v, d) => {
     if (v === null || v === undefined || v === '') return '';
     if (typeof v !== 'number') { const x = parseFloat(v); if (!isFinite(x) || String(x) !== String(v).trim()) return String(v); v = x; }

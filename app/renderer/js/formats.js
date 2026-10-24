@@ -254,12 +254,14 @@
     if (!L.corners) throw new Error('The DEM has no georeferencing (no GeoTIFF tags and no world file).');
     return L;
   };
-  AV.loadDataFile = async function (app, path) {
+  // opts.box: [x1, y1, x2, y2] in the map coordinates: a large geodatabase feature class is read only inside it
+  AV.loadDataFile = async function (app, path, opts) {
     if (AV.GDB.isGdbLayerPath(path)) {
-      const { gdb, layer } = AV.GDB.splitPath(path); const opts = {};
+      const { gdb, layer } = AV.GDB.splitPath(path); const gopts = opts || {}; opts = gopts;
       // very large feature classes (e.g. all buildings of a state): offer to read only the model area
       try { const ls = AV.GDB._cache[gdb] || await AV.GDB.listLayers(gdb); const d = ls.find(x => x.name === layer); const b = app.model && app.model.bounds(false);
-        if (d && d.count > 100000 && b && b.x2 > b.x1) { const mx = Math.max(b.x2 - b.x1, b.y2 - b.y1) * 0.15;
+        if (opts && opts.box && d && d.count > 20000) { opts.spat = opts.box; if (app.crsWKT) opts.spatWKT = app.crsWKT; }
+        else if (d && d.count > 100000 && b && b.x2 > b.x1) { const mx = Math.max(b.x2 - b.x1, b.y2 - b.y1) * 0.15;
           const v = await AV.modal({ title: 'Add Data', body: AV.h('div', { style: { maxWidth: '520px', lineHeight: 1.5, whiteSpace: 'pre-wrap' } }, layer + ' has ' + d.count.toLocaleString() + ' features. Reading all of them takes long and makes the map slow.\n\nRead only the features in the model area (with a margin of 15 %)?'), buttons: [{ label: 'Cancel', value: null }, { label: 'All ' + d.count.toLocaleString(), value: 'all' }, { label: 'Model Area Only', primary: true, value: 'area' }] }).done;
           if (!v) throw new Error('cancelled'); if (v === 'area') { opts.spat = [b.x1 - mx, b.y1 - mx, b.x2 + mx, b.y2 + mx]; if (app.crsWKT) opts.spatWKT = app.crsWKT; } } }
       catch (e) { if (e.message === 'cancelled') throw new Error('Cancelled.'); }

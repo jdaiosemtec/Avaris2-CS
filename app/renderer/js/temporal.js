@@ -71,7 +71,7 @@
     const WH = new Set(['totdur', 'maxrun', 'maxwin', 'first', 'peak']);
     const pending = (nd) => (nd.children || []).some(c => { const s = T.stores.get(keyOf(R, c)); return (WH.has(c.fn) && !(s && s.done)) || pending(c); });
     const all = T.queue.splice(0).sort((a, b) => a.depth - b.depth);
-    const nodes = all.filter(nd => !pending(nd)); T.queue.push(...all.filter(nd => pending(nd)));
+    const nodes = all.filter(nd => !pending(nd)); AV.pushAll(T.queue, all.filter(nd => pending(nd)));
     if (!nodes.length) { T.queue.length = 0; return; }
     const n = R.meta.nPeriods, stepMin = R.meta.reportStep / 60; const m = app.model;
     const objsOf = (k) => [...(k === 'node' ? m.nodes.values() : k === 'link' ? m.links.values() : m.subcatchments.values())];

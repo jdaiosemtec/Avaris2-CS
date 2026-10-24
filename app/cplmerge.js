@@ -1,6 +1,7 @@
 // Coupled parallel run: merge the results of the sub-models into one .out / .rpt with the objects of the master
 // model (Avaris2 CS front end and the web digital twin read one file, as for a normal run).
 'use strict';
+const pushAll = (to, a) => { for (const v of a) to.push(v); return to; }; // no spread: reports of large models have many lines
 const fs = require('fs');
 const OutReader = require('./outreader');
 
@@ -159,24 +160,24 @@ function mergeReport(job, cplVolFt3) {
   let errs = { runoff: 0, flow: 0 };
   for (const title of titles) {
     const bl = R.map(r => r.blocks.find(b => b.title === title)).filter(Boolean);
-    if (/Continuity/.test(title)) { const routing = !/Runoff/.test(title); const m = mergeContinuity(bl, /Flow Routing/.test(title) ? cplVol : null, routing); out.push(...m.lines);
+    if (/Continuity/.test(title)) { const routing = !/Runoff/.test(title); const m = mergeContinuity(bl, /Flow Routing/.test(title) ? cplVol : null, routing); pushAll(out, m.lines);
       if (/Runoff Quantity/.test(title)) errs.runoff = m.err; if (/Flow Routing/.test(title)) errs.flow = m.err; continue; }
-    if (/Analysis Options|Element Count|Routing Time Step Summary|Pollutant Summary|Landuse Summary|Raingage Summary/.test(title)) { out.push(...bl[0].lines); continue; }
+    if (/Analysis Options|Element Count|Routing Time Step Summary|Pollutant Summary|Landuse Summary|Raingage Summary/.test(title)) { pushAll(out, bl[0].lines); continue; }
     // lists "  Node J_1 (1.23%)"
     if (bl[0].lines.slice(3).some(l => /^\s+(Node|Link|Subcatchment)\s+\S+\s+\(/.test(l))) {
       const rows = []; R.forEach((r, p) => { const b = r.blocks.find(x => x.title === title); if (!b) return; for (const l of b.lines.slice(3)) { const m = /^\s+(Node|Link|Subcatchment)\s+(\S+)\s+\(([-\d.]+)/.exec(l); if (m && !bnd[p].has(m[2])) rows.push([num(m[3]), l]); } });
-      rows.sort((a, b) => b[0] - a[0]); out.push(...bl[0].lines.slice(0, 3), ...rows.slice(0, 50).map(r => r[1]), '', ''); continue;
+      rows.sort((a, b) => b[0] - a[0]); pushAll(out, bl[0].lines.slice(0, 3)); pushAll(out, rows.slice(0, 50).map(r => r[1])); out.push('', ''); continue;
     }
     // object tables: header up to the last dashed line, then one row per object
     const tb = bl.map(b => { let n = 0; for (let i = 3; i < Math.min(b.lines.length, 20); i++) if (/^\s+-{10,}/.test(b.lines[i]) && ++n === 2) return i; return -1; });
     const first = tb.findIndex(d => d >= 0);
-    if (first < 0) { out.push(...bl[0].lines); continue; }
+    if (first < 0) { pushAll(out, bl[0].lines); continue; }
     const rows = [];
     bl.forEach((b, j) => { const d = tb[j]; if (d < 0) return; const p = R.findIndex(r => r.blocks.includes(b));
       for (let i = d + 1; i < b.lines.length; i++) { const l = b.lines[i]; if (!l.trim()) break; if (/^\s+-{10,}/.test(l)) continue; const id = l.trim().split(/\s+/)[0];
         if (id === 'System' || bnd[p].has(id)) continue; rows.push([order.has(id) ? order.get(id) : 1e9, l]); } });
     rows.sort((a, b) => a[0] - b[0]);
-    out.push(...bl[first].lines.slice(0, tb[first] + 1), ...rows.map(r => r[1]), '', '');
+    pushAll(out, bl[first].lines.slice(0, tb[first] + 1)); pushAll(out, rows.map(r => r[1])); out.push('', '');
   }
   if (job.timing) out.push('', '  Analysis begun / ended: see the sub-model reports in ' + job.partsDir, '  Total elapsed time (coupled run): ' + job.timing);
   fs.writeFileSync(job.rpt, out.join('\n'), 'latin1');
