@@ -27,9 +27,15 @@
     let busy = false;
     const B = (l, fn, pri, dis) => h('button', { class: 'btn small' + (pri ? ' primary' : ''), onclick: fn, disabled: !!dis }, l);
     const num = (k, w, attrs) => h('input', Object.assign({ type: 'number', value: V.S[k], style: { width: (w || 64) + 'px' }, onchange: (e) => { V.S[k] = +e.target.value; app.prefs.partition = V.S; app.savePrefs(); } }, attrs || {}));
+    // keep the scroll position of the panel and of the partition table when the panel is drawn again (row click etc.)
     const render = () => {
+      const q = (c) => root.querySelector(c); const ob = q('.fllist'), ot = q('.ptwrap'); const keep = ob ? [ob.scrollTop, ot ? ot.scrollTop : 0, ot ? ot.scrollLeft : 0] : null;
+      render0();
+      if (keep) { const nb = q('.fllist'), nt = q('.ptwrap'); if (nb) nb.scrollTop = keep[0]; if (nt) { nt.scrollTop = keep[1]; nt.scrollLeft = keep[2]; } }
+    };
+    const render0 = () => {
       root.innerHTML = '';
-      root.appendChild(h('div', { class: 'fltb' }, ['part', 'regen'].map(t => h('button', { class: 'btn small' + (V.tab === t ? ' primary' : ''), onclick: () => { V.tab = t; render(); } }, t === 'part' ? 'Partition' : 'Regenerate')),
+      root.appendChild(h('div', { class: 'fltb' }, ['part', 'regen'].map(t => h('button', { class: 'btn small' + (V.tab === t ? ' primary' : ''), onclick: () => { V.tab = t; render(); const sb = root.querySelector('.fllist'); if (sb) sb.scrollTop = 0; } }, t === 'part' ? 'Partition' : 'Regenerate')),
         h('span', { style: { flex: 1 } }), h('span', { class: 'flunit' }, app.model.nodes.size.toLocaleString() + ' nodes · ' + app.model.links.size.toLocaleString() + ' links')));
       const body = h('div', { class: 'fllist partp', style: { padding: '8px 12px 14px' } }); root.appendChild(body);
       if (V.tab === 'regen') { regenView(body); return; }

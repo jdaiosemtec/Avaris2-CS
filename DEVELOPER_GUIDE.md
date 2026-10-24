@@ -536,3 +536,9 @@ git add -A && git commit -m "vX.Y.Z: …" && git tag vX.Y.Z
 - 分区数大于本机物理核：不阻止（可能在别的电脑上跑）。`partpanel.go()` 只在 `n ≤ 物理核数` 时用 Detect 的两类速度权重，否则各分区等大；Machine 框的预计速度按 Detect 的最佳数 `pl.n` 计算；手动数字的提示与 partChecks / Split 的文字改为中性说明（"本机跑可合并或用 Detect 的数"）。全部只是提示，不阻止生成。
 - 验证：scratchpad 的 vm 脚本在 36 万节点模型上（big600.inp）partCompute 4 区 ~12 s；加权 8 区 + 拆分 3 + partRecut 正常（默认 node 栈）。旧代码在 partRecut 报同样错误。
 
+## 30. 2.10.2：分区面板保持滚动位置
+
+- `partpanel.js`：`render()` 改为外壳，先记下 `.fllist`（面板）和 `.ptwrap`（分区表）的 scrollTop / scrollLeft，调用原来的绘制 `render0()` 后恢复。点行高亮、Split / Merge 后重绘都不再跳回顶部；切换 Partition / Regenerate 标签时手动置顶。
+- `partition.js partChecks`：分区数 > 本机物理核时不输出"每个分区负载在 1xx % 内"一行（表里的 Load 仍按本机显示，核数那一行已说明）。
+- 分区计算耗时与 2.9.6 相同（vm 脚本在 4 万节点模型上对比：n=4 0.94 s vs 0.78 s，n=14 0.73 s vs 0.71 s）。
+
